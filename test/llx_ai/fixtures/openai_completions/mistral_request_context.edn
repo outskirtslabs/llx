@@ -1,0 +1,35 @@
+{:messages [{:role :user
+            :content "run tools"
+            :timestamp 1}
+           {:role :assistant
+            :content [{:type :tool-call
+                       :id "call_source_1"
+                       :name "vision"
+                       :arguments {:path "img-1.png"}}
+                      {:type :tool-call
+                       :id "call_source_2"
+                       :name "vision"
+                       :arguments {:path "img-2.png"}}]
+            :api :openai-responses
+            :provider :openai
+            :model "gpt-5-mini"
+            :usage {:input 1 :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                    :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+            :stop-reason :tool-use
+            :timestamp 2}
+           {:role :tool-result
+            :tool-call-id "call_source_1"
+            :tool-name "vision"
+            :content [{:type :image :data "aW1nMQ==" :mime-type "image/png"}]
+            :is-error? false
+            :timestamp 3}
+           {:role :tool-result
+            :tool-call-id "call_source_2"
+            :tool-name "vision"
+            :content [{:type :text :text "secondary"}
+                      {:type :image :data "aW1nMg==" :mime-type "image/png"}]
+            :is-error? false
+            :timestamp 4}
+           {:role :user
+            :content "continue"
+            :timestamp 5}]}

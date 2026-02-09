@@ -37,14 +37,25 @@
 
 (def google-model
   {:id             "gemini-2.5-flash"
-   :name           "Gemini 2.5 Flash"
-   :provider       :google
-   :api            :google-generative-ai
+  :name           "Gemini 2.5 Flash"
+  :provider       :google
+  :api            :google-generative-ai
    :base-url       "https://generativelanguage.googleapis.com/v1beta"
    :context-window 1048576
    :max-tokens     8192
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? true :input #{:text}}})
+
+(def mistral-model
+  {:id             "devstral-medium-latest"
+   :name           "Devstral Medium"
+   :provider       :mistral
+   :api            :openai-completions
+   :base-url       "https://api.mistral.ai/v1"
+   :context-window 128000
+   :max-tokens     8192
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
 
 (def demo-context
   {:messages [{:role :user :content "say hello from llx" :timestamp 1}]})
@@ -76,10 +87,18 @@
                 {:messages [{:role :user :content "reply with exactly: llx google demo ok" :timestamp 1}]}
                 {:max-output-tokens 96
                  :reasoning         {:level :high :effort :high :summary :detailed}})
+  (jvm/complete mistral-model
+                {:messages [{:role :user :content "reply with exactly: llx mistral demo ok" :timestamp 1}]}
+                {:max-output-tokens 96})
   (let [stream (jvm/stream google-model
                            {:messages [{:role :user :content "reply with exactly: llx google stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 96
                             :reasoning         {:level :high :effort :high :summary :detailed}})]
+    (event-stream/drain! stream)
+    (event-stream/result stream))
+  (let [stream (jvm/stream mistral-model
+                           {:messages [{:role :user :content "reply with exactly: llx mistral stream demo ok" :timestamp 1}]}
+                           {:max-output-tokens 96})]
     (event-stream/drain! stream)
     (event-stream/result stream))
   ;; Handoff: Anthropic -> Google
@@ -102,6 +121,26 @@
     (jvm/complete openai-model
                   {:messages [user1 step-1 user2]}
                   {:max-output-tokens 96
+                   :temperature       0.0}))
+  ;; Handoff: Google -> Mistral
+  (let [user1       {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
+        step-1      (jvm/complete google-model
+                                  {:messages [user1]}
+                                  {:max-output-tokens 96
+                                   :reasoning         {:level :high :effort :high :summary :detailed}})
+        user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (jvm/complete mistral-model
+                  {:messages [user1 step-1 user2]}
+                  {:max-output-tokens 128}))
+  ;; Handoff: Mistral -> OpenAI-compatible
+  (let [user1       {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
+        step-1      (jvm/complete mistral-model
+                                  {:messages [user1]}
+                                  {:max-output-tokens 96})
+        user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (jvm/complete ollama-model
+                  {:messages [user1 step-1 user2]}
+                  {:max-output-tokens 128
                    :temperature       0.0}))
   ;;
 

@@ -50,6 +50,28 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? true :input #{:text}}})
 
+(def mistral-model
+  {:id             (or (live-env/get-env "LLX_LIVE_MISTRAL_MODEL") "devstral-medium-latest")
+   :name           "Live Mistral handoff model"
+   :provider       :mistral
+   :api            :openai-completions
+   :base-url       (or (live-env/get-env "LLX_LIVE_MISTRAL_BASE_URL") "https://api.mistral.ai/v1")
+   :context-window 128000
+   :max-tokens     8192
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
+
+(def openai-compatible-model
+  {:id             (or (live-env/get-env "LLX_LIVE_OLLAMA_MODEL") "devstral-small-2:latest")
+   :name           "Live OpenAI-compatible handoff model"
+   :provider       :openai-compatible
+   :api            :openai-completions
+   :base-url       (or (live-env/get-env "LLX_LIVE_OLLAMA_BASE_URL") "http://localhost:11434/v1")
+   :context-window 32768
+   :max-tokens     4096
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
+
 (deftest live-handoff-openai-to-anthropic
   (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
         anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
@@ -210,6 +232,52 @@
               step-2 (client/complete openai-model {:messages [user1 step-1 user2]}
                                       {:api-key           openai-key
                                        :max-output-tokens 128})]
+          (is (not= :error (:stop-reason step-1)))
+          (is (not= :error (:stop-reason step-2)))
+          (is (seq (:content step-2)))
+          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
+
+(deftest live-handoff-google-to-mistral
+  (let [google-key  (live-env/get-env "GEMINI_API_KEY")
+        mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+    (if-not (and google-key mistral-key)
+      (is true "Skipping Google->Mistral handoff: GEMINI_API_KEY and MISTRAL_API_KEY required")
+      (testing "Google-produced context can continue on Mistral"
+        (let [user1  {:role      :user
+                      :content   "Give one short sentence about Clojure protocols."
+                      :timestamp 1}
+              step-1 (client/complete google-model {:messages [user1]}
+                                      {:api-key           google-key
+                                       :max-output-tokens 96
+                                       :reasoning         {:level :high :effort :high :summary :detailed}})
+              user2  {:role      :user
+                      :content   "Now say hi and summarize your prior sentence."
+                      :timestamp 2}
+              step-2 (client/complete mistral-model {:messages [user1 step-1 user2]}
+                                      {:api-key           mistral-key
+                                       :max-output-tokens 128})]
+          (is (not= :error (:stop-reason step-1)))
+          (is (not= :error (:stop-reason step-2)))
+          (is (seq (:content step-2)))
+          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
+
+(deftest live-handoff-mistral-to-openai-compatible
+  (let [mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+    (if-not mistral-key
+      (is true "Skipping Mistral->OpenAI-compatible handoff: MISTRAL_API_KEY required")
+      (testing "Mistral-produced context can continue on OpenAI-compatible"
+        (let [user1  {:role      :user
+                      :content   "Give one short sentence about Clojure macros."
+                      :timestamp 1}
+              step-1 (client/complete mistral-model {:messages [user1]}
+                                      {:api-key           mistral-key
+                                       :max-output-tokens 96})
+              user2  {:role      :user
+                      :content   "Now say hi and summarize your prior sentence."
+                      :timestamp 2}
+              step-2 (client/complete openai-compatible-model {:messages [user1 step-1 user2]}
+                                      {:max-output-tokens 128
+                                       :temperature       0.0})]
           (is (not= :error (:stop-reason step-1)))
           (is (not= :error (:stop-reason step-2)))
           (is (seq (:content step-2)))

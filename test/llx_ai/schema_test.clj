@@ -87,6 +87,18 @@
   (testing "accepts a valid model"
     (is (sut/valid? :llx/model valid-model)))
 
+  (testing "accepts supported openai-completions compat profile keys"
+    (is (sut/valid? :llx/model
+                    (assoc valid-model
+                           :api :openai-completions
+                           :compat {:token-field                           :max_tokens
+                                    :store?                                false
+                                    :supports-usage-stream?                false
+                                    :supports-strict-tools?                false
+                                    :requires-tool-result-name?            true
+                                    :requires-assistant-after-tool-result? false
+                                    :requires-thinking-as-text?            true}))))
+
   (testing "rejects unknown model keys"
     (is (not (sut/valid? :llx/model (assoc valid-model :unknown true))))))
 

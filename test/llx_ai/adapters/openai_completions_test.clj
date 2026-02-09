@@ -1,0 +1,222 @@
+(ns llx-ai.adapters.openai-completions-test
+  (:require
+   [babashka.json :as json]
+   [clojure.edn :as edn]
+   [clojure.test :refer [deftest is testing]]
+   [llx-ai.adapters.openai-completions :as sut]))
+
+(set! *warn-on-reflection* true)
+
+(def openai-model
+  {:id             "gpt-4o-mini"
+   :name           "GPT-4o Mini"
+   :provider       :openai
+   :api            :openai-completions
+   :base-url       "https://api.openai.com/v1"
+   :context-window 128000
+   :max-tokens     16384
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text :image}}})
+
+(def mistral-model
+  {:id             "devstral-medium-latest"
+   :name           "Devstral Medium"
+   :provider       :mistral
+   :api            :openai-completions
+   :base-url       "https://api.mistral.ai/v1"
+   :context-window 128000
+   :max-tokens     8192
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text :image}}})
+
+(def openai-compatible-model
+  {:id             "devstral-small-2:latest"
+   :name           "Ollama Devstral"
+   :provider       :openai-compatible
+   :api            :openai-completions
+   :base-url       "http://localhost:11434/v1"
+   :context-window 32768
+   :max-tokens     4096
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
+
+(defn- fixture
+  [name]
+  (-> (str "test/llx_ai/fixtures/openai_completions/" name ".edn")
+      slurp
+      edn/read-string))
+
+(defn- stub-env
+  ([]
+   (stub-env {}))
+  ([overrides]
+   (merge
+    {:http/request     (fn [_] {:status 200 :body "{}"})
+     :json/encode      json/write-str
+     :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/decode-safe (fn [s _opts]
+                         (try
+                           (json/read-str s {:key-fn keyword})
+                           (catch Exception _ nil)))
+     :clock/now-ms     (fn [] 1730000000000)
+     :id/new           (fn [] "generated-id")}
+    overrides)))
+
+(deftest build-request-forwards-tools-and-tool-choice-with-compat-token-field
+  (let [model   (assoc openai-model
+                       :compat {:token-field            :max_tokens
+                                :supports-strict-tools? false})
+        context {:messages [{:role :user :content "call ping" :timestamp 1}]
+                 :tools    [{:name         "ping"
+                             :description  "Ping tool"
+                             :input-schema [:map [:ok :boolean]]}]}
+        request (sut/build-request (stub-env) model context {:api-key "k" :max-output-tokens 256 :tool-choice "ping"} false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= 256 (:max_tokens payload)))
+    (is (nil? (:max_completion_tokens payload)))
+    (is (= {:type "function" :function {:name "ping"}}
+           (:tool_choice payload)))
+    (is (= "ping" (get-in payload [:tools 0 :function :name])))
+    (is (= false (contains? (get-in payload [:tools 0 :function]) :strict)))))
+
+(deftest build-request-tool-choice-sentinel-strings-pass-through
+  (let [base-context {:messages [{:role :user :content "call ping" :timestamp 1}]}
+        mk-payload   (fn [tool-choice]
+                       (-> (sut/build-request (stub-env) openai-model base-context
+                                              {:api-key "k" :tool-choice tool-choice}
+                                              false)
+                           :body
+                           (json/read-str {:key-fn keyword})))]
+    (is (= "auto" (:tool_choice (mk-payload "auto"))))
+    (is (= "none" (:tool_choice (mk-payload "none"))))
+    (is (= "required" (:tool_choice (mk-payload "required"))))))
+
+(deftest build-request-batches-tool-result-images-for-openai-completions
+  (let [context   (fixture "mistral_request_context")
+        request   (sut/build-request (stub-env) mistral-model context {:api-key "mistral-key"} false)
+        payload   (json/read-str (:body request) {:key-fn keyword})
+        messages  (:messages payload)
+        roles     (mapv :role messages)
+        tool-1    (nth messages 2)
+        tool-2    (nth messages 3)
+        image-msg (nth messages 4)
+        user-msg  (nth messages 5)]
+    (is (= ["user" "assistant" "tool" "tool" "user" "user"] roles))
+    (is (= "vision" (:name tool-1)))
+    (is (= "vision" (:name tool-2)))
+    (is (= "(see attached image)" (:content tool-1)))
+    (is (= "secondary" (:content tool-2)))
+    (is (= "Attached image(s) from tool result:" (get-in image-msg [:content 0 :text])))
+    (is (= 2 (count (filter #(= "image_url" (:type %)) (:content image-msg)))))
+    (is (= "continue" (:content user-msg)))))
+
+(deftest decode-event-stream-contract
+  (let [env       (stub-env)
+        chunks    (fixture "mistral_stream_events")
+        reduced   (reduce (fn [{:keys [state events]} chunk]
+                            (let [{next-state :state next-events :events}
+                                  (sut/decode-event env state (json/write-str chunk))]
+                              {:state  next-state
+                               :events (into events next-events)}))
+                          {:state  {:model mistral-model}
+                           :events []}
+                          chunks)
+        finalized (sut/finalize env (:state reduced))]
+    (is (= [:toolcall-start
+            :toolcall-delta
+            :toolcall-delta
+            :toolcall-end
+            :text-start
+            :text-delta]
+           (mapv :type (:events reduced))))
+    (is (= {:path "img-1.png"}
+           (get-in finalized [:assistant-message :content 0 :arguments])))
+    (is (= "done"
+           (get-in finalized [:assistant-message :content 1 :text])))
+    (is (= :stop
+           (get-in finalized [:assistant-message :stop-reason])))))
+
+(deftest normalize-tool-call-id-mistral-shape
+  (testing "normalization is deterministic 9-char alphanumeric"
+    (let [source   "call_with+symbols/and spaces"
+          first-id (sut/normalize-tool-call-id source mistral-model nil)
+          next-id  (sut/normalize-tool-call-id source mistral-model nil)]
+      (is (= first-id next-id))
+      (is (= 9 (count first-id)))
+      (is (re-matches #"[A-Za-z0-9]{9}" first-id)))))
+
+(deftest normalize-tool-call-id-mistral-avoids-collision-for-distinct-source-ids
+  (let [assistant-message {:role        :assistant
+                           :content     [{:type      :tool-call
+                                          :id        "call_abcdefgh1--with-extra"
+                                          :name      "one"
+                                          :arguments {}}
+                                         {:type      :tool-call
+                                          :id        "call_abcdefgh2--with-extra"
+                                          :name      "two"
+                                          :arguments {}}]
+                           :api         :openai-responses
+                           :provider    :openai
+                           :model       "gpt-5-mini"
+                           :usage       {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                                         :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                           :stop-reason :tool-use
+                           :timestamp   1}
+        id-1              (sut/normalize-tool-call-id "call_abcdefgh1--with-extra" mistral-model assistant-message)
+        id-2              (sut/normalize-tool-call-id "call_abcdefgh2--with-extra" mistral-model assistant-message)]
+    (is (= 9 (count id-1)))
+    (is (= 9 (count id-2)))
+    (is (re-matches #"[A-Za-z0-9]{9}" id-1))
+    (is (re-matches #"[A-Za-z0-9]{9}" id-2))
+    (is (not= id-1 id-2))))
+
+(deftest build-request-openai-compatible-omits-auth-and-respects-compat-overrides
+  (let [env     (stub-env)
+        model   (assoc openai-compatible-model
+                       :compat {:store?                 false
+                                :supports-usage-stream? false
+                                :supports-strict-tools? false})
+        req     (sut/build-request env model
+                                   {:messages [{:role :user :content "ping" :timestamp 1}]
+                                    :tools    [{:name         "ping"
+                                                :description  "Ping tool"
+                                                :input-schema [:map [:ok :boolean]]}]}
+                                   {:max-output-tokens 128}
+                                   true)
+        body    (json/read-str (:body req) {:key-fn keyword})
+        tool-fn (get-in body [:tools 0 :function])]
+    (is (= nil (get-in req [:headers "Authorization"])))
+    (is (nil? (:store body)))
+    (is (nil? (:stream_options body)))
+    (is (= 128 (:max_completion_tokens body)))
+    (is (= "ping" (:name tool-fn)))
+    (is (= false (contains? tool-fn :strict)))))
+
+(deftest build-request-reads-provider-specific-env-api-key
+  (let [env-openai  (stub-env {:env/get (fn [k]
+                                          (case k
+                                            "OPENAI_API_KEY" "openai-env-key"
+                                            nil))})
+        req-openai  (sut/build-request env-openai openai-model
+                                       {:messages [{:role :user :content "ping" :timestamp 1}]}
+                                       {}
+                                       false)
+        env-mistral (stub-env {:env/get (fn [k]
+                                          (case k
+                                            "MISTRAL_API_KEY" "mistral-env-key"
+                                            nil))})
+        req-mistral (sut/build-request env-mistral mistral-model
+                                       {:messages [{:role :user :content "ping" :timestamp 1}]}
+                                       {}
+                                       false)]
+    (is (= "Bearer openai-env-key" (get-in req-openai [:headers "Authorization"])))
+    (is (= "Bearer mistral-env-key" (get-in req-mistral [:headers "Authorization"])))))
+
+(deftest build-request-missing-api-key-message-includes-env-var-name
+  (is (thrown-with-msg?
+       clojure.lang.ExceptionInfo
+       #"Set MISTRAL_API_KEY or pass :api-key"
+       (sut/build-request (stub-env) mistral-model
+                          {:messages [{:role :user :content "ping" :timestamp 1}]}
+                          {}
+                          false))))

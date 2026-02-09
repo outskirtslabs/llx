@@ -74,6 +74,27 @@
   {:type      "image_url"
    :image_url {:url (str "data:" (:mime-type block) ";base64," (:data block))}})
 
+(defn- detect-compat
+  [model]
+  (let [provider    (keyword (or (:provider model) :openai))
+        base-url    (str/lower-case (or (:base-url model) ""))
+        nonstandard (or (= provider :mistral)
+                        (str/includes? base-url "mistral.ai")
+                        (str/includes? base-url "chutes.ai"))
+        mistral?    (or (= provider :mistral)
+                        (str/includes? base-url "mistral.ai"))]
+    {:store?                                (not nonstandard)
+     :supports-usage-stream?                true
+     :supports-strict-tools?                true
+     :token-field                           (if mistral? :max_tokens :max_completion_tokens)
+     :requires-tool-result-name?            mistral?
+     :requires-assistant-after-tool-result? false
+     :requires-thinking-as-text?            mistral?}))
+
+(defn- resolve-compat
+  [model]
+  (merge (detect-compat model) (:compat model)))
+
 (defn- convert-user-content
   [model content]
   (if (string? content)
@@ -98,41 +119,131 @@
 
 (defn- tool-result-content->string
   [content]
-  (or (some (fn [block] (when (= :text (:type block)) (:text block))) content)
-      ""))
+  (->> content
+       (filter #(= :text (:type %)))
+       (map :text)
+       (remove str/blank?)
+       (str/join "\n")))
 
 (defn- convert-message
   [model message]
-  (case (:role message)
-    :user {:role    "user"
-           :content (convert-user-content model (:content message))}
-    :assistant (let [msg          {:role "assistant"}
-                     text-content (assistant-content->string (:content message))
-                     tool-calls   (->> (:content message)
-                                       (filter #(= :tool-call (:type %)))
-                                       (mapv (fn [tool-call]
-                                               {:id       (:id tool-call)
-                                                :type     "function"
-                                                :function {:name      (:name tool-call)
-                                                           :arguments ((fnil pr-str {}) (:arguments tool-call))}})))]
-                 (cond
-                   (seq tool-calls) (assoc msg :content (or text-content "") :tool_calls tool-calls)
-                   (some? text-content) (assoc msg :content text-content)
-                   :else nil))
-    :tool-result {:role         "tool"
-                  :tool_call_id (:tool-call-id message)
-                  :content      (tool-result-content->string (:content message))}
-    nil))
+  (let [compat-profile (resolve-compat model)]
+    (case (:role message)
+      :user {:role    "user"
+             :content (convert-user-content model (:content message))}
+      :assistant (let [msg          {:role "assistant"}
+                       base-text    (assistant-content->string (:content message))
+                       thinking     (->> (:content message)
+                                         (filter #(= :thinking (:type %)))
+                                         (map :thinking)
+                                         (remove str/blank?)
+                                         (str/join "\n\n"))
+                       text-content (if (and (:requires-thinking-as-text? compat-profile) (seq thinking))
+                                      (if (seq base-text)
+                                        (str thinking "\n\n" base-text)
+                                        thinking)
+                                      base-text)
+                       tool-calls   (->> (:content message)
+                                         (filter #(= :tool-call (:type %)))
+                                         (mapv (fn [tool-call]
+                                                 {:id       (:id tool-call)
+                                                  :type     "function"
+                                                  :function {:name      (:name tool-call)
+                                                             :arguments ((fnil pr-str {}) (:arguments tool-call))}})))]
+                   (cond
+                     (seq tool-calls) (assoc msg :content (or text-content "") :tool_calls tool-calls)
+                     (some? text-content) (assoc msg :content text-content)
+                     :else nil))
+      :tool-result (cond-> {:role         "tool"
+                            :tool_call_id (:tool-call-id message)
+                            :content      (let [text (tool-result-content->string (:content message))]
+                                            (if (seq text) text "(see attached image)"))}
+                     (:requires-tool-result-name? compat-profile)
+                     (assoc :name (:tool-name message)))
+      nil)))
+
+(defn- tool-result-images
+  [model message]
+  (when (contains? (get-in model [:capabilities :input] #{}) :image)
+    (->> (:content message)
+         (filter #(= :image (:type %)))
+         (mapv convert-image-block))))
 
 (defn- convert-messages
   [model context]
-  (let [system-prompt  (:system-prompt context)
-        system-message (when (seq system-prompt)
-                         [{:role "system" :content system-prompt}])
-        converted      (->> (:messages context)
-                            (map (partial convert-message model))
-                            (remove nil?))]
-    (vec (concat system-message converted))))
+  (let [system-prompt (:system-prompt context)
+        out0          (cond-> []
+                        (seq system-prompt)
+                        (conj {:role "system" :content system-prompt}))]
+    (loop [remaining (:messages context)
+           out       out0]
+      (if-let [message (first remaining)]
+        (if (= :tool-result (:role message))
+          (let [[batch rest-messages] (split-with #(= :tool-result (:role %)) remaining)
+                out1                  (reduce (fn [acc tool-msg]
+                                                (if-let [converted (convert-message model tool-msg)]
+                                                  (conj acc converted)
+                                                  acc))
+                                              out
+                                              batch)
+                image-blocks          (->> batch
+                                           (mapcat #(tool-result-images model %))
+                                           vec)
+                out2                  (cond-> out1
+                                        (seq image-blocks)
+                                        (conj {:role    "user"
+                                               :content (into [{:type "text"
+                                                                :text "Attached image(s) from tool result:"}]
+                                                              image-blocks)}))]
+            (recur rest-messages out2))
+          (recur (rest remaining)
+                 (if-let [converted (convert-message model message)]
+                   (conj out converted)
+                   out)))
+        (vec out)))))
+
+(defn- convert-tools
+  [model tools]
+  (let [compat-profile (resolve-compat model)]
+    (when (seq tools)
+      (mapv
+       (fn [tool]
+         {:type     "function"
+          :function (cond-> {:name        (:name tool)
+                             :description (:description tool)
+                             :parameters  (or (:input-schema tool) {})}
+                      (:supports-strict-tools? compat-profile)
+                      (assoc :strict false))})
+       tools))))
+
+(defn- tool-choice->wire
+  [tool-choice]
+  (cond
+    (keyword? tool-choice) (name tool-choice)
+    (#{"auto" "none" "required"} tool-choice) tool-choice
+    (string? tool-choice) {:type "function" :function {:name tool-choice}}
+    :else tool-choice))
+
+(defn- provider->env-var
+  [provider]
+  (case (keyword provider)
+    :openai "OPENAI_API_KEY"
+    :mistral "MISTRAL_API_KEY"
+    nil))
+
+(defn- env-api-key
+  [env provider]
+  (when-let [env-var (provider->env-var provider)]
+    (when-let [env-get (:env/get env)]
+      (env-get env-var))))
+
+(defn- missing-api-key-message
+  [provider]
+  (if-let [env-var (provider->env-var provider)]
+    (str "API key is required for provider " (pr-str provider)
+         ". Set " env-var " or pass :api-key.")
+    (str "API key is required for provider " (pr-str provider)
+         ". Pass :api-key.")))
 
 (>defn build-request
        ([env model context opts]
@@ -140,18 +251,30 @@
         (build-request env model context opts false))
        ([env model context opts stream?]
         [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
-        (let [api-key        (or (:api-key opts)
-                                 (when-let [env-get (:env/get env)]
-                                   (env-get "OPENAI_API_KEY")))
+        (let [compat-profile (resolve-compat model)
+              api-key        (or (:api-key opts)
+                                 (env-api-key env (:provider model)))
               needs-api-key? (not= :openai-compatible (:provider model))
               _              (when (and needs-api-key? (not (seq api-key)))
-                               (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
+                               (throw (ex-info (missing-api-key-message (:provider model))
+                                               {:provider (:provider model)})))
               payload        (cond-> {:model    (:id model)
                                       :messages (convert-messages model context)
                                       :stream   stream?}
-                               (:max-output-tokens opts) (assoc :max_completion_tokens (:max-output-tokens opts))
+                               (and stream? (:supports-usage-stream? compat-profile))
+                               (assoc :stream_options {:include_usage true})
+
+                               (:store? compat-profile)
+                               (assoc :store false)
+
+                               (:max-output-tokens opts)
+                               (assoc (or (:token-field compat-profile) :max_completion_tokens)
+                                      (:max-output-tokens opts))
+
                                (contains? opts :temperature) (assoc :temperature (:temperature opts))
-                               (contains? opts :top-p) (assoc :top_p (:top-p opts)))
+                               (contains? opts :top-p) (assoc :top_p (:top-p opts))
+                               (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools model (or (:tools context) (:tools opts))))
+                               (:tool-choice opts) (assoc :tool_choice (tool-choice->wire (:tool-choice opts))))
               body           ((:json/encode env) payload)
               base-url       (trim-trailing-slash (:base-url model))
               headers        (cond-> {"Content-Type" "application/json"}
@@ -443,17 +566,55 @@
       (str normalized (subs "ABCDEFGHI" 0 (- 9 (count normalized))))
       normalized)))
 
+(defn- stable-alnum-suffix
+  [source-id salt]
+  (let [h  (-> (hash (str source-id ":" salt))
+               long
+               Math/abs
+               str
+               str/upper-case)
+        h9 (subs (str h "ABCDE") 0 5)]
+    h9))
+
+(defn- ensure-unique-mistral-id
+  [used candidate source-id]
+  (if-not (contains? used candidate)
+    candidate
+    (loop [salt 1]
+      (let [prefix (subs candidate 0 4)
+            alt-id (str prefix (stable-alnum-suffix source-id salt))]
+        (if (contains? used alt-id)
+          (recur (inc salt))
+          alt-id)))))
+
 (defn- strip-openai-responses-pipe-id
   [tool-call-id]
   (if (str/includes? tool-call-id "|")
     (first (str/split tool-call-id #"\|" 2))
     tool-call-id))
 
+(defn- mistral-id-map
+  [assistant-message]
+  (let [tool-calls (->> (:content assistant-message)
+                        (filter #(= :tool-call (:type %)))
+                        (map :id)
+                        (filter string?))]
+    (:ids
+     (reduce
+      (fn [{:keys [used ids]} source-id]
+        (let [candidate (normalize-mistral-tool-id (strip-openai-responses-pipe-id source-id))
+              unique-id (ensure-unique-mistral-id used candidate source-id)]
+          {:used (conj used unique-id)
+           :ids  (assoc ids source-id unique-id)}))
+      {:used #{} :ids {}}
+      tool-calls))))
+
 (defn normalize-tool-call-id
-  [tool-call-id target-model _source-assistant-message]
+  [tool-call-id target-model source-assistant-message]
   (let [id (strip-openai-responses-pipe-id tool-call-id)]
     (if (mistral-target? target-model)
-      (normalize-mistral-tool-id id)
+      (or (get (mistral-id-map source-assistant-message) tool-call-id)
+          (normalize-mistral-tool-id id))
       (let [sanitized (str/replace id #"[^a-zA-Z0-9_-]" "_")]
         (if (> (count sanitized) 40)
           (subs sanitized 0 40)

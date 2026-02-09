@@ -100,6 +100,47 @@
     (is (= expected (:tool-call-id result)))
     (is (re-matches #"[A-Za-z0-9]{9}" expected))))
 
+(deftest tool-call-id-normalization-avoids-collision-for-mistral
+  (let [messages [{:role :user :content "run tools" :timestamp 1}
+                  {:role        :assistant
+                   :content     [{:type      :tool-call
+                                  :id        "call_abcdefgh1--with-extra"
+                                  :name      "one"
+                                  :arguments {}}
+                                 {:type      :tool-call
+                                  :id        "call_abcdefgh2--with-extra"
+                                  :name      "two"
+                                  :arguments {}}]
+                   :api         :openai-responses
+                   :provider    :openai
+                   :model       "gpt-5-mini"
+                   :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                                 :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                   :stop-reason :tool-use
+                   :timestamp   2}
+                  {:role         :tool-result
+                   :tool-call-id "call_abcdefgh1--with-extra"
+                   :tool-name    "one"
+                   :content      [{:type :text :text "ok-1"}]
+                   :is-error?    false
+                   :timestamp    3}
+                  {:role         :tool-result
+                   :tool-call-id "call_abcdefgh2--with-extra"
+                   :tool-name    "two"
+                   :content      [{:type :text :text "ok-2"}]
+                   :is-error?    false
+                   :timestamp    4}]
+        out      (sut/for-target-model
+                  messages
+                  {:provider :mistral :api :openai-completions :id "devstral-medium-latest"}
+                  {:clock/now-ms           (constantly 9999)
+                   :normalize-tool-call-id openai-completions/normalize-tool-call-id})
+        id-1     (get-in out [1 :content 0 :id])
+        id-2     (get-in out [1 :content 1 :id])]
+    (is (not= id-1 id-2))
+    (is (= id-1 (get-in out [2 :tool-call-id])))
+    (is (= id-2 (get-in out [3 :tool-call-id])))))
+
 (deftest missing-tool-results-get-synthetic-error-message
   (let [out      (sut/for-target-model
                   (fixture "orphan_tool_call")
