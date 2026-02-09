@@ -31,13 +31,15 @@
    (stub-env {}))
   ([overrides]
    (merge
-    {:json/encode      json/write-str
+    {:http/request     (fn [_] {:status 200 :body "{}"})
+     :json/encode      json/write-str
      :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
      :json/decode-safe (fn [s _opts]
                          (try
                            (json/read-str s {:key-fn keyword})
                            (catch Exception _ nil)))
-     :clock/now-ms     (fn [] 1730000000000)}
+     :clock/now-ms     (fn [] 1730000000000)
+     :id/new           (fn [] "id-1")}
     overrides)))
 
 (deftest build-request-converts-context-to-openai-responses-input

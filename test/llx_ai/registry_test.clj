@@ -48,5 +48,5 @@
 (deftest get-adapter-rejects-invalid-api-value
   (is (thrown-with-msg?
        clojure.lang.ExceptionInfo
-       #"Schema validation failed"
+       #"Schema validation failed|Validation Error"
        (registry/get-adapter (registry/immutable-registry) "openai-responses"))))

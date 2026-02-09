@@ -1,5 +1,6 @@
 (ns llx-ai.schema
   (:require
+   [com.fulcrologic.guardrails.malli.registry :as gr.reg]
    [malli.core :as m]
    [malli.error :as me]
    [llx-ai.schema.config :as config]
@@ -10,16 +11,22 @@
    [llx-ai.schema.options :as options]
    [llx-ai.schema.runtime :as runtime]))
 
-(defn registry
+(defn custom-schemas
   []
-  (merge (m/default-schemas)
-         core/schemas
+  (merge core/schemas
          model/schemas
          message/schemas
          event/schemas
          options/schemas
          config/schemas
          runtime/schemas))
+
+(defn registry
+  []
+  (merge (m/default-schemas)
+         (custom-schemas)))
+
+(gr.reg/merge-schemas! (custom-schemas))
 
 (defn schema
   [schema-id]

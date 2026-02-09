@@ -35,7 +35,8 @@
    (stub-env {}))
   ([overrides]
    (merge
-    {:json/encode      json/write-str
+    {:http/request     (fn [_] {:status 200 :body "{}"})
+     :json/encode      json/write-str
      :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
      :json/decode-safe (fn [s _opts]
                          (try
@@ -61,7 +62,7 @@
     (is (= "image/png" (get-in contents [0 :parts 1 :inlineData :mimeType])))
     (is (= true (get-in contents [1 :parts 0 :thought])))
     (is (= "Need tool." (get-in contents [1 :parts 0 :text])))
-    (is (= "c2lnX3RleHQ=" (get-in contents [1 :parts 1 :thoughtSignature])))
+    (is (= "c2lnX3RoaW5raW5n" (get-in contents [1 :parts 0 :thoughtSignature])))
     (is (= "double_number" (get-in contents [1 :parts 2 :functionCall :name])))
     (is (= {:value 21} (get-in contents [1 :parts 2 :functionCall :args])))
     (is (= "42" (get-in contents [2 :parts 0 :functionResponse :response :output])))
@@ -127,7 +128,7 @@
     (is (= [:text-start :text-delta]
            (mapv :type (:events result))))
     (is (= :text (get-in result [:state :current-block :kind])))
-    (is (= "opaque" (get-in result [:state :assistant-message :content 0 :signature])))))
+    (is (nil? (get-in result [:state :assistant-message :content 0 :signature])))))
 
 (deftest decode-event-tool-call-missing-args-defaults-to-empty-map
   (let [env    (stub-env)

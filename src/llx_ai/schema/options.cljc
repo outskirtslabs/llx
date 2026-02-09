@@ -36,4 +36,5 @@
     [:top-p {:optional true} :llx/non-neg-number]
     [:max-output-tokens {:optional true} :llx/non-neg-int]
     [:signal {:optional true} :any]
-    [:metadata {:optional true} :llx/metadata-map]]})
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]]})

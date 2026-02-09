@@ -62,7 +62,7 @@
 
          qa
          {:doc     "Run full quality assurance: format, lint, and test"
-          :depends [fmt lint #_guardrails:check-signatures test]}
+          :depends [fmt lint guardrails:check-signatures test]}
 
          ci
          {:doc     "Run CI checks: test, format check, and lint"

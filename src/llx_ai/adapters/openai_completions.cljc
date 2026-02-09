@@ -1,7 +1,9 @@
 (ns llx-ai.adapters.openai-completions
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [llx-ai.schema :as schema]))
+(schema/registry)
 
 (defn- trim-trailing-slash
   [s]
@@ -134,10 +136,10 @@
 
 (>defn build-request
        ([env model context opts]
-        [map? map? map? map? => map?]
+        [:llx/env :llx/model :llx/context-map :llx/request-options => :llx/adapter-request-map]
         (build-request env model context opts false))
        ([env model context opts stream?]
-        [map? map? map? map? boolean? => map?]
+        [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
         (let [api-key        (or (:api-key opts)
                                  (when-let [env-get (:env/get env)]
                                    (env-get "OPENAI_API_KEY")))
@@ -304,7 +306,7 @@
 
 (>defn decode-event
        [env state raw-chunk]
-       [map? map? any? => map?]
+       [:llx/env :llx/runtime-stream-state :llx/raw-stream-chunk => :llx/runtime-decode-event-result]
        (let [state (if (:assistant-message state)
                      state
                      (init-stream-state env (:model state)))
@@ -368,7 +370,7 @@
 
 (>defn finalize
        [env state-or-response]
-       [map? map? => map?]
+       [:llx/env :llx/runtime-finalize-input => :llx/runtime-finalize-result]
        (if (contains? state-or-response :response)
          {:assistant-message (response->assistant-message env (:model state-or-response) (:response state-or-response))
           :events            []}
@@ -381,7 +383,7 @@
 
 (>defn normalize-error
        [env ex partial-state]
-       [map? any? any? => map?]
+       [:llx/env any? :llx/runtime-normalize-error-partial => :llx/message-assistant]
        (let [model             (or (:model partial-state) (-> ex ex-data :model))
              assistant-message (or (:assistant-message partial-state)
                                    (:assistant-message (init-stream-state env model))
@@ -408,7 +410,7 @@
 
 (>defn open-stream
        [env _model request-map]
-       [map? any? map? => map?]
+       [:llx/env :llx/model :llx/adapter-request-map => :llx/http-response-map]
        (let [response ((:http/request env) request-map)
              status   (long (or (:status response) 0))]
          (when (or (< status 200) (>= status 300))

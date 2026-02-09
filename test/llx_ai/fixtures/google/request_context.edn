@@ -9,8 +9,8 @@
                               {:type :image :data "aGVsbG8=" :mime-type "image/png"}]
                   :timestamp 1001}
                  {:role        :assistant
-                  :content     [{:type :thinking :thinking "Need tool." :signature "c2lnX3RoaW5raW5n"}
-                                {:type :text :text "Calling tool." :signature "c2lnX3RleHQ="}
+                 :content     [{:type :thinking :thinking "Need tool." :signature "c2lnX3RoaW5raW5n"}
+                                {:type :text :text "Calling tool."}
                                 {:type      :tool-call
                                  :id        "call_1"
                                  :name      "double_number"

@@ -40,10 +40,10 @@
 
 (>defn resolve-registry
        ([]
-        [=> map?]
+        [=> :llx/registry-map]
         (resolve-registry (default-registry)))
        ([registry]
-        [any? => map?]
+        [any? => :llx/registry-map]
         (cond
           (nil? registry) (resolve-registry (default-registry))
           (instance? MutableRegistry registry) (resolve-registry @(:registry* registry))
@@ -55,10 +55,10 @@
 
 (>defn register-adapter
        ([registry adapter]
-        [any? map? => map?]
+        [any? :llx/adapter => :llx/registry-map]
         (register-adapter registry adapter nil))
        ([registry adapter source-id]
-        [any? map? any? => map?]
+        [any? :llx/adapter any? => :llx/registry-map]
         (let [registry (resolve-registry registry)
               adapter  (schema/assert-valid! :llx/adapter adapter)]
           (assoc-in registry [adapters-key (:api adapter)] {:adapter adapter :source-id source-id}))))
@@ -82,10 +82,10 @@
 
 (>defn get-adapter
        ([api]
-        [any? => any?]
+        [:llx/api => [:maybe :llx/adapter]]
         (get-adapter (default-registry) api))
        ([registry api]
-        [any? any? => any?]
+        [any? :llx/api => [:maybe :llx/adapter]]
         (schema/assert-valid! :llx/api api)
         (get-in (resolve-registry registry) [adapters-key api :adapter])))
 

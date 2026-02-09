@@ -13,8 +13,7 @@
                                  :thinking "Need to call tool."
                                  :signature "{\"type\":\"reasoning\",\"id\":\"rs_1\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Need to call tool.\"}],\"encrypted_content\":\"enc_1\"}"}
                                 {:type :text
-                                 :text "Calling tool now."
-                                 :signature "msg_assistant_1"}
+                                 :text "Calling tool now."}
                                 {:type      :tool-call
                                  :id        "call_abc|fc_abc"
                                  :name      "double_number"

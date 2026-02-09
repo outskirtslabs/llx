@@ -191,10 +191,24 @@
     (is (not (sut/valid? :llx/env (dissoc valid-env :http/request))))))
 
 (deftest runtime-boundary-schemas
-  (let [valid-event-transition {:state  {:cursor 1}
+  (let [valid-stream-state     {:model valid-model}
+        valid-event-transition {:state  valid-stream-state
                                 :events [{:type :text-delta :text "chunk"}]}
         valid-finalize-result  {:assistant-message valid-assistant
                                 :events            [{:type :text-end}]}
+        valid-http-response    {:status  200
+                                :headers {"content-type" "application/json"}
+                                :body    {:ok true}}
+        valid-run-stream-input {:adapter valid-adapter
+                                :env     valid-env
+                                :model   valid-model
+                                :request {:method :post :url "https://example.invalid"}
+                                :out     {:queue          :q
+                                          :closed?        (atom false)
+                                          :is-complete?   (fn [_] false)
+                                          :extract-result (fn [event] event)
+                                          :result*        (promise)}
+                                :state*  (atom {:model valid-model})}
         valid-run-stream-args  {:adapter valid-adapter
                                 :env     valid-env
                                 :model   valid-model
@@ -202,12 +216,40 @@
                                 :out     {:queue :q}
                                 :state*  (atom {:model valid-model})}]
     (testing "accepts runtime adapter boundary maps"
+      (is (sut/valid? :llx/http-response-map valid-http-response))
+      (is (sut/valid? :llx/runtime-stream-state valid-stream-state))
+      (is (sut/valid? :llx/runtime-finalize-input valid-stream-state))
+      (is (sut/valid? :llx/runtime-finalize-input
+                      {:model    valid-model
+                       :response valid-http-response}))
+      (is (sut/valid? :llx/runtime-normalize-error-partial nil))
+      (is (sut/valid? :llx/runtime-normalize-error-partial {:model valid-model}))
+      (is (sut/valid? :llx/runtime-normalize-error-partial {:assistant-message valid-assistant}))
+      (is (sut/valid? :llx/raw-stream-chunk "{\"type\":\"delta\"}"))
+      (is (sut/valid? :llx/raw-stream-chunk {:type :delta}))
+      (is (sut/valid? :llx/event-stream-map
+                      {:queue          :q
+                       :closed?        (atom false)
+                       :is-complete?   (fn [_] false)
+                       :extract-result (fn [_] nil)
+                       :result*        (promise)}))
+      (is (sut/valid? :llx/registry-entry {:adapter valid-adapter}))
+      (is (sut/valid? :llx/registry-map {:llx.registry/adapters {:openai-completions {:adapter valid-adapter}}}))
       (is (sut/valid? :llx/runtime-decode-event-result valid-event-transition))
-      (is (sut/valid? :llx/runtime-finalize-result valid-finalize-result)))
+      (is (sut/valid? :llx/runtime-finalize-result valid-finalize-result))
+      (is (sut/valid? :llx/runtime-run-stream-input valid-run-stream-input)))
 
     (testing "rejects malformed runtime boundary maps"
+      (is (not (sut/valid? :llx/http-response-map {:status -1})))
+      (is (not (sut/valid? :llx/runtime-stream-state {:assistant-message valid-assistant})))
+      (is (not (sut/valid? :llx/runtime-finalize-input {:response {:status "200"}})))
+      (is (not (sut/valid? :llx/runtime-normalize-error-partial {:model "gpt-5"})))
+      (is (not (sut/valid? :llx/raw-stream-chunk 42)))
+      (is (not (sut/valid? :llx/event-stream-map {:queue :q :closed? (atom false) :is-complete? (fn [_] false)})))
+      (is (not (sut/valid? :llx/registry-entry {:adapter valid-adapter :source-id :x :extra true})))
       (is (not (sut/valid? :llx/runtime-decode-event-result {:state {} :events [{:type :toolcall-delta :id "c1" :name "tool"}]})))
-      (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []}))))
+      (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []})))
+      (is (not (sut/valid? :llx/runtime-run-stream-input (assoc valid-run-stream-input :out :not-a-map)))))
 
     (testing "accepts run-stream argument map contract"
       (is (sut/valid? :llx/runtime-run-stream-args valid-run-stream-args)))))

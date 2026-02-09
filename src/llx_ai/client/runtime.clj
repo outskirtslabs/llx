@@ -54,8 +54,8 @@
 
 (>defn run-stream!
        [{:keys [adapter env model request out state*]}]
-       [map? => any?]
-       (schema/assert-valid! :llx/runtime-run-stream-args
+       [:llx/runtime-run-stream-input => any?]
+       (schema/assert-valid! :llx/runtime-run-stream-input
                              {:adapter adapter
                               :env     env
                               :model   model

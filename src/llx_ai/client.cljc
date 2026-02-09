@@ -75,8 +75,8 @@
 
 (>defn complete
        [env model context opts]
-       [map? map? map? [:maybe :map] => map?]
-       (let [_                           (schema/assert-valid! [:maybe :map] opts)
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/message-assistant]
+       (let [_                           (schema/assert-valid! [:maybe :llx/request-options] opts)
              opts                        (or opts {})
              {:keys [registry-override
                      request-opts]}      (split-client-opts opts)
@@ -98,8 +98,8 @@
 
 (>defn stream
        [env model context opts]
-       [map? map? map? [:maybe :map] => map?]
-       (let [_                         (schema/assert-valid! [:maybe :map] opts)
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/event-stream-map]
+       (let [_                         (schema/assert-valid! [:maybe :llx/request-options] opts)
              opts                      (or opts {})
              {:keys [registry-override
                      request-opts]}    (split-client-opts opts)

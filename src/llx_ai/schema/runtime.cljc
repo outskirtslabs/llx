@@ -30,6 +30,52 @@
     [:log/warn {:optional true} :llx/fn]
     [:log/error {:optional true} :llx/fn]]
 
+   :llx/http-response-map
+   [:map
+    [:status {:optional true} :llx/non-neg-int]
+    [:headers {:optional true} :map]
+    [:body {:optional true} :any]]
+
+   :llx/runtime-stream-state
+   [:map
+    [:model :llx/model]
+    [:assistant-message {:optional true} :llx/message-assistant]]
+
+   :llx/runtime-finalize-input
+   [:or
+    :llx/runtime-stream-state
+    [:map
+     [:model :llx/model]
+     [:response :llx/http-response-map]
+     [:assistant-message {:optional true} :llx/message-assistant]]]
+
+   :llx/runtime-normalize-error-partial
+   [:maybe
+    [:map
+     [:model {:optional true} :llx/model]
+     [:assistant-message {:optional true} :llx/message-assistant]]]
+
+   :llx/raw-stream-chunk
+   [:or :string :map]
+
+   :llx/event-stream-map
+   [:map
+    [:queue :any]
+    [:closed? :any]
+    [:is-complete? :llx/fn]
+    [:extract-result :llx/fn]
+    [:result* :any]]
+
+   :llx/registry-entry
+   [:map {:closed true}
+    [:adapter :llx/adapter]
+    [:source-id {:optional true} :any]]
+
+   :llx/registry-map
+   [:map
+    [:llx.registry/adapters {:optional true} [:map-of :llx/api :llx/registry-entry]]
+    [:llx.registry/tools {:optional true} :map]]
+
    :llx/adapter-request-map
    [:map
     [:method :keyword]
@@ -41,7 +87,7 @@
 
    :llx/runtime-decode-event-result
    [:map {:closed true}
-    [:state :map]
+    [:state :llx/runtime-stream-state]
     [:events [:vector :llx/event]]]
 
    :llx/runtime-finalize-result
@@ -49,11 +95,14 @@
     [:assistant-message :llx/message-assistant]
     [:events [:vector :llx/event]]]
 
-   :llx/runtime-run-stream-args
-   [:map {:closed true}
+   :llx/runtime-run-stream-input
+   [:map
     [:adapter :llx/adapter]
     [:env :llx/env]
     [:model :llx/model]
     [:request :llx/adapter-request-map]
     [:out :map]
-    [:state* :any]]})
+    [:state* :any]]
+
+   :llx/runtime-run-stream-args
+   :llx/runtime-run-stream-input})
