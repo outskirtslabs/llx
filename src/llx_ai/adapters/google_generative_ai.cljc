@@ -44,7 +44,7 @@
   [usage]
   (let [cache-read (long (or (:cachedContentTokenCount usage) 0))
         prompt     (long (or (:promptTokenCount usage) 0))
-        ;; Pi parity: Google promptTokenCount is the canonical input total.
+        ;; Google promptTokenCount is the canonical input total.
         ;; cache-read is tracked separately but not subtracted from input.
         input      prompt
         output     (+ (long (or (:candidatesTokenCount usage) 0))

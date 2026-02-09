@@ -42,6 +42,27 @@
       (:registry env)
       default-registry))
 
+(defn- clamp-reasoning-level
+  [level]
+  (if (= :xhigh level) :high level))
+
+(defn- simple-opts->request-opts
+  [model simple-opts]
+  (let [simple-opts       (or simple-opts {})
+        max-output-tokens (or (:max-tokens simple-opts)
+                              (min (long (:max-tokens model)) 32000))
+        reasoning-level   (or (:reasoning simple-opts) (:reasoning-effort simple-opts))
+        reasoning-level   (some-> reasoning-level clamp-reasoning-level)]
+    (cond-> {:max-output-tokens max-output-tokens}
+      (contains? simple-opts :temperature) (assoc :temperature (:temperature simple-opts))
+      (contains? simple-opts :top-p) (assoc :top-p (:top-p simple-opts))
+      (contains? simple-opts :api-key) (assoc :api-key (:api-key simple-opts))
+      (contains? simple-opts :headers) (assoc :headers (:headers simple-opts))
+      (contains? simple-opts :signal) (assoc :signal (:signal simple-opts))
+      (contains? simple-opts :metadata) (assoc :metadata (:metadata simple-opts))
+      (contains? simple-opts :registry) (assoc :registry (:registry simple-opts))
+      reasoning-level (assoc :reasoning {:level reasoning-level}))))
+
 (defn- select-adapter
   [resolved-registry model]
   (let [api     (:api model)
@@ -74,6 +95,7 @@
       transformed)))
 
 (>defn complete
+       "Runs a non-streaming completion request and returns the canonical assistant message."
        [env model context opts]
        [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/message-assistant]
        (let [_                           (schema/assert-valid! [:maybe :llx/request-options] opts)
@@ -97,6 +119,7 @@
          assistant-message))
 
 (>defn stream
+       "Runs a streaming completion request and returns an LLX event-stream map."
        [env model context opts]
        [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/event-stream-map]
        (let [_                         (schema/assert-valid! [:maybe :llx/request-options] opts)
@@ -125,3 +148,30 @@
                        :out     out
                        :state*  state*})
          out))
+
+(defn stream-simple
+  "Runs [[stream]] with normalized simple options.
+
+  Options:
+
+  | key | description |
+  | --- | --- |
+  | `:temperature` | Sampling temperature. |
+  | `:top-p` | Nucleus sampling probability. |
+  | `:max-tokens` | Requested output cap; maps to `:max-output-tokens`. |
+  | `:reasoning` | Reasoning level keyword; `:xhigh` is clamped to `:high`. |
+  | `:reasoning-effort` | Alias for `:reasoning`. |
+  | `:api-key` | Provider API key override. |
+  | `:headers` | Additional request headers. |
+  | `:signal` | Abort signal propagated to runtime. |
+  | `:metadata` | Request metadata map. |
+  | `:registry` | Adapter registry override for this call. |"
+  [env model context simple-opts]
+  (stream env model context (simple-opts->request-opts model simple-opts)))
+
+(defn complete-simple
+  "Runs [[complete]] with normalized simple options.
+
+  Accepts the same option keys as [[stream-simple]]."
+  [env model context simple-opts]
+  (complete env model context (simple-opts->request-opts model simple-opts)))

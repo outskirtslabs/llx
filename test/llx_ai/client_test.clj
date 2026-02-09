@@ -628,3 +628,35 @@
          clojure.lang.ExceptionInfo
          #"Schema validation failed"
          (sut/complete env base-model context {:api-key "x"})))))
+
+(deftest stream-simple-exists-and-normalizes-simple-options
+  (let [stream-simple (ns-resolve 'llx-ai.client 'stream-simple)
+        seen-opts*    (atom nil)
+        expected-out  {:fake-stream true}
+        env           (stub-env (fn [_] (throw (ex-info "unexpected request" {}))))
+        context       {:messages [{:role :user :content "hello" :timestamp 1}]}]
+    (is (ifn? stream-simple))
+    (when (ifn? stream-simple)
+      (with-redefs [sut/stream (fn [_env _model _context opts]
+                                 (reset! seen-opts* opts)
+                                 expected-out)]
+        (is (= expected-out
+               (stream-simple env
+                              base-model
+                              context
+                              {:temperature 0.25
+                               :max-tokens  2048
+                               :reasoning   :xhigh
+                               :api-key     "test-key"})))
+        (is (= 0.25 (:temperature @seen-opts*)))
+        (is (= 2048 (:max-output-tokens @seen-opts*)))
+        (is (= {:level :high} (:reasoning @seen-opts*))))
+      (with-redefs [sut/stream (fn [_env _model _context opts]
+                                 (reset! seen-opts* opts)
+                                 expected-out)]
+        (stream-simple env base-model context {})
+        (is (= 16384 (:max-output-tokens @seen-opts*)))))))
+
+(deftest complete-simple-exists
+  (let [complete-simple (ns-resolve 'llx-ai.client 'complete-simple)]
+    (is (ifn? complete-simple))))
