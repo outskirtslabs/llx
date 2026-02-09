@@ -385,6 +385,39 @@
     (is (= :assistant (:role out)))
     (is (= :stop (:stop-reason out)))))
 
+(deftest complete-google-generative-ai-dispatches-through-registry
+  (let [seen-request (atom nil)
+        model        {:id             "gemini-2.5-flash"
+                      :name           "Gemini 2.5 Flash"
+                      :provider       :google
+                      :api            :google-generative-ai
+                      :base-url       "https://generativelanguage.googleapis.com/v1beta"
+                      :context-window 1048576
+                      :max-tokens     8192
+                      :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                      :capabilities   {:reasoning? true :input #{:text}}}
+        env          (-> (stub-env (fn [request]
+                                     (reset! seen-request request)
+                                     {:status 200
+                                      :body   (json/write-str
+                                               {:candidates    [{:content      {:parts [{:text "hello from gemini"}]}
+                                                                 :finishReason "STOP"}]
+                                                :usageMetadata {:promptTokenCount     4
+                                                                :candidatesTokenCount 3
+                                                                :totalTokenCount      7}})}))
+                         (assoc :env/get (fn [k]
+                                           (case k
+                                             "GEMINI_API_KEY" "google-key"
+                                             nil))))
+        out          (sut/complete env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {})
+        payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
+    (is (= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+           (:url @seen-request)))
+    (is (= "google-key" (get-in @seen-request [:headers "x-goog-api-key"])))
+    (is (= "say hi" (get-in payload [:contents 0 :parts 0 :text])))
+    (is (= :assistant (:role out)))
+    (is (= :stop (:stop-reason out)))))
+
 (deftest stream-anthropic-messages-dispatches-through-registry
   (let [model  {:id             "claude-sonnet-4-5"
                 :name           "Claude Sonnet 4.5"
@@ -418,6 +451,38 @@
     (is (= [:start :text-start :text-delta :text-end :done]
            (mapv :type events)))
     (is (= "hello" (get-in out [:content 0 :text])))
+    (is (= :stop (:stop-reason out)))))
+
+(deftest stream-google-generative-ai-dispatches-through-registry
+  (let [model  {:id             "gemini-2.5-flash"
+                :name           "Gemini 2.5 Flash"
+                :provider       :google
+                :api            :google-generative-ai
+                :base-url       "https://generativelanguage.googleapis.com/v1beta"
+                :context-window 1048576
+                :max-tokens     8192
+                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                :capabilities   {:reasoning? true :input #{:text}}}
+        env    (-> (stub-env (fn [_request]
+                               {:status 200
+                                :body   (sse-body
+                                         [(str "data: " (json/write-str {:candidates [{:content {:parts [{:text "hello "}]}}]}))
+                                          (str "data: " (json/write-str {:candidates    [{:content      {:parts [{:text "world"}]}
+                                                                                          :finishReason "STOP"}]
+                                                                         :usageMetadata {:promptTokenCount     3
+                                                                                         :candidatesTokenCount 2
+                                                                                         :totalTokenCount      5}}))
+                                          "data: [DONE]"])}))
+                   (assoc :env/get (fn [k]
+                                     (case k
+                                       "GEMINI_API_KEY" "google-key"
+                                       nil))))
+        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {})
+        events (event-stream/drain! stream)
+        out    (event-stream/result stream)]
+    (is (= [:start :text-start :text-delta :text-delta :text-end :done]
+           (mapv :type events)))
+    (is (= "hello world" (get-in out [:content 0 :text])))
     (is (= :stop (:stop-reason out)))))
 
 (deftest anthropic-normalization-hook-sanitizes-tool-call-id

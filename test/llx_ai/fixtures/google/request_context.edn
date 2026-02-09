@@ -1,0 +1,43 @@
+{:system-prompt "You are a helpful assistant."
+ :tools         [{:name         "double_number"
+                  :description  "Double an integer value."
+                  :input-schema {:type       "object"
+                                 :properties {:value {:type "integer"}}
+                                 :required   ["value"]}}]
+ :messages      [{:role      :user
+                  :content   [{:type :text :text "Please use the tool for value 21."}
+                              {:type :image :data "aGVsbG8=" :mime-type "image/png"}]
+                  :timestamp 1001}
+                 {:role        :assistant
+                  :content     [{:type :thinking :thinking "Need tool." :signature "c2lnX3RoaW5raW5n"}
+                                {:type :text :text "Calling tool." :signature "c2lnX3RleHQ="}
+                                {:type      :tool-call
+                                 :id        "call_1"
+                                 :name      "double_number"
+                                 :arguments {:value 21}
+                                 :signature "c2lnX3Rvb2w="}]
+                  :api         :google-generative-ai
+                  :provider    :google
+                  :model       "gemini-2.5-flash"
+                  :usage       {:input        1
+                                :output       1
+                                :cache-read   0
+                                :cache-write  0
+                                :total-tokens 2
+                                :cost         {:input       0.0
+                                               :output      0.0
+                                               :cache-read  0.0
+                                               :cache-write 0.0
+                                               :total       0.0}}
+                  :stop-reason :tool-use
+                  :timestamp   1002}
+                 {:role         :tool-result
+                  :tool-call-id "call_1"
+                  :tool-name    "double_number"
+                  :content      [{:type :text :text "42"}
+                                 {:type :image :data "aGVsbG8=" :mime-type "image/png"}]
+                  :is-error?    false
+                  :timestamp    1003}
+                 {:role      :user
+                  :content   "Now summarize in one sentence."
+                  :timestamp 1004}]}

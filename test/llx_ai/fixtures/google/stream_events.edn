@@ -1,0 +1,9 @@
+[{:candidates [{:content {:parts [{:text "thinking one" :thought true :thoughtSignature "sig-a"}]}}]}
+ {:candidates [{:content {:parts [{:text " text one" :thoughtSignature "sig-b"}]}}]}
+ {:candidates [{:content {:parts [{:functionCall {:id "call_stream" :name "double_number" :args {:value 21}}}]}}]}
+ {:candidates [{:finishReason "STOP"}]
+  :usageMetadata {:promptTokenCount 12
+                  :candidatesTokenCount 4
+                  :thoughtsTokenCount 1
+                  :cachedContentTokenCount 2
+                  :totalTokenCount 19}}]

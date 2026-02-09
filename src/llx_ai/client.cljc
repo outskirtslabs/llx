@@ -2,6 +2,7 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx-ai.adapters.anthropic-messages :as anthropic-messages]
+   [llx-ai.adapters.google-generative-ai :as google-generative-ai]
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.event-stream :as event-stream]
@@ -21,6 +22,9 @@
        builtins-source-id)
       (registry/register-adapter
        (anthropic-messages/adapter)
+       builtins-source-id)
+      (registry/register-adapter
+       (google-generative-ai/adapter)
        builtins-source-id)))
 
 (defn- assert-context!
