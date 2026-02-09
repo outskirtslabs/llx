@@ -72,213 +72,102 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? false :input #{:text}}})
 
-(deftest live-handoff-openai-to-anthropic
-  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (if-not (and openai-key anthropic-key)
-      (is true "Skipping OpenAI->Anthropic handoff: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-      (testing "OpenAI-produced context can continue on Anthropic"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure."
-                      :timestamp 1}
-              step-1 (client/complete openai-model {:messages [user1]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 96})
-              user2  {:role      :user
-                      :content   "Now say hi and mention the previous sentence briefly."
-                      :timestamp 2}
-              step-2 (client/complete anthropic-model {:messages [user1 step-1 user2]}
-                                      {:api-key           anthropic-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
+(defn- handoff-check!
+  [model-a opts-a prompt-a model-b opts-b]
+  (let [user1  {:role      :user
+                :content   prompt-a
+                :timestamp 1}
+        step-1 (client/complete model-a {:messages [user1]} opts-a)
+        user2  {:role      :user
+                :content   "Now say hi and mention the previous sentence briefly."
+                :timestamp 2}
+        step-2 (client/complete model-b {:messages [user1 step-1 user2]} opts-b)]
+    (is (not= :error (:stop-reason step-1)))
+    (is (not= :error (:stop-reason step-2)))
+    (is (seq (:content step-2)))
+    (is (#{:stop :length :tool-use} (:stop-reason step-2)))))
 
-(deftest live-handoff-anthropic-to-openai
-  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (if-not (and openai-key anthropic-key)
-      (is true "Skipping Anthropic->OpenAI handoff: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-      (testing "Anthropic-produced context can continue on OpenAI"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Lisp history."
-                      :timestamp 1}
-              step-1 (client/complete anthropic-model {:messages [user1]}
-                                      {:api-key           anthropic-key
-                                       :max-output-tokens 96})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete openai-model {:messages [user1 step-1 user2]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-openai-responses-to-anthropic
-  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (if-not (and openai-key anthropic-key)
-      (is true "Skipping Responses->Anthropic handoff: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-      (testing "OpenAI Responses-produced context can continue on Anthropic"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure macros."
-                      :timestamp 1}
-              step-1 (client/complete openai-responses-model {:messages [user1]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})
-              user2  {:role      :user
-                      :content   "Now say hi and mention your previous sentence."
-                      :timestamp 2}
-              step-2 (client/complete anthropic-model {:messages [user1 step-1 user2]}
-                                      {:api-key           anthropic-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-anthropic-to-openai-responses
-  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (if-not (and openai-key anthropic-key)
-      (is true "Skipping Anthropic->Responses handoff: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-      (testing "Anthropic-produced context can continue on OpenAI Responses"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Lisp history."
-                      :timestamp 1}
-              step-1 (client/complete anthropic-model {:messages [user1]}
-                                      {:api-key           anthropic-key
-                                       :max-output-tokens 96})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete openai-responses-model {:messages [user1 step-1 user2]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-openai-responses-to-openai-completions
-  (let [openai-key (live-env/get-env "OPENAI_API_KEY")]
-    (if-not openai-key
-      (is true "Skipping Responses->Completions handoff: OPENAI_API_KEY required")
-      (testing "OpenAI Responses-produced context can continue on OpenAI Completions"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure protocols."
-                      :timestamp 1}
-              step-1 (client/complete openai-responses-model {:messages [user1]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete openai-model {:messages [user1 step-1 user2]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-anthropic-to-google
-  (let [anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")
-        google-key    (live-env/get-env "GEMINI_API_KEY")]
-    (if-not (and anthropic-key google-key)
-      (is true "Skipping Anthropic->Google handoff: ANTHROPIC_API_KEY and GEMINI_API_KEY required")
-      (testing "Anthropic-produced context can continue on Google"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure macros."
-                      :timestamp 1}
-              step-1 (client/complete anthropic-model {:messages [user1]}
-                                      {:api-key           anthropic-key
-                                       :max-output-tokens 96})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete google-model {:messages [user1 step-1 user2]}
-                                      {:api-key           google-key
-                                       :max-output-tokens 128
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-google-to-openai-completions
-  (let [openai-key (live-env/get-env "OPENAI_API_KEY")
-        google-key (live-env/get-env "GEMINI_API_KEY")]
-    (if-not (and openai-key google-key)
-      (is true "Skipping Google->OpenAI Completions handoff: GEMINI_API_KEY and OPENAI_API_KEY required")
-      (testing "Google-produced context can continue on OpenAI Completions"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure protocols."
-                      :timestamp 1}
-              step-1 (client/complete google-model {:messages [user1]}
-                                      {:api-key           google-key
-                                       :max-output-tokens 96
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete openai-model {:messages [user1 step-1 user2]}
-                                      {:api-key           openai-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-google-to-mistral
-  (let [google-key  (live-env/get-env "GEMINI_API_KEY")
-        mistral-key (live-env/get-env "MISTRAL_API_KEY")]
-    (if-not (and google-key mistral-key)
-      (is true "Skipping Google->Mistral handoff: GEMINI_API_KEY and MISTRAL_API_KEY required")
-      (testing "Google-produced context can continue on Mistral"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure protocols."
-                      :timestamp 1}
-              step-1 (client/complete google-model {:messages [user1]}
-                                      {:api-key           google-key
-                                       :max-output-tokens 96
-                                       :reasoning         {:level :high :effort :high :summary :detailed}})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete mistral-model {:messages [user1 step-1 user2]}
-                                      {:api-key           mistral-key
-                                       :max-output-tokens 128})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
-
-(deftest live-handoff-mistral-to-openai-compatible
-  (let [mistral-key (live-env/get-env "MISTRAL_API_KEY")]
-    (if-not mistral-key
-      (is true "Skipping Mistral->OpenAI-compatible handoff: MISTRAL_API_KEY required")
-      (testing "Mistral-produced context can continue on OpenAI-compatible"
-        (let [user1  {:role      :user
-                      :content   "Give one short sentence about Clojure macros."
-                      :timestamp 1}
-              step-1 (client/complete mistral-model {:messages [user1]}
-                                      {:api-key           mistral-key
-                                       :max-output-tokens 96})
-              user2  {:role      :user
-                      :content   "Now say hi and summarize your prior sentence."
-                      :timestamp 2}
-              step-2 (client/complete openai-compatible-model {:messages [user1 step-1 user2]}
-                                      {:max-output-tokens 128
-                                       :temperature       0.0})]
-          (is (not= :error (:stop-reason step-1)))
-          (is (not= :error (:stop-reason step-2)))
-          (is (seq (:content step-2)))
-          (is (#{:stop :length :tool-use} (:stop-reason step-2))))))))
+(deftest live-cross-provider-handoff
+  (testing "OpenAI -> Anthropic"
+    (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+          anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+      (if-not (and openai-key anthropic-key)
+        (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
+        (handoff-check! openai-model {:api-key openai-key :max-output-tokens 96}
+                        "Give one short sentence about Clojure."
+                        anthropic-model {:api-key anthropic-key :max-output-tokens 128}))))
+  (testing "Anthropic -> OpenAI"
+    (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+          anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+      (if-not (and openai-key anthropic-key)
+        (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
+        (handoff-check! anthropic-model {:api-key anthropic-key :max-output-tokens 96}
+                        "Give one short sentence about Lisp history."
+                        openai-model {:api-key openai-key :max-output-tokens 128}))))
+  (testing "OpenAI Responses -> Anthropic"
+    (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+          anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+      (if-not (and openai-key anthropic-key)
+        (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
+        (handoff-check! openai-responses-model {:api-key           openai-key
+                                                :max-output-tokens 128
+                                                :reasoning         {:level :high :effort :high :summary :detailed}}
+                        "Give one short sentence about Clojure macros."
+                        anthropic-model {:api-key anthropic-key :max-output-tokens 128}))))
+  (testing "Anthropic -> OpenAI Responses"
+    (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+          anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+      (if-not (and openai-key anthropic-key)
+        (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
+        (handoff-check! anthropic-model {:api-key anthropic-key :max-output-tokens 96}
+                        "Give one short sentence about Lisp history."
+                        openai-responses-model {:api-key           openai-key
+                                                :max-output-tokens 128
+                                                :reasoning         {:level :high :effort :high :summary :detailed}}))))
+  (testing "OpenAI Responses -> OpenAI Completions"
+    (let [openai-key (live-env/get-env "OPENAI_API_KEY")]
+      (if-not openai-key
+        (is true "Skipping: OPENAI_API_KEY required")
+        (handoff-check! openai-responses-model {:api-key           openai-key
+                                                :max-output-tokens 128
+                                                :reasoning         {:level :high :effort :high :summary :detailed}}
+                        "Give one short sentence about Clojure protocols."
+                        openai-model {:api-key openai-key :max-output-tokens 128}))))
+  (testing "Anthropic -> Google"
+    (let [anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")
+          google-key    (live-env/get-env "GEMINI_API_KEY")]
+      (if-not (and anthropic-key google-key)
+        (is true "Skipping: ANTHROPIC_API_KEY and GEMINI_API_KEY required")
+        (handoff-check! anthropic-model {:api-key anthropic-key :max-output-tokens 96}
+                        "Give one short sentence about Clojure macros."
+                        google-model {:api-key           google-key
+                                      :max-output-tokens 128
+                                      :reasoning         {:level :high :effort :high :summary :detailed}}))))
+  (testing "Google -> OpenAI Completions"
+    (let [openai-key (live-env/get-env "OPENAI_API_KEY")
+          google-key (live-env/get-env "GEMINI_API_KEY")]
+      (if-not (and openai-key google-key)
+        (is true "Skipping: GEMINI_API_KEY and OPENAI_API_KEY required")
+        (handoff-check! google-model {:api-key           google-key
+                                      :max-output-tokens 96
+                                      :reasoning         {:level :high :effort :high :summary :detailed}}
+                        "Give one short sentence about Clojure protocols."
+                        openai-model {:api-key openai-key :max-output-tokens 128}))))
+  (testing "Google -> Mistral"
+    (let [google-key  (live-env/get-env "GEMINI_API_KEY")
+          mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+      (if-not (and google-key mistral-key)
+        (is true "Skipping: GEMINI_API_KEY and MISTRAL_API_KEY required")
+        (handoff-check! google-model {:api-key           google-key
+                                      :max-output-tokens 96
+                                      :reasoning         {:level :high :effort :high :summary :detailed}}
+                        "Give one short sentence about Clojure protocols."
+                        mistral-model {:api-key mistral-key :max-output-tokens 128}))))
+  (testing "Mistral -> OpenAI-compatible"
+    (let [mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+      (if-not mistral-key
+        (is true "Skipping: MISTRAL_API_KEY required")
+        (handoff-check! mistral-model {:api-key mistral-key :max-output-tokens 96}
+                        "Give one short sentence about Clojure macros."
+                        openai-compatible-model {:max-output-tokens 128
+                                                 :temperature       0.0})))))

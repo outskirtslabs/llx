@@ -190,83 +190,77 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? false :input #{:text}}})
 
-(deftest live-parity-openai-responses-followup-and-tool
-  (let [api-key (maybe-openai-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity OpenAI Responses test: set "
-                    deep-parity-flag "=1 and OPENAI_API_KEY"))
-      (testing "OpenAI Responses supports follow-up continuity and tool stream events"
-        (follow-up-check! openai-responses-model {:api-key   api-key                                         :max-output-tokens 128
-                                                  :reasoning {:level :high :effort :high :summary :detailed}})
-        (stream-tool-call-check! openai-responses-model {:api-key   api-key                                         :max-output-tokens 128
-                                                         :reasoning {:level :high :effort :high :summary :detailed}})))))
-
-(deftest live-parity-openai-responses-thinking-and-image
-  (let [api-key (maybe-openai-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity OpenAI Responses thinking/image test: set "
-                    deep-parity-flag "=1 and OPENAI_API_KEY"))
-      (testing "OpenAI Responses supports thinking stream and image input"
-        (stream-thinking-check! openai-responses-model {:api-key   api-key                                         :max-output-tokens 128
-                                                        :reasoning {:level :high :effort :high :summary :detailed}})
-        (if (image-parity-enabled?)
-          (image-input-check! openai-responses-model {:api-key api-key :max-output-tokens 128})
-          (is true (str "Skipping image parity check: set " image-parity-flag "=1")))))))
-
-(deftest live-parity-openai-completions-followup-and-tool
-  (let [api-key (maybe-openai-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity OpenAI Completions test: set "
-                    deep-parity-flag "=1 and OPENAI_API_KEY"))
-      (testing "OpenAI Completions supports follow-up continuity and tool stream events"
-        (follow-up-check! openai-completions-model {:api-key api-key :max-output-tokens 128})
-        (stream-tool-call-check! openai-completions-model {:api-key api-key :max-output-tokens 128})))))
-
-(deftest live-parity-anthropic-followup-and-tool
-  (let [api-key (maybe-anthropic-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity Anthropic test: set "
-                    deep-parity-flag "=1 and ANTHROPIC_API_KEY"))
-      (testing "Anthropic supports follow-up continuity and tool stream events"
-        (follow-up-check! anthropic-model {:api-key api-key :max-output-tokens 128})
-        (stream-tool-call-check! anthropic-model {:api-key api-key :max-output-tokens 128})))))
-
-(deftest live-parity-google-followup-and-tool
-  (let [api-key (maybe-google-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity Google test: set "
-                    deep-parity-flag "=1 and GEMINI_API_KEY"))
-      (testing "Google supports follow-up continuity and tool stream events"
-        (follow-up-check! google-model {:api-key   api-key                                         :max-output-tokens 128
-                                        :reasoning {:level :high :effort :high :summary :detailed}})
-        (stream-tool-call-check! google-model {:api-key   api-key                                         :max-output-tokens 128
-                                               :reasoning {:level :high :effort :high :summary :detailed}})))))
-
-(deftest live-parity-google-thinking-and-image
-  (let [api-key (maybe-google-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity Google thinking/image test: set "
-                    deep-parity-flag "=1 and GEMINI_API_KEY"))
-      (testing "Google supports thinking stream and image input"
-        (stream-thinking-check! google-model {:api-key   api-key                                         :max-output-tokens 128
-                                              :reasoning {:level :high :effort :high :summary :detailed}})
-        (if (image-parity-enabled?)
-          (image-input-check! google-model {:api-key   api-key                                         :max-output-tokens 128
-                                            :reasoning {:level :high :effort :high :summary :detailed}})
-          (is true (str "Skipping image parity check: set " image-parity-flag "=1")))))))
-
-(deftest live-parity-mistral-followup-and-tool
-  (let [api-key (maybe-mistral-key)]
-    (if-not (and (deep-parity-enabled?) api-key)
-      (is true (str "Skipping deep parity Mistral test: set "
-                    deep-parity-flag "=1 and MISTRAL_API_KEY"))
-      (testing "Mistral supports follow-up continuity and tool stream events"
-        (follow-up-check! mistral-model {:api-key api-key :max-output-tokens 128})
-        (stream-tool-call-check! mistral-model {:api-key api-key :max-output-tokens 128})))))
-
-(deftest live-parity-openai-compatible-followup-and-tool
-  (if-not (deep-parity-enabled?)
-    (is true (str "Skipping deep parity OpenAI-compatible test: set " deep-parity-flag "=1"))
-    (testing "OpenAI-compatible supports follow-up continuity and tool stream events"
-      (follow-up-check! ollama-model {:max-output-tokens 128 :temperature 0.0})
-      (stream-tool-call-check! ollama-model {:max-output-tokens 128 :temperature 0.0}))))
+(deftest live-provider-parity
+  (testing "OpenAI Responses: follow-up and tool"
+    (let [api-key (maybe-openai-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and OPENAI_API_KEY"))
+        (do
+          (follow-up-check! openai-responses-model {:api-key           api-key
+                                                    :max-output-tokens 128
+                                                    :reasoning         {:level :high :effort :high :summary :detailed}})
+          (stream-tool-call-check! openai-responses-model {:api-key           api-key
+                                                           :max-output-tokens 128
+                                                           :reasoning         {:level :high :effort :high :summary :detailed}})))))
+  (testing "OpenAI Responses: thinking and image"
+    (let [api-key (maybe-openai-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and OPENAI_API_KEY"))
+        (do
+          (stream-thinking-check! openai-responses-model {:api-key           api-key
+                                                          :max-output-tokens 128
+                                                          :reasoning         {:level :high :effort :high :summary :detailed}})
+          (if (image-parity-enabled?)
+            (image-input-check! openai-responses-model {:api-key api-key :max-output-tokens 128})
+            (is true (str "Skipping image parity check: set " image-parity-flag "=1")))))))
+  (testing "OpenAI Completions: follow-up and tool"
+    (let [api-key (maybe-openai-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and OPENAI_API_KEY"))
+        (do
+          (follow-up-check! openai-completions-model {:api-key api-key :max-output-tokens 128})
+          (stream-tool-call-check! openai-completions-model {:api-key api-key :max-output-tokens 128})))))
+  (testing "Anthropic: follow-up and tool"
+    (let [api-key (maybe-anthropic-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and ANTHROPIC_API_KEY"))
+        (do
+          (follow-up-check! anthropic-model {:api-key api-key :max-output-tokens 128})
+          (stream-tool-call-check! anthropic-model {:api-key api-key :max-output-tokens 128})))))
+  (testing "Google: follow-up and tool"
+    (let [api-key (maybe-google-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and GEMINI_API_KEY"))
+        (do
+          (follow-up-check! google-model {:api-key           api-key
+                                          :max-output-tokens 128
+                                          :reasoning         {:level :high :effort :high :summary :detailed}})
+          (stream-tool-call-check! google-model {:api-key           api-key
+                                                 :max-output-tokens 128
+                                                 :reasoning         {:level :high :effort :high :summary :detailed}})))))
+  (testing "Google: thinking and image"
+    (let [api-key (maybe-google-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and GEMINI_API_KEY"))
+        (do
+          (stream-thinking-check! google-model {:api-key           api-key
+                                                :max-output-tokens 128
+                                                :reasoning         {:level :high :effort :high :summary :detailed}})
+          (if (image-parity-enabled?)
+            (image-input-check! google-model {:api-key           api-key
+                                              :max-output-tokens 128
+                                              :reasoning         {:level :high :effort :high :summary :detailed}})
+            (is true (str "Skipping image parity check: set " image-parity-flag "=1")))))))
+  (testing "Mistral: follow-up and tool"
+    (let [api-key (maybe-mistral-key)]
+      (if-not (and (deep-parity-enabled?) api-key)
+        (is true (str "Skipping: set " deep-parity-flag "=1 and MISTRAL_API_KEY"))
+        (do
+          (follow-up-check! mistral-model {:api-key api-key :max-output-tokens 128})
+          (stream-tool-call-check! mistral-model {:api-key api-key :max-output-tokens 128})))))
+  (testing "OpenAI-compatible: follow-up and tool"
+    (if-not (deep-parity-enabled?)
+      (is true (str "Skipping: set " deep-parity-flag "=1"))
+      (do
+        (follow-up-check! ollama-model {:max-output-tokens 128 :temperature 0.0})
+        (stream-tool-call-check! ollama-model {:max-output-tokens 128 :temperature 0.0})))))
