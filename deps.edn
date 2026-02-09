@@ -1,5 +1,5 @@
 {:paths   ["src"]
- :deps    {}
+ :deps    {metosin/malli {:mvn/version "0.17.0"}}
  :aliases {:kaocha {:extra-paths ["test"]
                     :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
                     :main-opts   ["-m" "kaocha.runner"]}
