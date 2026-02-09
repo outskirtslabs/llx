@@ -1,9 +1,13 @@
 {:paths   ["src"]
- :deps    {metosin/malli {:mvn/version "0.17.0"}}
+ :deps    {metosin/malli            {:mvn/version "0.17.0"}
+           org.babashka/http-client {:mvn/version "0.4.23"}
+           org.babashka/json        {:mvn/version "0.1.6"}
+           com.cnuernber/charred    {:mvn/version "1.037"}}
  :aliases {:kaocha {:extra-paths ["test"]
                     :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
                     :main-opts   ["-m" "kaocha.runner"]}
            :dev    {:extra-paths ["dev"]
+                    :jvm-opts ["-Dbabashka.json.provider=com.cnuernber/charred"]
                     :extra-deps  {dev.weavejester/hashp                    {:mvn/version "0.5.1"}
                                   io.github.tonsky/clj-reload              {:mvn/version "1.0.0"}
                                   djblue/portal                            {:mvn/version "0.62.1"}

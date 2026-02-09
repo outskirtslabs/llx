@@ -1,0 +1,30 @@
+(ns llx-ai.live.ollama-smoke-test
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [llx-ai.client.jvm :as client]))
+
+(def live-model
+  {:id             (or (System/getenv "LLX_LIVE_OLLAMA_MODEL") "gemma3:12b")
+   :name           "Live Ollama model"
+   :provider       :openai-compatible
+   :api            :openai-completions
+   :base-url       "http://localhost:11434/v1"
+   :context-window 32768
+   :max-tokens     4096
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
+
+(deftest live-ollama-complete
+  (let [run-live? (= "1" (System/getenv "LLX_RUN_LIVE_TESTS"))]
+    (if run-live?
+      (testing "real Ollama OpenAI-compatible call returns canonical assistant response"
+        (let [out (client/complete live-model
+                                   {:messages [{:role      :user
+                                                :content   "reply with exactly: llx ollama smoke ok"
+                                                :timestamp 1}]}
+                                   {:max-output-tokens 64
+                                    :temperature       0.0})]
+          (is (= :assistant (:role out)))
+          (is (#{:stop :length :tool-use} (:stop-reason out)))
+          (is (seq (:content out)))))
+      (is true "skipped live Ollama test; set LLX_RUN_LIVE_TESTS=1"))))

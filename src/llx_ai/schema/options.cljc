@@ -29,6 +29,8 @@
     [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
     [:reasoning {:optional true} :llx/reasoning-options]
     [:cache-control {:optional true} :llx/cache-control]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
     [:temperature {:optional true} :llx/non-neg-number]
     [:top-p {:optional true} :llx/non-neg-number]
     [:max-output-tokens {:optional true} :llx/non-neg-int]
