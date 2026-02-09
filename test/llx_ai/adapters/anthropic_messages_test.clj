@@ -5,6 +5,8 @@
    [clojure.test :refer [deftest is]]
    [llx-ai.adapters.anthropic-messages :as sut]))
 
+(set! *warn-on-reflection* true)
+
 (def anthropic-model
   {:id             "claude-sonnet-4-5"
    :name           "Claude Sonnet 4.5"

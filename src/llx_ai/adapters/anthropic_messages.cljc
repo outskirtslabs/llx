@@ -1,5 +1,6 @@
 (ns llx-ai.adapters.anthropic-messages
   (:require
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]))
 
 (defn- trim-trailing-slash
@@ -187,48 +188,50 @@
                :input_schema (or (:input-schema tool) {})}))
        vec))
 
-(defn build-request
-  ([env model context opts]
-   (build-request env model context opts false))
-  ([env model context opts stream?]
-   (let [api-key  (or (:api-key opts)
-                      (when-let [env-get (:env/get env)]
-                        (env-get "ANTHROPIC_API_KEY")))
-         _        (when-not (seq api-key)
-                    (throw (ex-info "Anthropic API key is required" {:provider (:provider model)})))
-         payload  (cond-> {:model      (:id model)
-                           :messages   (convert-messages model context)
-                           :max_tokens (or (:max-output-tokens opts)
-                                           (max 1 (long (/ (:max-tokens model) 3))))
-                           :stream     stream?}
-                    (seq (:system-prompt context))
-                    (assoc :system [{:type "text" :text (:system-prompt context)}])
+(>defn build-request
+       ([env model context opts]
+        [map? map? map? map? => map?]
+        (build-request env model context opts false))
+       ([env model context opts stream?]
+        [map? map? map? map? boolean? => map?]
+        (let [api-key  (or (:api-key opts)
+                           (when-let [env-get (:env/get env)]
+                             (env-get "ANTHROPIC_API_KEY")))
+              _        (when-not (seq api-key)
+                         (throw (ex-info "Anthropic API key is required" {:provider (:provider model)})))
+              payload  (cond-> {:model      (:id model)
+                                :messages   (convert-messages model context)
+                                :max_tokens (or (:max-output-tokens opts)
+                                                (max 1 (long (/ (:max-tokens model) 3))))
+                                :stream     stream?}
+                         (seq (:system-prompt context))
+                         (assoc :system [{:type "text" :text (:system-prompt context)}])
 
-                    (contains? opts :temperature)
-                    (assoc :temperature (:temperature opts))
+                         (contains? opts :temperature)
+                         (assoc :temperature (:temperature opts))
 
-                    (seq (:tools context))
-                    (assoc :tools (convert-tools (:tools context)))
+                         (seq (:tools context))
+                         (assoc :tools (convert-tools (:tools context)))
 
-                    (seq (:tools opts))
-                    (assoc :tools (convert-tools (:tools opts)))
+                         (seq (:tools opts))
+                         (assoc :tools (convert-tools (:tools opts)))
 
-                    (:tool-choice opts)
-                    (assoc :tool_choice (if (keyword? (:tool-choice opts))
-                                          {:type (name (:tool-choice opts))}
-                                          {:type (:tool-choice opts)})))
-         base-url (trim-trailing-slash (:base-url model))
-         headers  (cond-> {"Content-Type"      "application/json"
-                           "anthropic-version" "2023-06-01"
-                           "x-api-key"         api-key}
-                    (:headers model) (merge (:headers model))
-                    (:headers opts) (merge (:headers opts)))]
-     {:method  :post
-      :url     (str base-url "/v1/messages")
-      :headers headers
-      :body    ((:json/encode env) payload)
-      :as      (if stream? :stream :string)
-      :throw   false})))
+                         (:tool-choice opts)
+                         (assoc :tool_choice (if (keyword? (:tool-choice opts))
+                                               {:type (name (:tool-choice opts))}
+                                               {:type (:tool-choice opts)})))
+              base-url (trim-trailing-slash (:base-url model))
+              headers  (cond-> {"Content-Type"      "application/json"
+                                "anthropic-version" "2023-06-01"
+                                "x-api-key"         api-key}
+                         (:headers model) (merge (:headers model))
+                         (:headers opts) (merge (:headers opts)))]
+          {:method  :post
+           :url     (str base-url "/v1/messages")
+           :headers headers
+           :body    ((:json/encode env) payload)
+           :as      (if stream? :stream :string)
+           :throw   false})))
 
 (defn- decode-response-body
   [env body]
@@ -256,28 +259,29 @@
        (remove nil?)
        vec))
 
-(defn finalize
-  [env state-or-response]
-  (if (contains? state-or-response :response)
-    (let [response (:response state-or-response)
-          body     (decode-response-body env (:body response))
-          status   (long (or (:status response) 0))]
-      (when (or (< status 200) (>= status 300))
-        (throw
-         (ex-info "Anthropic messages request failed"
-                  {:status status
-                   :error  (or (get-in body [:error :message]) body)})))
-      {:assistant-message {:role        :assistant
-                           :content     (response-content->canonical (:content body))
-                           :api         (get-in state-or-response [:model :api])
-                           :provider    (get-in state-or-response [:model :provider])
-                           :model       (get-in state-or-response [:model :id])
-                           :usage       (usage->canonical (:usage body))
-                           :stop-reason (map-stop-reason (:stop_reason body))
-                           :timestamp   ((:clock/now-ms env))}
-       :events            []})
-    {:assistant-message (:assistant-message state-or-response)
-     :events            []}))
+(>defn finalize
+       [env state-or-response]
+       [map? map? => map?]
+       (if (contains? state-or-response :response)
+         (let [response (:response state-or-response)
+               body     (decode-response-body env (:body response))
+               status   (long (or (:status response) 0))]
+           (when (or (< status 200) (>= status 300))
+             (throw
+              (ex-info "Anthropic messages request failed"
+                       {:status status
+                        :error  (or (get-in body [:error :message]) body)})))
+           {:assistant-message {:role        :assistant
+                                :content     (response-content->canonical (:content body))
+                                :api         (get-in state-or-response [:model :api])
+                                :provider    (get-in state-or-response [:model :provider])
+                                :model       (get-in state-or-response [:model :id])
+                                :usage       (usage->canonical (:usage body))
+                                :stop-reason (map-stop-reason (:stop_reason body))
+                                :timestamp   ((:clock/now-ms env))}
+            :events            []})
+         {:assistant-message (:assistant-message state-or-response)
+          :events            []}))
 
 (defn- init-stream-state
   [env model]
@@ -304,156 +308,159 @@
     (assoc-in state [:assistant-message :usage] (usage->canonical usage))
     state))
 
-(defn decode-event
-  [env state raw-chunk]
-  (let [state (if (:assistant-message state)
-                state
-                (init-stream-state env (:model state)))
-        chunk (cond
-                (map? raw-chunk) raw-chunk
-                (string? raw-chunk) (parse-json-lenient env raw-chunk)
-                :else {})]
-    (case (:type chunk)
-      "message_start"
-      {:state  (update-usage state (get-in chunk [:message :usage]))
-       :events []}
+(>defn decode-event
+       [env state raw-chunk]
+       [map? map? any? => map?]
+       (let [state (if (:assistant-message state)
+                     state
+                     (init-stream-state env (:model state)))
+             chunk (cond
+                     (map? raw-chunk) raw-chunk
+                     (string? raw-chunk) (parse-json-lenient env raw-chunk)
+                     :else {})]
+         (case (:type chunk)
+           "message_start"
+           {:state  (update-usage state (get-in chunk [:message :usage]))
+            :events []}
 
-      "content_block_start"
-      (let [index (:index chunk)
-            block (:content_block chunk)]
-        (case (:type block)
-          "text"
-          (let [{next-state :state content-index :content-index}
-                (append-content-block state {:type :text :text ""})]
-            {:state  (assoc-in next-state [:stream-blocks index]
-                               {:kind :text :content-index content-index})
-             :events [{:type :text-start}]})
+           "content_block_start"
+           (let [index (:index chunk)
+                 block (:content_block chunk)]
+             (case (:type block)
+               "text"
+               (let [{next-state :state content-index :content-index}
+                     (append-content-block state {:type :text :text ""})]
+                 {:state  (assoc-in next-state [:stream-blocks index]
+                                    {:kind :text :content-index content-index})
+                  :events [{:type :text-start}]})
 
-          "thinking"
-          (let [{next-state :state content-index :content-index}
-                (append-content-block state {:type :thinking :thinking ""})]
-            {:state  (assoc-in next-state [:stream-blocks index]
-                               {:kind :thinking :content-index content-index})
-             :events [{:type :thinking-start}]})
+               "thinking"
+               (let [{next-state :state content-index :content-index}
+                     (append-content-block state {:type :thinking :thinking ""})]
+                 {:state  (assoc-in next-state [:stream-blocks index]
+                                    {:kind :thinking :content-index content-index})
+                  :events [{:type :thinking-start}]})
 
-          "tool_use"
-          (let [{next-state :state content-index :content-index}
-                (append-content-block state {:type      :tool-call
-                                             :id        (:id block)
-                                             :name      (:name block)
-                                             :arguments (or (:input block) {})})]
-            {:state  (assoc-in next-state [:stream-blocks index]
-                               {:kind          :tool-call
-                                :content-index content-index
-                                :id            (:id block)
-                                :name          (:name block)
-                                :partial-json  ""})
-             :events [{:type :toolcall-start :id (:id block) :name (:name block)}]})
+               "tool_use"
+               (let [{next-state :state content-index :content-index}
+                     (append-content-block state {:type      :tool-call
+                                                  :id        (:id block)
+                                                  :name      (:name block)
+                                                  :arguments (or (:input block) {})})]
+                 {:state  (assoc-in next-state [:stream-blocks index]
+                                    {:kind          :tool-call
+                                     :content-index content-index
+                                     :id            (:id block)
+                                     :name          (:name block)
+                                     :partial-json  ""})
+                  :events [{:type :toolcall-start :id (:id block) :name (:name block)}]})
 
-          {:state state :events []}))
+               {:state state :events []}))
 
-      "content_block_delta"
-      (let [index         (:index chunk)
-            stream-block  (get-in state [:stream-blocks index])
-            content-index (:content-index stream-block)
-            current-id    (or (:id stream-block) (get-in state [:assistant-message :content content-index :id]))
-            current-name  (or (:name stream-block) (get-in state [:assistant-message :content content-index :name]))]
-        (case (get-in chunk [:delta :type])
-          "text_delta"
-          (let [delta (get-in chunk [:delta :text] "")]
-            {:state  (update-in state [:assistant-message :content content-index :text] str delta)
-             :events [{:type :text-delta :text delta}]})
+           "content_block_delta"
+           (let [index         (:index chunk)
+                 stream-block  (get-in state [:stream-blocks index])
+                 content-index (:content-index stream-block)
+                 current-id    (or (:id stream-block) (get-in state [:assistant-message :content content-index :id]))
+                 current-name  (or (:name stream-block) (get-in state [:assistant-message :content content-index :name]))]
+             (case (get-in chunk [:delta :type])
+               "text_delta"
+               (let [delta (get-in chunk [:delta :text] "")]
+                 {:state  (update-in state [:assistant-message :content content-index :text] str delta)
+                  :events [{:type :text-delta :text delta}]})
 
-          "thinking_delta"
-          (let [delta (get-in chunk [:delta :thinking] "")]
-            {:state  (update-in state [:assistant-message :content content-index :thinking] str delta)
-             :events [{:type :thinking-delta :thinking delta}]})
+               "thinking_delta"
+               (let [delta (get-in chunk [:delta :thinking] "")]
+                 {:state  (update-in state [:assistant-message :content content-index :thinking] str delta)
+                  :events [{:type :thinking-delta :thinking delta}]})
 
-          "signature_delta"
-          (let [delta (get-in chunk [:delta :signature] "")]
-            {:state  (update-in state [:assistant-message :content content-index :signature] (fnil str "") delta)
-             :events []})
+               "signature_delta"
+               (let [delta (get-in chunk [:delta :signature] "")]
+                 {:state  (update-in state [:assistant-message :content content-index :signature] (fnil str "") delta)
+                  :events []})
 
-          "input_json_delta"
-          (let [delta        (get-in chunk [:delta :partial_json] "")
-                partial-json (str (or (:partial-json stream-block) "") delta)
-                parsed-args  (parse-json-safe env partial-json)
-                next-state   (-> state
-                                 (assoc-in [:stream-blocks index :partial-json] partial-json)
-                                 (assoc-in [:assistant-message :content content-index :arguments] parsed-args))]
-            {:state  next-state
-             :events [{:type :toolcall-delta :id current-id :name current-name :arguments parsed-args}]})
+               "input_json_delta"
+               (let [delta        (get-in chunk [:delta :partial_json] "")
+                     partial-json (str (or (:partial-json stream-block) "") delta)
+                     parsed-args  (parse-json-safe env partial-json)
+                     next-state   (-> state
+                                      (assoc-in [:stream-blocks index :partial-json] partial-json)
+                                      (assoc-in [:assistant-message :content content-index :arguments] parsed-args))]
+                 {:state  next-state
+                  :events [{:type :toolcall-delta :id current-id :name current-name :arguments parsed-args}]})
 
-          {:state state :events []}))
+               {:state state :events []}))
 
-      "content_block_stop"
-      (let [index         (:index chunk)
-            stream-block  (get-in state [:stream-blocks index])
-            content-index (:content-index stream-block)
-            tool-call     (get-in state [:assistant-message :content content-index])]
-        (case (:kind stream-block)
-          :text {:state  (update state :stream-blocks dissoc index)
-                 :events [{:type :text-end}]}
-          :thinking {:state  (update state :stream-blocks dissoc index)
-                     :events [{:type :thinking-end}]}
-          :tool-call {:state  (update state :stream-blocks dissoc index)
-                      :events [{:type      :toolcall-end
-                                :id        (:id tool-call)
-                                :name      (:name tool-call)
-                                :arguments (:arguments tool-call)}]}
-          {:state state :events []}))
+           "content_block_stop"
+           (let [index         (:index chunk)
+                 stream-block  (get-in state [:stream-blocks index])
+                 content-index (:content-index stream-block)
+                 tool-call     (get-in state [:assistant-message :content content-index])]
+             (case (:kind stream-block)
+               :text {:state  (update state :stream-blocks dissoc index)
+                      :events [{:type :text-end}]}
+               :thinking {:state  (update state :stream-blocks dissoc index)
+                          :events [{:type :thinking-end}]}
+               :tool-call {:state  (update state :stream-blocks dissoc index)
+                           :events [{:type      :toolcall-end
+                                     :id        (:id tool-call)
+                                     :name      (:name tool-call)
+                                     :arguments (:arguments tool-call)}]}
+               {:state state :events []}))
 
-      "message_delta"
-      (let [next-state (-> state
-                           (assoc-in [:assistant-message :stop-reason]
-                                     (map-stop-reason (get-in chunk [:delta :stop_reason])))
-                           (update-usage (:usage chunk)))]
-        {:state next-state :events []})
+           "message_delta"
+           (let [next-state (-> state
+                                (assoc-in [:assistant-message :stop-reason]
+                                          (map-stop-reason (get-in chunk [:delta :stop_reason])))
+                                (update-usage (:usage chunk)))]
+             {:state next-state :events []})
 
-      {:state state :events []})))
+           {:state state :events []})))
 
-(defn normalize-error
-  [env ex partial-state]
-  (let [model             (or (:model partial-state) (-> ex ex-data :model))
-        assistant-message (or (:assistant-message partial-state)
-                              (:assistant-message (init-stream-state env model))
-                              {:role        :assistant
-                               :content     []
-                               :api         (:api model)
-                               :provider    (:provider model)
-                               :model       (:id model)
-                               :usage       (empty-usage)
-                               :stop-reason :error
-                               :timestamp   ((:clock/now-ms env))})
-        aborted?          (or (:aborted? (ex-data ex))
-                              (= "Request was aborted" (ex-message ex)))
-        error-detail      (some-> (ex-data ex) :error str)
-        error-message     (or (when (seq (or error-detail ""))
-                                (if (and (ex-message ex) (not (str/includes? (ex-message ex) error-detail)))
-                                  (str (ex-message ex) ": " error-detail)
-                                  error-detail))
-                              (ex-message ex)
-                              (pr-str ex))]
-    (-> assistant-message
-        (assoc :stop-reason (if aborted? :aborted :error))
-        (assoc :error-message error-message))))
+(>defn normalize-error
+       [env ex partial-state]
+       [map? any? any? => map?]
+       (let [model             (or (:model partial-state) (-> ex ex-data :model))
+             assistant-message (or (:assistant-message partial-state)
+                                   (:assistant-message (init-stream-state env model))
+                                   {:role        :assistant
+                                    :content     []
+                                    :api         (:api model)
+                                    :provider    (:provider model)
+                                    :model       (:id model)
+                                    :usage       (empty-usage)
+                                    :stop-reason :error
+                                    :timestamp   ((:clock/now-ms env))})
+             aborted?          (or (:aborted? (ex-data ex))
+                                   (= "Request was aborted" (ex-message ex)))
+             error-detail      (some-> (ex-data ex) :error str)
+             error-message     (or (when (seq (or error-detail ""))
+                                     (if (and (ex-message ex) (not (str/includes? (ex-message ex) error-detail)))
+                                       (str (ex-message ex) ": " error-detail)
+                                       error-detail))
+                                   (ex-message ex)
+                                   (pr-str ex))]
+         (-> assistant-message
+             (assoc :stop-reason (if aborted? :aborted :error))
+             (assoc :error-message error-message))))
 
-(defn open-stream
-  [env _model request-map]
-  (let [response ((:http/request env) request-map)
-        status   (long (or (:status response) 0))]
-    (when (or (< status 200) (>= status 300))
-      (let [body-string (cond
-                          (string? (:body response)) (:body response)
-                          (nil? (:body response)) ""
-                          :else (if-let [read-body-string (:http/read-body-string env)]
-                                  (read-body-string (:body response))
-                                  ""))
-            body        (parse-json-safe env body-string)]
-        (throw (ex-info "Anthropic messages request failed"
-                        {:status status
-                         :error  (or (get-in body [:error :message]) body-string)}))))
-    response))
+(>defn open-stream
+       [env _model request-map]
+       [map? any? map? => map?]
+       (let [response ((:http/request env) request-map)
+             status   (long (or (:status response) 0))]
+         (when (or (< status 200) (>= status 300))
+           (let [body-string (cond
+                               (string? (:body response)) (:body response)
+                               (nil? (:body response)) ""
+                               :else (if-let [read-body-string (:http/read-body-string env)]
+                                       (read-body-string (:body response))
+                                       ""))
+                 body        (parse-json-safe env body-string)]
+             (throw (ex-info "Anthropic messages request failed"
+                             {:status status
+                              :error  (or (get-in body [:error :message]) body-string)}))))
+         response))
 
 (defn adapter
   []

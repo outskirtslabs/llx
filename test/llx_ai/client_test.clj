@@ -11,6 +11,8 @@
    [llx-ai.client.runtime :as runtime]
    [llx-ai.registry :as registry]))
 
+(set! *warn-on-reflection* true)
+
 (def base-model
   {:id             "gpt-4o-mini"
    :name           "GPT-4o Mini"
@@ -504,3 +506,64 @@
                     nil)]
     (is (string? normalized))
     (is (str/includes? normalized "|"))))
+
+(deftest complete-rejects-context-map-with-unknown-keys
+  (let [env     (stub-env (fn [_request]
+                            {:status 200
+                             :body   (json/write-str
+                                      {:choices [{:finish_reason "stop"
+                                                  :message       {:role    "assistant"
+                                                                  :content "ok"}}]
+                                       :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
+        context {:messages [{:role :user :content "hello" :timestamp 1}]
+                 :unknown  true}]
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Schema validation failed"
+         (sut/complete env base-model context {:api-key "x"})))))
+
+(deftest complete-rejects-non-map-opts-with-schema-error
+  (let [env     (stub-env (fn [_request]
+                            {:status 200
+                             :body   (json/write-str
+                                      {:choices [{:finish_reason "stop"
+                                                  :message       {:role    "assistant"
+                                                                  :content "ok"}}]
+                                       :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
+        context {:messages [{:role :user :content "hello" :timestamp 1}]}]
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Schema validation failed"
+         (sut/complete env base-model context [1 2])))))
+
+(deftest complete-fails-fast-on-unknown-openai-completions-stop-reason
+  (let [env     (stub-env (fn [_request]
+                            {:status 200
+                             :body   (json/write-str
+                                      {:choices [{:finish_reason "unknown_new_reason"
+                                                  :message       {:role    "assistant"
+                                                                  :content "ok"}}]
+                                       :usage   {:prompt_tokens 2 :completion_tokens 1 :total_tokens 3}})}))
+        context {:messages [{:role :user :content "hello" :timestamp 1}]}]
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Unknown OpenAI completions stop reason"
+         (sut/complete env base-model context {:api-key "x"})))))
+
+(deftest complete-rejects-malformed-adapter-finalize-result
+  (let [adapter {:api             :openai-completions
+                 :build-request   (fn [_env _model _context _opts _stream?]
+                                    {:method :post :url "https://example.invalid" :headers {} :body "{}"})
+                 :open-stream     (fn [_env _model _request] nil)
+                 :decode-event    (fn [_env state _chunk] {:state state :events []})
+                 :finalize        (fn [_env _state] {:assistant-message {:role :assistant}})
+                 :normalize-error (fn [_env _ex _partial] {})
+                 :supports-model? (fn [_model] true)}
+        reg     (registry/register-adapter (registry/immutable-registry) adapter "test")
+        env     (-> (stub-env (fn [_request] {:status 200 :body "{}"}))
+                    (assoc :registry reg))
+        context {:messages [{:role :user :content "hello" :timestamp 1}]}]
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Schema validation failed"
+         (sut/complete env base-model context {:api-key "x"})))))

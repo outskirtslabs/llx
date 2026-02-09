@@ -1,5 +1,6 @@
 (ns llx-ai.adapters.openai-responses
   (:require
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]))
 
 (defn- trim-trailing-slash
@@ -82,7 +83,7 @@
     "cancelled" :error
     "in_progress" :stop
     "queued" :stop
-    :stop))
+    (throw (ex-info "Unknown OpenAI responses stop reason" {:status status}))))
 
 (defn- short-hash
   [s]
@@ -154,7 +155,7 @@
   (let [fallback (str "msg_" idx)
         v        (or s fallback)]
     (if (> (count v) 64)
-      (str "msg_" (Math/abs (hash v)))
+      (str "msg_" (Math/abs (long (hash v))))
       v)))
 
 (defn- assistant-blocks->responses-items
@@ -264,49 +265,51 @@
                 :parameters  (or (:input-schema tool) {})
                 :strict      false}))))
 
-(defn build-request
-  ([env model context opts]
-   (build-request env model context opts false))
-  ([env model context opts stream?]
-   (let [api-key (or (:api-key opts)
-                     (when-let [env-get (:env/get env)]
-                       (env-get "OPENAI_API_KEY")))
-         _       (when-not (seq api-key)
-                   (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
-         input   (convert-messages env model context)
-         cache   (normalize-cache-control env (:cache-control opts))
-         payload (cond-> {:model                  (:id model)
-                          :input                  input
-                          :stream                 stream?
-                          :store                  false
-                          :prompt_cache_key       (when-not (= :none cache) (:session-id opts))
-                          :prompt_cache_retention (prompt-cache-retention (:base-url model) cache)}
-                   (:max-output-tokens opts) (assoc :max_output_tokens (:max-output-tokens opts))
-                   (contains? opts :temperature) (assoc :temperature (:temperature opts))
-                   (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools (or (:tools context) (:tools opts))))
-                   (and (true? (get-in model [:capabilities :reasoning?]))
-                        (map? (:reasoning opts)))
-                   (assoc :reasoning {:effort  (name (or (get-in opts [:reasoning :effort]) :medium))
-                                      :summary (name (or (get-in opts [:reasoning :summary]) :auto))}
-                          :include ["reasoning.encrypted_content"])
+(>defn build-request
+       ([env model context opts]
+        [map? map? map? map? => map?]
+        (build-request env model context opts false))
+       ([env model context opts stream?]
+        [map? map? map? map? boolean? => map?]
+        (let [api-key (or (:api-key opts)
+                          (when-let [env-get (:env/get env)]
+                            (env-get "OPENAI_API_KEY")))
+              _       (when-not (seq api-key)
+                        (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
+              input   (convert-messages env model context)
+              cache   (normalize-cache-control env (:cache-control opts))
+              payload (cond-> {:model                  (:id model)
+                               :input                  input
+                               :stream                 stream?
+                               :store                  false
+                               :prompt_cache_key       (when-not (= :none cache) (:session-id opts))
+                               :prompt_cache_retention (prompt-cache-retention (:base-url model) cache)}
+                        (:max-output-tokens opts) (assoc :max_output_tokens (:max-output-tokens opts))
+                        (contains? opts :temperature) (assoc :temperature (:temperature opts))
+                        (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools (or (:tools context) (:tools opts))))
+                        (and (true? (get-in model [:capabilities :reasoning?]))
+                             (map? (:reasoning opts)))
+                        (assoc :reasoning {:effort  (name (or (get-in opts [:reasoning :effort]) :medium))
+                                           :summary (name (or (get-in opts [:reasoning :summary]) :auto))}
+                               :include ["reasoning.encrypted_content"])
 
-                   (and (true? (get-in model [:capabilities :reasoning?]))
-                        (not (map? (:reasoning opts)))
-                        (str/starts-with? (:id model) "gpt-5"))
-                   (update :input conj {:role    "developer"
-                                        :content [{:type "input_text"
-                                                   :text "# Juice: 0 !important"}]}))
-         body    ((:json/encode env) payload)
-         headers (cond-> {"Content-Type"  "application/json"
-                          "Authorization" (str "Bearer " api-key)}
-                   (:headers model) (merge (:headers model))
-                   (:headers opts) (merge (:headers opts)))]
-     {:method  :post
-      :url     (str (trim-trailing-slash (:base-url model)) "/responses")
-      :headers headers
-      :body    body
-      :as      (if stream? :stream :string)
-      :throw   false})))
+                        (and (true? (get-in model [:capabilities :reasoning?]))
+                             (not (map? (:reasoning opts)))
+                             (str/starts-with? (:id model) "gpt-5"))
+                        (update :input conj {:role    "developer"
+                                             :content [{:type "input_text"
+                                                        :text "# Juice: 0 !important"}]}))
+              body    ((:json/encode env) payload)
+              headers (cond-> {"Content-Type"  "application/json"
+                               "Authorization" (str "Bearer " api-key)}
+                        (:headers model) (merge (:headers model))
+                        (:headers opts) (merge (:headers opts)))]
+          {:method  :post
+           :url     (str (trim-trailing-slash (:base-url model)) "/responses")
+           :headers headers
+           :body    body
+           :as      (if stream? :stream :string)
+           :throw   false})))
 
 (defn- ensure-stream-state
   [env state]
@@ -332,188 +335,189 @@
          (update-in [:assistant-message :content] conj block))
      idx]))
 
-(defn decode-event
-  [env state raw-chunk]
-  (let [state (ensure-stream-state env state)
-        chunk (cond
-                (map? raw-chunk) raw-chunk
-                (string? raw-chunk) (parse-json-lenient env raw-chunk)
-                :else {})]
-    (case (:type chunk)
-      "response.output_item.added"
-      (let [item (:item chunk)]
-        (case (:type item)
-          "reasoning"
-          (let [[next-state idx] (append-content-block state {:type :thinking :thinking ""})]
-            {:state  (assoc next-state
-                            :current-item item
-                            :current-block {:kind :thinking :index idx})
-             :events [{:type :thinking-start}]})
+(>defn decode-event
+       [env state raw-chunk]
+       [map? map? any? => map?]
+       (let [state (ensure-stream-state env state)
+             chunk (cond
+                     (map? raw-chunk) raw-chunk
+                     (string? raw-chunk) (parse-json-lenient env raw-chunk)
+                     :else {})]
+         (case (:type chunk)
+           "response.output_item.added"
+           (let [item (:item chunk)]
+             (case (:type item)
+               "reasoning"
+               (let [[next-state idx] (append-content-block state {:type :thinking :thinking ""})]
+                 {:state  (assoc next-state
+                                 :current-item item
+                                 :current-block {:kind :thinking :index idx})
+                  :events [{:type :thinking-start}]})
 
-          "message"
-          (let [[next-state idx] (append-content-block state {:type :text :text ""})]
-            {:state  (assoc next-state
-                            :current-item item
-                            :current-block {:kind :text :index idx})
-             :events [{:type :text-start}]})
+               "message"
+               (let [[next-state idx] (append-content-block state {:type :text :text ""})]
+                 {:state  (assoc next-state
+                                 :current-item item
+                                 :current-block {:kind :text :index idx})
+                  :events [{:type :text-start}]})
 
-          "function_call"
-          (let [id               (str (:call_id item) "|" (:id item))
-                [next-state idx] (append-content-block state {:type      :tool-call
-                                                              :id        id
-                                                              :name      (:name item)
-                                                              :arguments {}})]
-            {:state  (assoc next-state
-                            :current-item item
-                            :current-block {:kind         :tool-call
-                                            :index        idx
-                                            :id           id
-                                            :name         (:name item)
-                                            :partial-json (or (:arguments item) "")})
-             :events [{:type :toolcall-start :id id :name (:name item)}]})
+               "function_call"
+               (let [id               (str (:call_id item) "|" (:id item))
+                     [next-state idx] (append-content-block state {:type      :tool-call
+                                                                   :id        id
+                                                                   :name      (:name item)
+                                                                   :arguments {}})]
+                 {:state  (assoc next-state
+                                 :current-item item
+                                 :current-block {:kind         :tool-call
+                                                 :index        idx
+                                                 :id           id
+                                                 :name         (:name item)
+                                                 :partial-json (or (:arguments item) "")})
+                  :events [{:type :toolcall-start :id id :name (:name item)}]})
 
-          {:state state :events []}))
+               {:state state :events []}))
 
-      "response.reasoning_summary_text.delta"
-      (if (= :thinking (get-in state [:current-block :kind]))
-        (let [idx        (get-in state [:current-block :index])
-              delta      (:delta chunk "")
-              next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
-          {:state  next-state
-           :events [{:type :thinking-delta :thinking delta}]})
-        {:state state :events []})
+           "response.reasoning_summary_text.delta"
+           (if (= :thinking (get-in state [:current-block :kind]))
+             (let [idx        (get-in state [:current-block :index])
+                   delta      (:delta chunk "")
+                   next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
+               {:state  next-state
+                :events [{:type :thinking-delta :thinking delta}]})
+             {:state state :events []})
 
-      "response.reasoning_summary_part.done"
-      (if (= :thinking (get-in state [:current-block :kind]))
-        (let [idx        (get-in state [:current-block :index])
-              delta      "\n\n"
-              next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
-          {:state  next-state
-           :events [{:type :thinking-delta :thinking delta}]})
-        {:state state :events []})
+           "response.reasoning_summary_part.done"
+           (if (= :thinking (get-in state [:current-block :kind]))
+             (let [idx        (get-in state [:current-block :index])
+                   delta      "\n\n"
+                   next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
+               {:state  next-state
+                :events [{:type :thinking-delta :thinking delta}]})
+             {:state state :events []})
 
-      "response.output_text.delta"
-      (if (= :text (get-in state [:current-block :kind]))
-        (let [idx        (get-in state [:current-block :index])
-              delta      (:delta chunk "")
-              next-state (update-in state [:assistant-message :content idx :text] str delta)]
-          {:state  next-state
-           :events [{:type :text-delta :text delta}]})
-        {:state state :events []})
+           "response.output_text.delta"
+           (if (= :text (get-in state [:current-block :kind]))
+             (let [idx        (get-in state [:current-block :index])
+                   delta      (:delta chunk "")
+                   next-state (update-in state [:assistant-message :content idx :text] str delta)]
+               {:state  next-state
+                :events [{:type :text-delta :text delta}]})
+             {:state state :events []})
 
-      "response.refusal.delta"
-      (if (= :text (get-in state [:current-block :kind]))
-        (let [idx        (get-in state [:current-block :index])
-              delta      (:delta chunk "")
-              next-state (update-in state [:assistant-message :content idx :text] str delta)]
-          {:state  next-state
-           :events [{:type :text-delta :text delta}]})
-        {:state state :events []})
+           "response.refusal.delta"
+           (if (= :text (get-in state [:current-block :kind]))
+             (let [idx        (get-in state [:current-block :index])
+                   delta      (:delta chunk "")
+                   next-state (update-in state [:assistant-message :content idx :text] str delta)]
+               {:state  next-state
+                :events [{:type :text-delta :text delta}]})
+             {:state state :events []})
 
-      "response.function_call_arguments.delta"
-      (if (= :tool-call (get-in state [:current-block :kind]))
-        (let [delta        (:delta chunk "")
-              partial-json (str (get-in state [:current-block :partial-json] "") delta)
-              args         (parse-json-safe env partial-json)
-              idx          (get-in state [:current-block :index])
-              id           (get-in state [:current-block :id])
-              name         (get-in state [:current-block :name])
-              next-state   (-> state
-                               (assoc-in [:current-block :partial-json] partial-json)
-                               (assoc-in [:assistant-message :content idx :arguments] args))]
-          {:state  next-state
-           :events [{:type :toolcall-delta :id id :name name :arguments args}]})
-        {:state state :events []})
+           "response.function_call_arguments.delta"
+           (if (= :tool-call (get-in state [:current-block :kind]))
+             (let [delta        (:delta chunk "")
+                   partial-json (str (get-in state [:current-block :partial-json] "") delta)
+                   args         (parse-json-safe env partial-json)
+                   idx          (get-in state [:current-block :index])
+                   id           (get-in state [:current-block :id])
+                   name         (get-in state [:current-block :name])
+                   next-state   (-> state
+                                    (assoc-in [:current-block :partial-json] partial-json)
+                                    (assoc-in [:assistant-message :content idx :arguments] args))]
+               {:state  next-state
+                :events [{:type :toolcall-delta :id id :name name :arguments args}]})
+             {:state state :events []})
 
-      "response.function_call_arguments.done"
-      (if (= :tool-call (get-in state [:current-block :kind]))
-        (let [partial-json (:arguments chunk "")
-              args         (parse-json-lenient env partial-json)
-              idx          (get-in state [:current-block :index])
-              next-state   (-> state
-                               (assoc-in [:current-block :partial-json] partial-json)
-                               (assoc-in [:assistant-message :content idx :arguments] args))]
-          {:state next-state :events []})
-        {:state state :events []})
+           "response.function_call_arguments.done"
+           (if (= :tool-call (get-in state [:current-block :kind]))
+             (let [partial-json (:arguments chunk "")
+                   args         (parse-json-lenient env partial-json)
+                   idx          (get-in state [:current-block :index])
+                   next-state   (-> state
+                                    (assoc-in [:current-block :partial-json] partial-json)
+                                    (assoc-in [:assistant-message :content idx :arguments] args))]
+               {:state next-state :events []})
+             {:state state :events []})
 
-      "response.output_item.done"
-      (let [item (:item chunk)]
-        (case (:type item)
-          "reasoning"
-          (if (= :thinking (get-in state [:current-block :kind]))
-            (let [idx        (get-in state [:current-block :index])
-                  thinking   (->> (:summary item)
-                                  (map :text)
-                                  (remove nil?)
-                                  (str/join "\n\n"))
-                  next-state (-> state
-                                 (assoc-in [:assistant-message :content idx :thinking] (or thinking ""))
-                                 (assoc-in [:assistant-message :content idx :signature] ((:json/encode env) item))
-                                 (assoc :current-item nil :current-block nil))]
-              {:state  next-state
-               :events [{:type :thinking-end}]})
-            {:state state :events []})
+           "response.output_item.done"
+           (let [item (:item chunk)]
+             (case (:type item)
+               "reasoning"
+               (if (= :thinking (get-in state [:current-block :kind]))
+                 (let [idx        (get-in state [:current-block :index])
+                       thinking   (->> (:summary item)
+                                       (map :text)
+                                       (remove nil?)
+                                       (str/join "\n\n"))
+                       next-state (-> state
+                                      (assoc-in [:assistant-message :content idx :thinking] (or thinking ""))
+                                      (assoc-in [:assistant-message :content idx :signature] ((:json/encode env) item))
+                                      (assoc :current-item nil :current-block nil))]
+                   {:state  next-state
+                    :events [{:type :thinking-end}]})
+                 {:state state :events []})
 
-          "message"
-          (if (= :text (get-in state [:current-block :kind]))
-            (let [idx        (get-in state [:current-block :index])
-                  text       (->> (:content item)
-                                  (map (fn [part]
-                                         (case (:type part)
-                                           "output_text" (:text part)
-                                           "refusal" (:refusal part)
-                                           nil)))
-                                  (remove nil?)
-                                  (apply str))
-                  next-state (-> state
-                                 (assoc-in [:assistant-message :content idx :text] (or text ""))
-                                 (assoc :current-item nil :current-block nil))]
-              {:state  next-state
-               :events [{:type :text-end}]})
-            {:state state :events []})
+               "message"
+               (if (= :text (get-in state [:current-block :kind]))
+                 (let [idx        (get-in state [:current-block :index])
+                       text       (->> (:content item)
+                                       (map (fn [part]
+                                              (case (:type part)
+                                                "output_text" (:text part)
+                                                "refusal" (:refusal part)
+                                                nil)))
+                                       (remove nil?)
+                                       (apply str))
+                       next-state (-> state
+                                      (assoc-in [:assistant-message :content idx :text] (or text ""))
+                                      (assoc :current-item nil :current-block nil))]
+                   {:state  next-state
+                    :events [{:type :text-end}]})
+                 {:state state :events []})
 
-          "function_call"
-          (if (= :tool-call (get-in state [:current-block :kind]))
-            (let [idx        (get-in state [:current-block :index])
-                  id         (or (get-in state [:current-block :id])
-                                 (str (:call_id item) "|" (:id item)))
-                  name       (or (get-in state [:current-block :name]) (:name item))
-                  args-json  (or (get-in state [:current-block :partial-json]) (:arguments item) "{}")
-                  args       (parse-json-lenient env args-json)
-                  next-state (-> state
-                                 (assoc-in [:assistant-message :content idx :id] id)
-                                 (assoc-in [:assistant-message :content idx :name] name)
-                                 (assoc-in [:assistant-message :content idx :arguments] args)
-                                 (assoc :current-item nil :current-block nil))]
-              {:state  next-state
-               :events [{:type :toolcall-end :id id :name name :arguments args}]})
-            {:state state :events []})
+               "function_call"
+               (if (= :tool-call (get-in state [:current-block :kind]))
+                 (let [idx        (get-in state [:current-block :index])
+                       id         (or (get-in state [:current-block :id])
+                                      (str (:call_id item) "|" (:id item)))
+                       name       (or (get-in state [:current-block :name]) (:name item))
+                       args-json  (or (get-in state [:current-block :partial-json]) (:arguments item) "{}")
+                       args       (parse-json-lenient env args-json)
+                       next-state (-> state
+                                      (assoc-in [:assistant-message :content idx :id] id)
+                                      (assoc-in [:assistant-message :content idx :name] name)
+                                      (assoc-in [:assistant-message :content idx :arguments] args)
+                                      (assoc :current-item nil :current-block nil))]
+                   {:state  next-state
+                    :events [{:type :toolcall-end :id id :name name :arguments args}]})
+                 {:state state :events []})
 
-          {:state state :events []}))
+               {:state state :events []}))
 
-      "response.completed"
-      (let [response   (:response chunk)
-            next-state (-> state
-                           (assoc-in [:assistant-message :usage]
-                                     (usage->canonical
-                                      (:model state)
-                                      (:usage response)
-                                      (:service_tier response)))
-                           (assoc-in [:assistant-message :stop-reason] (map-stop-reason (:status response))))
-            next-state (if (and (= :stop (get-in next-state [:assistant-message :stop-reason]))
-                                (some #(= :tool-call (:type %)) (get-in next-state [:assistant-message :content])))
-                         (assoc-in next-state [:assistant-message :stop-reason] :tool-use)
-                         next-state)]
-        {:state next-state :events []})
+           "response.completed"
+           (let [response   (:response chunk)
+                 next-state (-> state
+                                (assoc-in [:assistant-message :usage]
+                                          (usage->canonical
+                                           (:model state)
+                                           (:usage response)
+                                           (:service_tier response)))
+                                (assoc-in [:assistant-message :stop-reason] (map-stop-reason (:status response))))
+                 next-state (if (and (= :stop (get-in next-state [:assistant-message :stop-reason]))
+                                     (some #(= :tool-call (:type %)) (get-in next-state [:assistant-message :content])))
+                              (assoc-in next-state [:assistant-message :stop-reason] :tool-use)
+                              next-state)]
+             {:state next-state :events []})
 
-      "response.failed"
-      (throw (ex-info "OpenAI responses stream failed" {:error chunk}))
+           "response.failed"
+           (throw (ex-info "OpenAI responses stream failed" {:error chunk}))
 
-      "error"
-      (throw (ex-info "OpenAI responses stream error"
-                      {:error (str "Error Code " (:code chunk) ": " (:message chunk))}))
+           "error"
+           (throw (ex-info "OpenAI responses stream error"
+                           {:error (str "Error Code " (:code chunk) ": " (:message chunk))}))
 
-      {:state state :events []})))
+           {:state state :events []})))
 
 (defn- output-item->canonical-content
   [env item]
@@ -576,57 +580,60 @@
        :stop-reason stop-reason
        :timestamp   ((:clock/now-ms env))})))
 
-(defn finalize
-  [env state-or-response]
-  (if (contains? state-or-response :response)
-    {:assistant-message (response->assistant-message env (:model state-or-response) (:response state-or-response))
-     :events            []}
-    (let [state-or-response (ensure-stream-state env state-or-response)]
-      {:assistant-message (:assistant-message state-or-response)
-       :events            []})))
+(>defn finalize
+       [env state-or-response]
+       [map? map? => map?]
+       (if (contains? state-or-response :response)
+         {:assistant-message (response->assistant-message env (:model state-or-response) (:response state-or-response))
+          :events            []}
+         (let [state-or-response (ensure-stream-state env state-or-response)]
+           {:assistant-message (:assistant-message state-or-response)
+            :events            []})))
 
-(defn normalize-error
-  [env ex partial-state]
-  (let [model             (or (:model partial-state) (-> ex ex-data :model))
-        assistant-message (or (:assistant-message partial-state)
-                              (:assistant-message (ensure-stream-state env {:model model}))
-                              {:role        :assistant
-                               :content     []
-                               :api         (:api model)
-                               :provider    (:provider model)
-                               :model       (:id model)
-                               :usage       (empty-usage)
-                               :stop-reason :error
-                               :timestamp   ((:clock/now-ms env))})
-        aborted?          (or (:aborted? (ex-data ex))
-                              (= "Request was aborted" (ex-message ex)))
-        error-detail      (some-> (ex-data ex) :error str)
-        error-message     (or (when (seq (or error-detail ""))
-                                (if (and (ex-message ex) (not (str/includes? (ex-message ex) error-detail)))
-                                  (str (ex-message ex) ": " error-detail)
-                                  error-detail))
-                              (ex-message ex)
-                              (pr-str ex))]
-    (-> assistant-message
-        (assoc :stop-reason (if aborted? :aborted :error))
-        (assoc :error-message error-message))))
+(>defn normalize-error
+       [env ex partial-state]
+       [map? any? any? => map?]
+       (let [model             (or (:model partial-state) (-> ex ex-data :model))
+             assistant-message (or (:assistant-message partial-state)
+                                   (:assistant-message (ensure-stream-state env {:model model}))
+                                   {:role        :assistant
+                                    :content     []
+                                    :api         (:api model)
+                                    :provider    (:provider model)
+                                    :model       (:id model)
+                                    :usage       (empty-usage)
+                                    :stop-reason :error
+                                    :timestamp   ((:clock/now-ms env))})
+             aborted?          (or (:aborted? (ex-data ex))
+                                   (= "Request was aborted" (ex-message ex)))
+             error-detail      (some-> (ex-data ex) :error str)
+             error-message     (or (when (seq (or error-detail ""))
+                                     (if (and (ex-message ex) (not (str/includes? (ex-message ex) error-detail)))
+                                       (str (ex-message ex) ": " error-detail)
+                                       error-detail))
+                                   (ex-message ex)
+                                   (pr-str ex))]
+         (-> assistant-message
+             (assoc :stop-reason (if aborted? :aborted :error))
+             (assoc :error-message error-message))))
 
-(defn open-stream
-  [env _model request-map]
-  (let [response ((:http/request env) request-map)
-        status   (long (or (:status response) 0))]
-    (when (or (< status 200) (>= status 300))
-      (let [body-string (cond
-                          (string? (:body response)) (:body response)
-                          (nil? (:body response)) ""
-                          :else (if-let [read-body-string (:http/read-body-string env)]
-                                  (read-body-string (:body response))
-                                  ""))
-            body        (parse-json-safe env body-string)]
-        (throw (ex-info "OpenAI responses request failed"
-                        {:status status
-                         :error  (or (get-in body [:error :message]) body-string)}))))
-    response))
+(>defn open-stream
+       [env _model request-map]
+       [map? any? map? => map?]
+       (let [response ((:http/request env) request-map)
+             status   (long (or (:status response) 0))]
+         (when (or (< status 200) (>= status 300))
+           (let [body-string (cond
+                               (string? (:body response)) (:body response)
+                               (nil? (:body response)) ""
+                               :else (if-let [read-body-string (:http/read-body-string env)]
+                                       (read-body-string (:body response))
+                                       ""))
+                 body        (parse-json-safe env body-string)]
+             (throw (ex-info "OpenAI responses request failed"
+                             {:status status
+                              :error  (or (get-in body [:error :message]) body-string)}))))
+         response))
 
 (defn adapter
   []

@@ -28,4 +28,32 @@
     [:env/get {:optional true} :llx/fn]
     [:log/debug {:optional true} :llx/fn]
     [:log/warn {:optional true} :llx/fn]
-    [:log/error {:optional true} :llx/fn]]})
+    [:log/error {:optional true} :llx/fn]]
+
+   :llx/adapter-request-map
+   [:map
+    [:method :keyword]
+    [:url :string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:body {:optional true} :any]
+    [:as {:optional true} :any]
+    [:throw {:optional true} :boolean]]
+
+   :llx/runtime-decode-event-result
+   [:map {:closed true}
+    [:state :map]
+    [:events [:vector :llx/event]]]
+
+   :llx/runtime-finalize-result
+   [:map {:closed true}
+    [:assistant-message :llx/message-assistant]
+    [:events [:vector :llx/event]]]
+
+   :llx/runtime-run-stream-args
+   [:map {:closed true}
+    [:adapter :llx/adapter]
+    [:env :llx/env]
+    [:model :llx/model]
+    [:request :llx/adapter-request-map]
+    [:out :map]
+    [:state* :any]]})

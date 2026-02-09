@@ -4,6 +4,8 @@
    [llx-ai.client.jvm :as client]
    [llx-ai.live.env :as live-env]))
 
+(set! *warn-on-reflection* true)
+
 (def live-model
   {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_MODEL") "gpt-5.2-2025-12-11")
    :name           "Live OpenAI model"

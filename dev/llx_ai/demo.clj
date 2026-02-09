@@ -4,6 +4,8 @@
    [llx-ai.event-stream :as event-stream]
    [llx-ai.schema :as schema]))
 
+(set! *warn-on-reflection* true)
+
 (def demo-model
   {:id             "gpt-5.2-2025-12-11"
    :name           "GPT-5.2 "

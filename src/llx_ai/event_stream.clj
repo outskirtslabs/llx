@@ -2,6 +2,8 @@
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
 
+(set! *warn-on-reflection* true)
+
 (def ^:private end-marker ::end-of-stream)
 
 (defn create

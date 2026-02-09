@@ -3,6 +3,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]))
 
+(set! *warn-on-reflection* true)
+
 (defn- strip-wrapping-quotes
   [s]
   (if (and (string? s)

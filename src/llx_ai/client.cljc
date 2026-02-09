@@ -1,5 +1,6 @@
 (ns llx-ai.client
   (:require
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx-ai.adapters.anthropic-messages :as anthropic-messages]
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.adapters.openai-responses :as openai-responses]
@@ -24,12 +25,7 @@
 
 (defn- assert-context!
   [context]
-  (let [messages (:messages context)]
-    (when-not (vector? messages)
-      (throw (ex-info "Context must contain :messages vector" {:context context})))
-    (doseq [message messages]
-      (schema/assert-valid! :llx/message message))
-    context))
+  (schema/assert-valid! :llx/context-map context))
 
 (defn- split-client-opts
   [opts]
@@ -73,45 +69,55 @@
       (transform-context-fn model transformed)
       transformed)))
 
-(defn complete
-  [env model context opts]
-  (let [opts                        (or opts {})
-        {:keys [registry-override
-                request-opts]}      (split-client-opts opts)
-        _                           (schema/assert-valid! :llx/env env)
-        _                           (schema/assert-valid! :llx/model model)
-        _                           (schema/assert-valid! :llx/request-options request-opts)
-        context                     (assert-context! context)
-        resolved-registry           (resolve-call-registry env registry-override)
-        adapter                     (select-adapter resolved-registry model)
-        context                     (apply-message-transform env adapter model context)
-        request                     ((:build-request adapter) env model context request-opts false)
-        response                    ((:http/request env) request)
-        {:keys [assistant-message]} ((:finalize adapter) env {:model model :response response})]
-    assistant-message))
+(>defn complete
+       [env model context opts]
+       [map? map? map? [:maybe :map] => map?]
+       (let [_                           (schema/assert-valid! [:maybe :map] opts)
+             opts                        (or opts {})
+             {:keys [registry-override
+                     request-opts]}      (split-client-opts opts)
+             _                           (schema/assert-valid! :llx/env env)
+             _                           (schema/assert-valid! :llx/model model)
+             _                           (schema/assert-valid! :llx/request-options request-opts)
+             context                     (assert-context! context)
+             resolved-registry           (resolve-call-registry env registry-override)
+             adapter                     (select-adapter resolved-registry model)
+             context                     (apply-message-transform env adapter model context)
+             request                     (schema/assert-valid!
+                                          :llx/adapter-request-map
+                                          ((:build-request adapter) env model context request-opts false))
+             response                    ((:http/request env) request)
+             {:keys [assistant-message]} (schema/assert-valid!
+                                          :llx/runtime-finalize-result
+                                          ((:finalize adapter) env {:model model :response response}))]
+         assistant-message))
 
-(defn stream
-  [env model context opts]
-  (let [opts                      (or opts {})
-        {:keys [registry-override
-                request-opts]}    (split-client-opts opts)
-        _                         (schema/assert-valid! :llx/env env)
-        _                         (schema/assert-valid! :llx/model model)
-        _                         (schema/assert-valid! :llx/request-options request-opts)
-        context                   (assert-context! context)
-        resolved-registry         (resolve-call-registry env registry-override)
-        adapter                   (select-adapter resolved-registry model)
-        context                   (apply-message-transform env adapter model context)
-        request                   ((:build-request adapter) env model context request-opts true)
-        out                       (event-stream/assistant-message-stream)
-        state*                    (atom {:model model})
-        run-stream!               (:stream/run! env)]
-    (when-not run-stream!
-      (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
-    (run-stream! {:adapter adapter
-                  :env     env
-                  :model   model
-                  :request request
-                  :out     out
-                  :state*  state*})
-    out))
+(>defn stream
+       [env model context opts]
+       [map? map? map? [:maybe :map] => map?]
+       (let [_                         (schema/assert-valid! [:maybe :map] opts)
+             opts                      (or opts {})
+             {:keys [registry-override
+                     request-opts]}    (split-client-opts opts)
+             _                         (schema/assert-valid! :llx/env env)
+             _                         (schema/assert-valid! :llx/model model)
+             _                         (schema/assert-valid! :llx/request-options request-opts)
+             context                   (assert-context! context)
+             resolved-registry         (resolve-call-registry env registry-override)
+             adapter                   (select-adapter resolved-registry model)
+             context                   (apply-message-transform env adapter model context)
+             request                   (schema/assert-valid!
+                                        :llx/adapter-request-map
+                                        ((:build-request adapter) env model context request-opts true))
+             out                       (event-stream/assistant-message-stream)
+             state*                    (atom {:model model})
+             run-stream!               (:stream/run! env)]
+         (when-not run-stream!
+           (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
+         (run-stream! {:adapter adapter
+                       :env     env
+                       :model   model
+                       :request request
+                       :out     out
+                       :state*  state*})
+         out))

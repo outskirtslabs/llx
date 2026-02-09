@@ -89,4 +89,10 @@
    [:or :llx/message-user :llx/message-assistant :llx/message-tool-result]
 
    :llx/context
-   [:vector :llx/message]})
+   [:vector :llx/message]
+
+   :llx/context-map
+   [:map {:closed true}
+    [:messages :llx/context]
+    [:system-prompt {:optional true} :string]
+    [:tools {:optional true} [:vector :llx/tool]]]})

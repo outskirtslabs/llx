@@ -5,6 +5,8 @@
    [llx-ai.event-stream :as event-stream]
    [llx-ai.live.env :as live-env]))
 
+(set! *warn-on-reflection* true)
+
 (def live-model
   {:id             (or (live-env/get-env "LLX_LIVE_ANTHROPIC_MODEL") "claude-sonnet-4-5")
    :name           "Live Anthropic model"

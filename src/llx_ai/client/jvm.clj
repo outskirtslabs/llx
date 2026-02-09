@@ -5,6 +5,8 @@
    [llx-ai.client :as client]
    [llx-ai.client.runtime :as runtime]))
 
+(set! *warn-on-reflection* true)
+
 (defn default-env
   []
   {:http/request          (fn [request] (http/request request))

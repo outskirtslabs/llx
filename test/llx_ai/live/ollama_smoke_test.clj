@@ -4,6 +4,8 @@
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client.jvm :as client]))
 
+(set! *warn-on-reflection* true)
+
 (def live-model
   {:id             (or (System/getenv "LLX_LIVE_OLLAMA_MODEL") "devstral-small-2:latest")
    :name           "Live Ollama model"

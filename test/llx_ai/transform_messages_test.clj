@@ -5,6 +5,8 @@
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.transform-messages :as sut]))
 
+(set! *warn-on-reflection* true)
+
 (def source-openai-model
   {:provider :openai
    :api      :openai-responses

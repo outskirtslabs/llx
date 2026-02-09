@@ -7,6 +7,8 @@
    [llx-ai.adapters.openai-responses :as sut]
    [llx-ai.transform-messages :as transform-messages]))
 
+(set! *warn-on-reflection* true)
+
 (def openai-responses-model
   {:id             "gpt-5-mini"
    :name           "GPT-5 Mini"
@@ -184,6 +186,21 @@
                                            :usage  {:input_tokens 12 :output_tokens 4 :total_tokens 16}})}})]
     (is (= :tool-use
            (get-in tool-result [:assistant-message :stop-reason])))))
+
+(deftest finalize-throws-on-unknown-stop-reason
+  (is (thrown-with-msg?
+       clojure.lang.ExceptionInfo
+       #"Unknown OpenAI responses stop reason"
+       (sut/finalize
+        (stub-env)
+        {:model    openai-responses-model
+         :response {:status 200
+                    :body   (json/write-str
+                             {:status "brand_new_reason"
+                              :output [{:type    "message"
+                                        :id      "msg_1"
+                                        :content [{:type "output_text" :text "ok"}]}]
+                              :usage  {:input_tokens 1 :output_tokens 1 :total_tokens 2}})}}))))
 
 (deftest finalize-calculates-tier-adjusted-cost-when-usage-present
   (let [model-with-cost (assoc openai-responses-model

@@ -3,6 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.registry :as registry]))
 
+(set! *warn-on-reflection* true)
+
 (def valid-adapter
   {:api             :openai-responses
    :build-request   (fn [_env _model _context _opts _stream?])
@@ -42,3 +44,9 @@
     (is (nil? (registry/get-adapter removed :openai-responses)))
     (is (= :google-generative-ai (-> (registry/get-adapter removed :google-generative-ai) :api)))
     (is (empty? (registry/get-adapters cleared)))))
+
+(deftest get-adapter-rejects-invalid-api-value
+  (is (thrown-with-msg?
+       clojure.lang.ExceptionInfo
+       #"Schema validation failed"
+       (registry/get-adapter (registry/immutable-registry) "openai-responses"))))

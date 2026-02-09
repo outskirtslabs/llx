@@ -5,6 +5,8 @@
    [llx-ai.event-stream :as event-stream]
    [llx-ai.live.env :as live-env]))
 
+(set! *warn-on-reflection* true)
+
 (def live-model
   {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_MODEL") "gpt-5-mini")
    :name           "Live OpenAI Responses model"

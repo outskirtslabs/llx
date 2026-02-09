@@ -4,6 +4,8 @@
    [llx-ai.schema.options :as schema-options]
    [llx-ai.schema :as sut]))
 
+(set! *warn-on-reflection* true)
+
 (def valid-model
   {:id             "gpt-5"
    :name           "GPT-5"
@@ -107,7 +109,15 @@
 
 (deftest context-schema
   (testing "context is an ordered vector of canonical messages"
-    (is (sut/valid? :llx/context [valid-user valid-assistant valid-tool-result]))))
+    (is (sut/valid? :llx/context [valid-user valid-assistant valid-tool-result])))
+
+  (testing "context-map enforces required :messages and optional envelope keys"
+    (is (sut/valid? :llx/context-map
+                    {:messages      [valid-user valid-assistant]
+                     :system-prompt "You are helpful."
+                     :tools         [valid-tool]}))
+    (is (not (sut/valid? :llx/context-map {:messages [valid-user] :unknown true})))
+    (is (not (sut/valid? :llx/context-map {:system-prompt "missing messages"})))))
 
 (deftest event-schemas
   (testing "accepts stream terminal events"
@@ -179,3 +189,25 @@
 
   (testing "rejects env missing required function slots"
     (is (not (sut/valid? :llx/env (dissoc valid-env :http/request))))))
+
+(deftest runtime-boundary-schemas
+  (let [valid-event-transition {:state  {:cursor 1}
+                                :events [{:type :text-delta :text "chunk"}]}
+        valid-finalize-result  {:assistant-message valid-assistant
+                                :events            [{:type :text-end}]}
+        valid-run-stream-args  {:adapter valid-adapter
+                                :env     valid-env
+                                :model   valid-model
+                                :request {:method :post :url "https://example.invalid"}
+                                :out     {:queue :q}
+                                :state*  (atom {:model valid-model})}]
+    (testing "accepts runtime adapter boundary maps"
+      (is (sut/valid? :llx/runtime-decode-event-result valid-event-transition))
+      (is (sut/valid? :llx/runtime-finalize-result valid-finalize-result)))
+
+    (testing "rejects malformed runtime boundary maps"
+      (is (not (sut/valid? :llx/runtime-decode-event-result {:state {} :events [{:type :toolcall-delta :id "c1" :name "tool"}]})))
+      (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []}))))
+
+    (testing "accepts run-stream argument map contract"
+      (is (sut/valid? :llx/runtime-run-stream-args valid-run-stream-args)))))

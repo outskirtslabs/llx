@@ -4,6 +4,8 @@
    [llx-ai.client.jvm :as client]
    [llx-ai.live.env :as live-env]))
 
+(set! *warn-on-reflection* true)
+
 (def openai-model
   {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_MODEL") "gpt-4o-mini")
    :name           "Live OpenAI handoff model"
