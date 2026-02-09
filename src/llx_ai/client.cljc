@@ -2,6 +2,7 @@
   (:require
    [llx-ai.adapters.anthropic-messages :as anthropic-messages]
    [llx-ai.adapters.openai-completions :as openai-completions]
+   [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.registry :as registry]
    [llx-ai.schema :as schema]
@@ -13,6 +14,9 @@
   (-> (registry/immutable-registry)
       (registry/register-adapter
        (openai-completions/adapter)
+       builtins-source-id)
+      (registry/register-adapter
+       (openai-responses/adapter)
        builtins-source-id)
       (registry/register-adapter
        (anthropic-messages/adapter)

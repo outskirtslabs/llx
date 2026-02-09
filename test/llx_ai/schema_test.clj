@@ -1,6 +1,7 @@
 (ns llx-ai.schema-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.schema.options :as schema-options]
    [llx-ai.schema :as sut]))
 
 (def valid-model
@@ -128,6 +129,7 @@
               :tool-choice       :auto
               :reasoning         {:level :high}
               :cache-control     :short
+              :session-id        "demo-openai-responses"
               :temperature       0.3
               :top-p             0.95
               :max-output-tokens 1024
@@ -138,6 +140,15 @@
 
     (testing "rejects unknown request option keys"
       (is (not (sut/valid? :llx/request-options (assoc opts :unknown 1)))))))
+
+(deftest schema-registry-rebuilds-when-component-schemas-change
+  (with-redefs [schema-options/schemas
+                (assoc schema-options/schemas
+                       :llx/request-options
+                       [:map {:closed true}
+                        [:foo :string]])]
+    (is (sut/valid? :llx/request-options {:foo "bar"}))
+    (is (not (sut/valid? :llx/request-options {:session-id "still-old"})))))
 
 (deftest config-schema
   (let [cfg {:providers {:openai            {:api-key "k1"}

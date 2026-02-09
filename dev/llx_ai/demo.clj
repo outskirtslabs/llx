@@ -1,7 +1,5 @@
 (ns llx-ai.demo
   (:require
-   [babashka.json :as json]
-   [llx-ai.client :as client]
    [llx-ai.client.jvm :as jvm]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.schema :as schema]))
@@ -56,11 +54,62 @@
                            {:max-output-tokens 64 :temperature 0.0})]
     (event-stream/drain! stream)
     (event-stream/result stream))
-  (when-let [api-key (System/getenv "ANTHROPIC_API_KEY")]
-    (let [stream (jvm/stream anthropic-model
-                             {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
-                             {:api-key api-key :max-output-tokens 128})]
-      (event-stream/drain! stream)
-      (event-stream/result stream)))
+  (let [stream (jvm/stream anthropic-model
+                           {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
+                           {:max-output-tokens 128})]
+    (event-stream/drain! stream)
+    (event-stream/result stream))
   ;;
-  )
+
+(comment
+    ;; OpenAI Responses demo model + request options
+  (def openai-responses-model
+    {:id             "gpt-5-mini"
+     :name           "GPT-5 Mini"
+     :provider       :openai
+     :api            :openai-responses
+     :base-url       "https://api.openai.com/v1"
+     :context-window 400000
+     :max-tokens     128000
+     :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+     :capabilities   {:reasoning? true :input #{:text}}})
+
+    ;; Responses complete
+  (jvm/complete openai-responses-model
+                {:messages [{:role :user :content "reply with exactly: llx openai responses demo ok" :timestamp 1}]}
+                {:max-output-tokens 96
+                 :reasoning         {:level :high :effort :high :summary :detailed}
+                 :session-id        "demo-openai-responses"
+                 :cache-control     :short})
+;; ERROR
+;; =>  Schema validation failed
+
+    ;; Responses stream
+  (let [stream (jvm/stream openai-responses-model
+                           {:messages [{:role :user :content "reply with exactly: llx openai responses stream demo ok" :timestamp 1}]}
+                           {:max-output-tokens 96
+                            :reasoning         {:level :high :effort :high :summary :detailed}})]
+    (event-stream/drain! stream)
+    (event-stream/result stream))
+
+    ;; Handoff: OpenAI Responses -> Anthropic
+  (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
+        step-1 (jvm/complete openai-responses-model
+                             {:messages [user1]}
+                             {:max-output-tokens 128
+                              :reasoning         {:level :high :effort :high :summary :detailed}})
+        user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (jvm/complete anthropic-model
+                  {:messages [user1 step-1 user2]}
+                  {:max-output-tokens 128}))
+
+    ;; Handoff: Anthropic -> OpenAI Responses
+  (let [user1  {:role :user :content "Give one short sentence about Lisp history." :timestamp 1}
+        step-1 (jvm/complete anthropic-model
+                             {:messages [user1]}
+                             {:max-output-tokens 96})
+        user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (jvm/complete openai-responses-model
+                  {:messages [user1 step-1 user2]}
+                  {:max-output-tokens 128
+                   :reasoning         {:level :high :effort :high :summary :detailed}}))))

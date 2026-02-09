@@ -1,0 +1,46 @@
+{:system-prompt "You are a rigorous assistant."
+ :tools         [{:name         "double_number"
+                  :description  "Double the provided integer."
+                  :input-schema {:type       "object"
+                                 :properties {:value {:type "integer"}}
+                                 :required   ["value"]}}]
+ :messages      [{:role      :user
+                  :content   [{:type :text :text "Use the tool to double 21."}
+                              {:type :image :data "aGVsbG8=" :mime-type "image/png"}]
+                  :timestamp 1001}
+                 {:role        :assistant
+                  :content     [{:type :thinking
+                                 :thinking "Need to call tool."
+                                 :signature "{\"type\":\"reasoning\",\"id\":\"rs_1\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Need to call tool.\"}],\"encrypted_content\":\"enc_1\"}"}
+                                {:type :text
+                                 :text "Calling tool now."
+                                 :signature "msg_assistant_1"}
+                                {:type      :tool-call
+                                 :id        "call_abc|fc_abc"
+                                 :name      "double_number"
+                                 :arguments {:value 21}}]
+                  :api         :openai-responses
+                  :provider    :openai
+                  :model       "gpt-5-mini"
+                  :usage       {:input        12
+                                :output       8
+                                :cache-read   1
+                                :cache-write  0
+                                :total-tokens 21
+                                :cost         {:input       0.0
+                                               :output      0.0
+                                               :cache-read  0.0
+                                               :cache-write 0.0
+                                               :total       0.0}}
+                  :stop-reason :tool-use
+                  :timestamp   1002}
+                 {:role         :tool-result
+                  :tool-call-id "call_abc|fc_abc"
+                  :tool-name    "double_number"
+                  :content      [{:type :text :text "42"}
+                                 {:type :image :data "aGVsbG8=" :mime-type "image/png"}]
+                  :is-error?    false
+                  :timestamp    1003}
+                 {:role      :user
+                  :content   "What was the result?"
+                  :timestamp 1004}]}

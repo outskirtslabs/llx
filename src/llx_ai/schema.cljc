@@ -10,7 +10,8 @@
    [llx-ai.schema.options :as options]
    [llx-ai.schema.runtime :as runtime]))
 
-(def registry
+(defn registry
+  []
   (merge (m/default-schemas)
          core/schemas
          model/schemas
@@ -22,7 +23,7 @@
 
 (defn schema
   [schema-id]
-  (m/schema schema-id {:registry registry}))
+  (m/schema schema-id {:registry (registry)}))
 
 (defn valid?
   [schema-id data]

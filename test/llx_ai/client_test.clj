@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest is]]
    [llx-ai.adapters.anthropic-messages :as anthropic-messages]
    [llx-ai.adapters.openai-completions :as openai-completions]
+   [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client :as sut]
    [llx-ai.client.runtime :as runtime]
@@ -424,3 +425,82 @@
                     nil)]
     (is (re-matches #"[A-Za-z0-9_-]+" normalized))
     (is (<= (count normalized) 64))))
+
+(deftest complete-openai-responses-dispatches-through-registry
+  (let [seen-request (atom nil)
+        model        {:id             "gpt-5-mini"
+                      :name           "GPT-5 Mini"
+                      :provider       :openai
+                      :api            :openai-responses
+                      :base-url       "https://api.openai.com/v1"
+                      :context-window 400000
+                      :max-tokens     128000
+                      :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                      :capabilities   {:reasoning? true :input #{:text}}}
+        env          (stub-env (fn [request]
+                                 (reset! seen-request request)
+                                 {:status 200
+                                  :body   (json/write-str
+                                           {:status "completed"
+                                            :output [{:type    "message"
+                                                      :id      "msg_1"
+                                                      :role    "assistant"
+                                                      :content [{:type "output_text"
+                                                                 :text "hello from responses"}]}]
+                                            :usage  {:input_tokens 6 :output_tokens 4 :total_tokens 10}})}))
+        out          (sut/complete env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                   {:api-key "openai-test-key"})
+        payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
+    (is (= "https://api.openai.com/v1/responses" (:url @seen-request)))
+    (is (= "Bearer openai-test-key" (get-in @seen-request [:headers "Authorization"])))
+    (is (= "gpt-5-mini" (:model payload)))
+    (is (= false (:stream payload)))
+    (is (= :assistant (:role out)))
+    (is (= :stop (:stop-reason out)))
+    (is (= "hello from responses" (get-in out [:content 0 :text])))))
+
+(deftest stream-openai-responses-dispatches-through-registry
+  (let [model  {:id             "gpt-5-mini"
+                :name           "GPT-5 Mini"
+                :provider       :openai
+                :api            :openai-responses
+                :base-url       "https://api.openai.com/v1"
+                :context-window 400000
+                :max-tokens     128000
+                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                :capabilities   {:reasoning? true :input #{:text}}}
+        env    (stub-env (fn [_request]
+                           {:status 200
+                            :body   (sse-body
+                                     [(str "data: " (json/write-str {:type "response.output_item.added"
+                                                                     :item {:type    "message"
+                                                                            :id      "msg_1"
+                                                                            :content []}}))
+                                      (str "data: " (json/write-str {:type "response.content_part.added"
+                                                                     :part {:type "output_text" :text ""}}))
+                                      (str "data: " (json/write-str {:type  "response.output_text.delta"
+                                                                     :delta "hello"}))
+                                      (str "data: " (json/write-str {:type "response.output_item.done"
+                                                                     :item {:type    "message"
+                                                                            :id      "msg_1"
+                                                                            :content [{:type "output_text" :text "hello"}]}}))
+                                      (str "data: " (json/write-str {:type     "response.completed"
+                                                                     :response {:status "completed"
+                                                                                :usage  {:input_tokens 2 :output_tokens 1 :total_tokens 3}}}))
+                                      "data: [DONE]"])}))
+        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                           {:api-key "openai-test-key"})
+        events (event-stream/drain! stream)
+        out    (event-stream/result stream)]
+    (is (= [:start :text-start :text-delta :text-end :done]
+           (mapv :type events)))
+    (is (= "hello" (get-in out [:content 0 :text])))
+    (is (= :stop (:stop-reason out)))))
+
+(deftest openai-responses-normalization-hook-normalizes-pipe-id
+  (let [normalized (openai-responses/normalize-tool-call-id
+                    "call_bad|item/with+chars=="
+                    {:provider :openai :api :openai-responses :id "gpt-5-mini"}
+                    nil)]
+    (is (string? normalized))
+    (is (str/includes? normalized "|"))))

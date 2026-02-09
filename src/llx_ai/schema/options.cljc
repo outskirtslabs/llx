@@ -29,6 +29,7 @@
     [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
     [:reasoning {:optional true} :llx/reasoning-options]
     [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
     [:api-key {:optional true} :llx/id-string]
     [:headers {:optional true} [:map-of :string :string]]
     [:temperature {:optional true} :llx/non-neg-number]

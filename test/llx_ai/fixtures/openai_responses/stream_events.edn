@@ -1,0 +1,50 @@
+[{:type "response.output_item.added"
+  :item {:type "reasoning"
+         :id "rs_1"
+         :summary []}}
+ {:type "response.reasoning_summary_part.added"
+  :part {:type "summary_text" :text ""}}
+ {:type "response.reasoning_summary_text.delta"
+  :delta "Need tool"}
+ {:type "response.reasoning_summary_part.done"}
+ {:type "response.output_item.done"
+  :item {:type "reasoning"
+         :id "rs_1"
+         :summary [{:type "summary_text" :text "Need tool\n\n"}]
+         :encrypted_content "enc_1"}}
+ {:type "response.output_item.added"
+  :item {:type "message"
+         :id "msg_1"
+         :content []}}
+ {:type "response.content_part.added"
+  :part {:type "output_text" :text ""}}
+ {:type "response.output_text.delta"
+  :delta "Hello "}
+ {:type "response.output_text.delta"
+  :delta "world"}
+ {:type "response.output_item.done"
+  :item {:type "message"
+         :id "msg_1"
+         :content [{:type "output_text" :text "Hello world"}]}}
+ {:type "response.output_item.added"
+  :item {:type "function_call"
+         :id "fc_1"
+         :call_id "call_1"
+         :name "double_number"
+         :arguments "{"}}
+ {:type "response.function_call_arguments.delta"
+  :delta "\"value\": 2"}
+ {:type "response.function_call_arguments.done"
+  :arguments "{\"value\": 21}"}
+ {:type "response.output_item.done"
+  :item {:type "function_call"
+         :id "fc_1"
+         :call_id "call_1"
+         :name "double_number"
+         :arguments "{\"value\": 21}"}}
+ {:type "response.completed"
+  :response {:status "completed"
+             :usage {:input_tokens 20
+                     :output_tokens 5
+                     :total_tokens 25
+                     :input_tokens_details {:cached_tokens 4}}}}]
