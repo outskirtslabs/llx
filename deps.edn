@@ -1,0 +1,18 @@
+{:paths   ["src"]
+ :deps    {}
+ :aliases {:kaocha {:extra-paths ["test"]
+                    :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+                    :main-opts   ["-m" "kaocha.runner"]}
+           :dev    {:extra-paths ["dev"]
+                    :extra-deps  {dev.weavejester/hashp                    {:mvn/version "0.5.1"}
+                                  io.github.tonsky/clj-reload              {:mvn/version "1.0.0"}
+                                  djblue/portal                            {:mvn/version "0.62.1"}
+                                  com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}}
+           :build  {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.11"
+                                                                :git/sha "c6c670a"}
+                                 slipset/deps-deploy           {:mvn/version "0.2.2"}}
+                    :ns-default build}
+           :neil   {:project {:name        com.outskirtslabs/TODO
+                              :license     {:id "TODO"}
+                              :description ""
+                              :version     "0.0.TODO"}}}}
