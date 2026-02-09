@@ -4,7 +4,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
    [llx-ai.event-stream :as event-stream]
-   [llx-ai.client :as sut]))
+   [llx-ai.client :as sut]
+   [llx-ai.client.runtime :as runtime]))
 
 (def base-model
   {:id             "gpt-4o-mini"
@@ -19,11 +20,18 @@
 
 (defn stub-env
   [handler]
-  {:http/request handler
-   :json/encode  json/write-str
-   :json/decode  (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :clock/now-ms (fn [] 1730000000000)
-   :id/new       (fn [] "id-1")})
+  {:http/request          handler
+   :json/encode           json/write-str
+   :json/decode           (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :json/decode-safe      (fn [s _opts]
+                            (try
+                              (json/read-str s {:key-fn keyword})
+                              (catch Exception _
+                                nil)))
+   :http/read-body-string (fn [body] (slurp body))
+   :stream/run!           runtime/run-stream!
+   :clock/now-ms          (fn [] 1730000000000)
+   :id/new                (fn [] "id-1")})
 
 (defn- sse-body
   [events]

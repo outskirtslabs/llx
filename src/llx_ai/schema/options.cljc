@@ -4,11 +4,11 @@
 
 (defn schema-form?
   [x]
-  (try
-    (m/schema x)
-    true
-    (catch Exception _
-      false)))
+  (or (m/schema? x)
+      (keyword? x)
+      (vector? x)
+      (map? x)
+      (set? x)))
 
 (def schemas
   {:llx/reasoning-options

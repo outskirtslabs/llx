@@ -11,11 +11,18 @@
     s))
 
 (defn- parse-json-safe
-  [decode-fn s]
-  (try
-    (decode-fn s {:key-fn keyword})
-    (catch Exception _
-      {})))
+  [env s]
+  (if-let [decode-safe-fn (:json/decode-safe env)]
+    (or (decode-safe-fn s {:key-fn keyword}) {})
+    {}))
+
+(defn- parse-json-lenient
+  [env s]
+  (if-let [decode-safe-fn (:json/decode-safe env)]
+    (or (decode-safe-fn s {:key-fn keyword})
+        ((:json/decode env) s {:key-fn keyword})
+        {})
+    ((:json/decode env) s {:key-fn keyword})))
 
 (defn- map-stop-reason
   [finish-reason]
@@ -154,7 +161,7 @@
       :throw   false})))
 
 (defn- message->canonical-content
-  [decode-fn message]
+  [env message]
   (let [tool-calls   (seq (:tool_calls message))
         text-content (:content message)]
     (cond
@@ -163,7 +170,7 @@
               {:type      :tool-call
                :id        (or (:id tc) "")
                :name      (get-in tc [:function :name] "")
-               :arguments (parse-json-safe decode-fn (or (get-in tc [:function :arguments]) "{}"))})
+               :arguments (parse-json-lenient env (or (get-in tc [:function :arguments]) "{}"))})
             tool-calls)
 
       (string? text-content)
@@ -182,18 +189,19 @@
       [])))
 
 (defn- decode-response-body
-  [decode-fn body]
+  [env body]
   (cond
     (map? body) body
-    (string? body) (decode-fn body {:key-fn keyword})
+    (string? body) ((:json/decode env) body {:key-fn keyword})
     (nil? body) {}
-    :else (decode-fn (slurp body) {:key-fn keyword})))
+    :else (if-let [read-body-string (:http/read-body-string env)]
+            ((:json/decode env) (read-body-string body) {:key-fn keyword})
+            {})))
 
 (defn response->assistant-message
   [env model response]
-  (let [decode-fn (:json/decode env)
-        body      (decode-response-body decode-fn (:body response))
-        status    (long (or (:status response) 0))]
+  (let [body   (decode-response-body env (:body response))
+        status (long (or (:status response) 0))]
     (when (or (< status 200) (>= status 300))
       (throw
        (ex-info "OpenAI completions request failed"
@@ -204,7 +212,7 @@
       (when-not choice
         (throw (ex-info "OpenAI completions response missing choices" {:body body})))
       {:role        :assistant
-       :content     (message->canonical-content decode-fn message)
+       :content     (message->canonical-content env message)
        :api         (:api model)
        :provider    (:provider model)
        :model       (:id model)
@@ -293,14 +301,13 @@
 
 (defn decode-event
   [env state raw-chunk]
-  (let [state     (if (:assistant-message state)
-                    state
-                    (init-stream-state env (:model state)))
-        decode-fn (:json/decode env)
-        chunk     (cond
-                    (map? raw-chunk) raw-chunk
-                    (string? raw-chunk) (parse-json-safe decode-fn raw-chunk)
-                    :else {})]
+  (let [state (if (:assistant-message state)
+                state
+                (init-stream-state env (:model state)))
+        chunk (cond
+                (map? raw-chunk) raw-chunk
+                (string? raw-chunk) (parse-json-safe env raw-chunk)
+                :else {})]
     (if-not (seq chunk)
       {:state state :events []}
       (let [state  (if-let [usage (:usage chunk)]
@@ -336,7 +343,7 @@
                   {state1 :state ensure-events :events} (ensure-active-toolcall-block state tool-index id name)
                   args-delta                            (or (get-in tool-call [:function :arguments]) "")
                   partial-args                          (str (:partial-args prior-tool) args-delta)
-                  parsed-args                           (parse-json-safe decode-fn partial-args)
+                  parsed-args                           (parse-json-safe env partial-args)
                   index                                 (get-in state1 [:current-block :index])]
               (recur (-> state1
                          (assoc-in [:assistant-message :content index :id] id)
@@ -394,24 +401,21 @@
         (assoc :error-message error-message))))
 
 (defn open-stream
-  ([env request-map]
-   (let [response ((:http/request env) request-map)
-         status   (long (or (:status response) 0))]
-     (when (or (< status 200) (>= status 300))
-       (let [body-string (try
-                           (cond
-                             (string? (:body response)) (:body response)
-                             (nil? (:body response)) ""
-                             :else (slurp (:body response)))
-                           (catch Exception _
-                             ""))
-             body        (parse-json-safe (:json/decode env) body-string)]
-         (throw (ex-info "OpenAI completions request failed"
-                         {:status status
-                          :error  (or (get-in body [:error :message]) body-string)}))))
-     response))
-  ([env _model request-map]
-   (open-stream env request-map)))
+  [env _model request-map]
+  (let [response ((:http/request env) request-map)
+        status   (long (or (:status response) 0))]
+    (when (or (< status 200) (>= status 300))
+      (let [body-string (cond
+                          (string? (:body response)) (:body response)
+                          (nil? (:body response)) ""
+                          :else (if-let [read-body-string (:http/read-body-string env)]
+                                  (read-body-string (:body response))
+                                  ""))
+            body        (parse-json-safe env body-string)]
+        (throw (ex-info "OpenAI completions request failed"
+                        {:status status
+                         :error  (or (get-in body [:error :message]) body-string)}))))
+    response))
 
 (defn adapter
   []
