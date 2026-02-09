@@ -20,6 +20,7 @@
     [:json/decode-safe {:optional true} :llx/fn]
     [:http/read-body-string {:optional true} :llx/fn]
     [:stream/run! {:optional true} :llx/fn]
+    [:registry {:optional true} :any]
     [:clock/now-ms :llx/fn]
     [:id/new :llx/fn]
     [:env/get {:optional true} :llx/fn]

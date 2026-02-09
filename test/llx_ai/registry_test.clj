@@ -1,6 +1,6 @@
 (ns llx-ai.registry-test
   (:require
-   [clojure.test :refer [deftest is use-fixtures]]
+   [clojure.test :refer [deftest is testing]]
    [llx-ai.registry :as registry]))
 
 (def valid-adapter
@@ -11,33 +11,34 @@
    :finalize        (fn [_env _state] {:assistant-message {} :events []})
    :normalize-error (fn [_env _ex _partial] {})})
 
-(defn- with-registry-snapshot
-  [f]
-  (let [snapshot (registry/get-adapters)]
-    (try
-      (f)
-      (finally
-        (registry/clear!)
-        (doseq [adapter snapshot]
-          (registry/register! adapter))))))
+(deftest immutable-registry-pattern
+  (let [registry (registry/immutable-registry)
+        updated  (registry/register-adapter registry valid-adapter "source-a")]
+    (testing "immutable registry returns new value"
+      (is (nil? (registry/get-adapter registry :openai-responses)))
+      (is (= :openai-responses (-> (registry/get-adapter updated :openai-responses) :api))))
+    (testing "registry map is scoped for future resource types"
+      (is (contains? updated registry/adapters-key))
+      (is (contains? updated registry/tools-key)))))
 
-(use-fixtures :each with-registry-snapshot)
+(deftest mutable-registry-pattern
+  (let [registry* (atom (registry/immutable-registry))
+        impl      (registry/mutable-registry registry*)]
+    (swap! registry* registry/register-adapter valid-adapter "source-a")
+    (is (= :openai-responses (-> (registry/get-adapter impl :openai-responses) :api)))))
 
-(deftest register-and-get-adapter
-  (registry/clear!)
-  (registry/register! valid-adapter "test-source")
-  (is (= :openai-responses (-> (registry/get-adapter :openai-responses) :api))))
+(deftest dynamic-registry-pattern
+  (let [dynamic-impl (registry/dynamic-registry)
+        local-reg    (registry/register-adapter (registry/immutable-registry) valid-adapter "source-a")]
+    (binding [registry/*registry* local-reg]
+      (is (= :openai-responses (-> (registry/get-adapter dynamic-impl :openai-responses) :api))))))
 
-(deftest unregister-source-removes-only-matching-entries
-  (registry/clear!)
-  (registry/register! valid-adapter "test-source")
-  (registry/register! (assoc valid-adapter :api :google-generative-ai) "other-source")
-  (registry/unregister-source! "test-source")
-  (is (nil? (registry/get-adapter :openai-responses)))
-  (is (= :google-generative-ai (-> (registry/get-adapter :google-generative-ai) :api))))
-
-(deftest clear-removes-all-adapters
-  (registry/clear!)
-  (registry/register! valid-adapter "test-source")
-  (registry/clear!)
-  (is (empty? (registry/get-adapters))))
+(deftest unregister-and-clear-adapters
+  (let [registry (-> (registry/immutable-registry)
+                     (registry/register-adapter valid-adapter "source-a")
+                     (registry/register-adapter (assoc valid-adapter :api :google-generative-ai) "source-b"))
+        removed  (registry/unregister-adapters-by-source registry "source-a")
+        cleared  (registry/clear-adapters removed)]
+    (is (nil? (registry/get-adapter removed :openai-responses)))
+    (is (= :google-generative-ai (-> (registry/get-adapter removed :google-generative-ai) :api)))
+    (is (empty? (registry/get-adapters cleared)))))

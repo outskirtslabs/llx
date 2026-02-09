@@ -17,6 +17,7 @@
                                 nil)))
    :http/read-body-string (fn [body] (slurp body))
    :stream/run!           runtime/run-stream!
+   :registry              client/default-registry
    :clock/now-ms          (fn [] (System/currentTimeMillis))
    :id/new                (fn [] (str (java.util.UUID/randomUUID)))
    :env/get               (fn [k] (System/getenv k))})

@@ -7,11 +7,11 @@
 
 (def ^:private builtins-source-id "llx-ai.client/builtins")
 
-(defn register-builtins!
-  []
-  (registry/register! (openai-completions/adapter) builtins-source-id))
-
-(register-builtins!)
+(def default-registry
+  (registry/register-adapter
+   (registry/immutable-registry)
+   (openai-completions/adapter)
+   builtins-source-id))
 
 (defn- assert-context!
   [context]
@@ -22,10 +22,21 @@
       (schema/assert-valid! :llx/message message))
     context))
 
-(defn- resolve-adapter!
-  [model]
+(defn- split-client-opts
+  [opts]
+  {:registry-override (:registry opts)
+   :request-opts      (dissoc opts :registry)})
+
+(defn- resolve-call-registry
+  [env registry-override]
+  (or registry-override
+      (:registry env)
+      default-registry))
+
+(defn- select-adapter
+  [resolved-registry model]
   (let [api     (:api model)
-        adapter (registry/get-adapter api)]
+        adapter (registry/get-adapter resolved-registry api)]
     (when-not adapter
       (throw (ex-info "No adapter registered for api" {:api api})))
     (when-not (= api (:api adapter))
@@ -44,30 +55,36 @@
 (defn complete
   [env model context opts]
   (let [opts                        (or opts {})
+        {:keys [registry-override
+                request-opts]}      (split-client-opts opts)
         _                           (schema/assert-valid! :llx/env env)
         _                           (schema/assert-valid! :llx/model model)
-        _                           (schema/assert-valid! :llx/request-options opts)
+        _                           (schema/assert-valid! :llx/request-options request-opts)
         context                     (assert-context! context)
-        adapter                     (resolve-adapter! model)
+        resolved-registry           (resolve-call-registry env registry-override)
+        adapter                     (select-adapter resolved-registry model)
         context                     (transform-context adapter model context)
-        request                     ((:build-request adapter) env model context opts false)
+        request                     ((:build-request adapter) env model context request-opts false)
         response                    ((:http/request env) request)
         {:keys [assistant-message]} ((:finalize adapter) env {:model model :response response})]
     assistant-message))
 
 (defn stream
   [env model context opts]
-  (let [opts        (or opts {})
-        _           (schema/assert-valid! :llx/env env)
-        _           (schema/assert-valid! :llx/model model)
-        _           (schema/assert-valid! :llx/request-options opts)
-        context     (assert-context! context)
-        adapter     (resolve-adapter! model)
-        context     (transform-context adapter model context)
-        request     ((:build-request adapter) env model context opts true)
-        out         (event-stream/assistant-message-stream)
-        state*      (atom {:model model})
-        run-stream! (:stream/run! env)]
+  (let [opts                      (or opts {})
+        {:keys [registry-override
+                request-opts]}    (split-client-opts opts)
+        _                         (schema/assert-valid! :llx/env env)
+        _                         (schema/assert-valid! :llx/model model)
+        _                         (schema/assert-valid! :llx/request-options request-opts)
+        context                   (assert-context! context)
+        resolved-registry         (resolve-call-registry env registry-override)
+        adapter                   (select-adapter resolved-registry model)
+        context                   (transform-context adapter model context)
+        request                   ((:build-request adapter) env model context request-opts true)
+        out                       (event-stream/assistant-message-stream)
+        state*                    (atom {:model model})
+        run-stream!               (:stream/run! env)]
     (when-not run-stream!
       (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
     (run-stream! {:adapter adapter

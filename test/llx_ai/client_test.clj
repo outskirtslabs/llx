@@ -5,7 +5,8 @@
    [clojure.test :refer [deftest is]]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client :as sut]
-   [llx-ai.client.runtime :as runtime]))
+   [llx-ai.client.runtime :as runtime]
+   [llx-ai.registry :as registry]))
 
 (def base-model
   {:id             "gpt-4o-mini"
@@ -30,6 +31,7 @@
                                 nil)))
    :http/read-body-string (fn [body] (slurp body))
    :stream/run!           runtime/run-stream!
+   :registry              sut/default-registry
    :clock/now-ms          (fn [] 1730000000000)
    :id/new                (fn [] "id-1")})
 
@@ -229,3 +231,22 @@
     (is (= :error (:stop-reason out)))
     (is (string? (:error-message out)))
     (is (.contains ^String (:error-message out) "boom"))))
+
+(deftest opts-registry-overrides-env-registry
+  (let [seen-request (atom nil)
+        env          (stub-env (fn [request]
+                                 (reset! seen-request request)
+                                 {:status 200
+                                  :body   (json/write-str
+                                           {:choices [{:finish_reason "stop"
+                                                       :message       {:role    "assistant"
+                                                                       :content "override ok"}}]
+                                            :usage   {:prompt_tokens     1
+                                                      :completion_tokens 1
+                                                      :total_tokens      2}})}))
+        env          (assoc env :registry (registry/immutable-registry))
+        out          (sut/complete env base-model {:messages [{:role :user :content "ping" :timestamp 1}]}
+                                   {:api-key  "x"
+                                    :registry sut/default-registry})]
+    (is (= "override ok" (get-in out [:content 0 :text])))
+    (is (= "gpt-4o-mini" (get-in (json/read-str (:body @seen-request) {:key-fn keyword}) [:model])))))

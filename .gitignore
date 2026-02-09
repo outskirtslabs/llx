@@ -14,3 +14,4 @@ extra/
 prompts/PROMPTS.md
 result
 .env
+*.md
