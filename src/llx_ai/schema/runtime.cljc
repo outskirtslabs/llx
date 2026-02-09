@@ -10,6 +10,8 @@
     [:finalize :llx/fn]
     [:normalize-error :llx/fn]
     [:supports-model? {:optional true} :llx/fn]
+    [:normalize-tool-call-id {:optional true} :llx/fn]
+    [:transform-options {:optional true} :map]
     [:transform-context {:optional true} :llx/fn]]
 
    :llx/env

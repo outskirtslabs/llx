@@ -3,6 +3,7 @@
    [babashka.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
+   [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client :as sut]
    [llx-ai.client.runtime :as runtime]
@@ -250,3 +251,104 @@
                                     :registry sut/default-registry})]
     (is (= "override ok" (get-in out [:content 0 :text])))
     (is (= "gpt-4o-mini" (get-in (json/read-str (:body @seen-request) {:key-fn keyword}) [:model])))))
+
+(deftest complete-transforms-context-before-build-request
+  (let [captured-context (atom nil)
+        adapter          {:api                    :anthropic-messages
+                          :build-request          (fn [_env _model context _opts _stream?]
+                                                    (reset! captured-context context)
+                                                    {:method :post :url "https://example.invalid" :headers {} :body "{}"})
+                          :open-stream            (fn [_env _model _request] nil)
+                          :decode-event           (fn [_env _state _chunk] {:state {} :events []})
+                          :finalize               (fn [_env {:keys [model]}]
+                                                    {:assistant-message {:role        :assistant
+                                                                         :content     [{:type :text :text "ok"}]
+                                                                         :api         (:api model)
+                                                                         :provider    (:provider model)
+                                                                         :model       (:id model)
+                                                                         :usage       {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                                                                                       :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                                                                         :stop-reason :stop
+                                                                         :timestamp   1730000000000}
+                                                     :events            []})
+                          :normalize-error        (fn [_env _ex _state] nil)
+                          :supports-model?        (fn [_model] true)
+                          :normalize-tool-call-id (fn [_id _target _source] "norm_call_1")}
+        registry         (registry/register-adapter (registry/immutable-registry) adapter "test")
+        env              (-> (stub-env (fn [_request] {:status 200 :body "{}"}))
+                             (assoc :registry registry)
+                             (assoc :clock/now-ms (fn [] 4242)))
+        model            (assoc base-model
+                                :id "claude-sonnet-4-5"
+                                :provider :anthropic
+                                :api :anthropic-messages)
+        context          {:messages [{:role :user :content "use tool" :timestamp 1}
+                                     {:role        :assistant
+                                      :content     [{:type :tool-call :id "call_orig" :name "echo" :arguments {:message "hello"}}]
+                                      :api         :openai-responses
+                                      :provider    :openai
+                                      :model       "gpt-5-mini"
+                                      :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                                                    :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                                      :stop-reason :tool-use
+                                      :timestamp   2}
+                                     {:role :user :content "continue" :timestamp 3}]}]
+    (sut/complete env model context {})
+    (is (= [:user :assistant :tool-result :user]
+           (mapv :role (:messages @captured-context))))
+    (is (= "norm_call_1" (get-in @captured-context [:messages 1 :content 0 :id])))
+    (is (= "norm_call_1" (get-in @captured-context [:messages 2 :tool-call-id])))
+    (is (= true (get-in @captured-context [:messages 2 :is-error?])))
+    (is (= 4242 (get-in @captured-context [:messages 2 :timestamp])))))
+
+(deftest complete-openai-completions-mistral-normalizes-pipe-tool-id
+  (let [pipe-id      "call_pAYbIr76hXIjncD9UE4eGfnS|t5nnb2qYMFWGSsr13fhCd1CaCu3t3qONEPuOudu4HSVEtA8YJSL6FAZUxvoOoD792VIJWl91g87EdqsCWp9krVsdBysQoDaf9lMCLb8BS4EYi4gQd5kBQBYLlgD71PYwvf+TbMD9J9/5OMD42oxSRj8H+vRf78/l2Xla33LWz4nOgsddBlbvabICRs8GHt5C9PK5keFtzyi3lsyVKNlfduK3iphsZqs4MLv4zyGJnvZo/+QzShyk5xnMSQX/f98+aEoNflEApCdEOXipipgeiNWnpFSHbcwmMkZoJhURNu+JEz3xCh1mrXeYoN5o+trLL3IXJacSsLYXDrYTipZZbJFRPAucgbnjYBC+/ZzJOfkwCs+Gkw7EoZR7ZQgJ8ma+9586n4tT4cI8DEhBSZsWMjrCt8dxKg=="
+        seen-request (atom nil)
+        model        {:id             "devstral-medium-latest"
+                      :name           "Devstral Medium"
+                      :provider       :mistral
+                      :api            :openai-completions
+                      :base-url       "https://api.mistral.ai/v1"
+                      :context-window 128000
+                      :max-tokens     8192
+                      :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                      :capabilities   {:reasoning? false :input #{:text}}}
+        env          (stub-env (fn [request]
+                                 (reset! seen-request request)
+                                 {:status 200
+                                  :body   (json/write-str
+                                           {:choices [{:finish_reason "stop"
+                                                       :message       {:role    "assistant"
+                                                                       :content "ok"}}]
+                                            :usage   {:prompt_tokens     1
+                                                      :completion_tokens 1
+                                                      :total_tokens      2}})}))
+        context      {:messages [{:role :user :content "use echo" :timestamp 1}
+                                 {:role        :assistant
+                                  :content     [{:type :tool-call :id pipe-id :name "echo" :arguments {:message "hello"}}]
+                                  :api         :openai-responses
+                                  :provider    :openai
+                                  :model       "gpt-5-mini"
+                                  :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                                                :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                                  :stop-reason :tool-use
+                                  :timestamp   2}
+                                 {:role         :tool-result
+                                  :tool-call-id pipe-id
+                                  :tool-name    "echo"
+                                  :content      [{:type :text :text "hello"}]
+                                  :is-error?    false
+                                  :timestamp    3}
+                                 {:role :user :content "say hi" :timestamp 4}]}
+        _            (sut/complete env model context {:api-key "x"})
+        payload      (json/read-str (:body @seen-request) {:key-fn keyword})
+        call-id      (get-in payload [:messages 1 :tool_calls 0 :id])
+        result-id    (get-in payload [:messages 2 :tool_call_id])]
+    (is (= call-id result-id))
+    (is (= (openai-completions/normalize-tool-call-id
+            pipe-id
+            model
+            (second (:messages context)))
+           call-id))
+    (is (re-matches #"[A-Za-z0-9]{9}" call-id))
+    (is (not (str/includes? call-id "|")))))

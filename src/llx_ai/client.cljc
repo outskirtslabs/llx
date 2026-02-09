@@ -3,7 +3,8 @@
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.registry :as registry]
-   [llx-ai.schema :as schema]))
+   [llx-ai.schema :as schema]
+   [llx-ai.transform-messages :as transform-messages]))
 
 (def ^:private builtins-source-id "llx-ai.client/builtins")
 
@@ -46,11 +47,23 @@
         (throw (ex-info "Adapter does not support model" {:api api :model (:id model)}))))
     adapter))
 
-(defn- transform-context
-  [adapter model context]
-  (if-let [transform-context-fn (:transform-context adapter)]
-    (transform-context-fn model context)
-    context))
+(defn- apply-message-transform
+  [env adapter model context]
+  (let [transform-options (cond-> {:clock/now-ms (:clock/now-ms env)}
+                            (:normalize-tool-call-id adapter)
+                            (assoc :normalize-tool-call-id (:normalize-tool-call-id adapter))
+
+                            (map? (:transform-options adapter))
+                            (merge (:transform-options adapter)))
+        transformed       (assoc context
+                                 :messages
+                                 (transform-messages/for-target-model
+                                  (:messages context)
+                                  model
+                                  transform-options))]
+    (if-let [transform-context-fn (:transform-context adapter)]
+      (transform-context-fn model transformed)
+      transformed)))
 
 (defn complete
   [env model context opts]
@@ -63,7 +76,7 @@
         context                     (assert-context! context)
         resolved-registry           (resolve-call-registry env registry-override)
         adapter                     (select-adapter resolved-registry model)
-        context                     (transform-context adapter model context)
+        context                     (apply-message-transform env adapter model context)
         request                     ((:build-request adapter) env model context request-opts false)
         response                    ((:http/request env) request)
         {:keys [assistant-message]} ((:finalize adapter) env {:model model :response response})]
@@ -80,7 +93,7 @@
         context                   (assert-context! context)
         resolved-registry         (resolve-call-registry env registry-override)
         adapter                   (select-adapter resolved-registry model)
-        context                   (transform-context adapter model context)
+        context                   (apply-message-transform env adapter model context)
         request                   ((:build-request adapter) env model context request-opts true)
         out                       (event-stream/assistant-message-stream)
         state*                    (atom {:model model})

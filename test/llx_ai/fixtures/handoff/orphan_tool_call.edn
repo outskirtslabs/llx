@@ -1,0 +1,22 @@
+[{:role :user
+  :content "Use the calculator tool."
+  :timestamp 1000}
+ {:role :assistant
+  :content [{:type :tool-call
+             :id "call_orphan"
+             :name "calculate"
+             :arguments {:expression "25*18"}}]
+  :api :openai-responses
+  :provider :openai
+  :model "gpt-5-mini"
+  :usage {:input 10
+          :output 5
+          :cache-read 0
+          :cache-write 0
+          :total-tokens 15
+          :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+  :stop-reason :tool-use
+  :timestamp 1001}
+ {:role :user
+  :content "Never mind, what is 2+2?"
+  :timestamp 1002}]

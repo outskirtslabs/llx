@@ -1,0 +1,21 @@
+[{:role :user
+  :content "Use the tool."
+  :timestamp 3000}
+ {:role :assistant
+  :content [{:type :thinking
+             :thinking "internal reasoning"
+             :signature "sig-aborted"}]
+  :api :openai-responses
+  :provider :openai
+  :model "gpt-5-mini"
+  :usage {:input 20
+          :output 4
+          :cache-read 0
+          :cache-write 0
+          :total-tokens 24
+          :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+  :stop-reason :aborted
+  :timestamp 3001}
+ {:role :user
+  :content "Continue."
+  :timestamp 3002}]

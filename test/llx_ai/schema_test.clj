@@ -157,6 +157,10 @@
 (deftest adapter-and-env-schema
   (testing "accepts valid adapter and runtime env"
     (is (sut/valid? :llx/adapter valid-adapter))
+    (is (sut/valid? :llx/adapter
+                    (assoc valid-adapter
+                           :normalize-tool-call-id (fn [_id _model _source] "call_1")
+                           :transform-options {:id-normalization-profile :openai-completions})))
     (is (sut/valid? :llx/env valid-env)))
 
   (testing "rejects adapter missing required function slots"

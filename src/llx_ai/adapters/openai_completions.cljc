@@ -417,13 +417,48 @@
                          :error  (or (get-in body [:error :message]) body-string)}))))
     response))
 
+(defn- mistral-target?
+  [target-model]
+  (let [provider (name (or (:provider target-model) ""))
+        base-url (str/lower-case (or (:base-url target-model) ""))]
+    (or (= provider "mistral")
+        (str/includes? base-url "mistral.ai")
+        (str/includes? base-url "chutes.ai"))))
+
+(defn- normalize-mistral-tool-id
+  [id]
+  (let [normalized (-> id
+                       (str/replace #"[^a-zA-Z0-9]" "")
+                       (subs 0 (min 9 (count (str/replace id #"[^a-zA-Z0-9]" "")))))]
+    (if (< (count normalized) 9)
+      (str normalized (subs "ABCDEFGHI" 0 (- 9 (count normalized))))
+      normalized)))
+
+(defn- strip-openai-responses-pipe-id
+  [tool-call-id]
+  (if (str/includes? tool-call-id "|")
+    (first (str/split tool-call-id #"\|" 2))
+    tool-call-id))
+
+(defn normalize-tool-call-id
+  [tool-call-id target-model _source-assistant-message]
+  (let [id (strip-openai-responses-pipe-id tool-call-id)]
+    (if (mistral-target? target-model)
+      (normalize-mistral-tool-id id)
+      (let [sanitized (str/replace id #"[^a-zA-Z0-9_-]" "_")]
+        (if (> (count sanitized) 40)
+          (subs sanitized 0 40)
+          sanitized)))))
+
 (defn adapter
   []
-  {:api               :openai-completions
-   :build-request     build-request
-   :open-stream       open-stream
-   :decode-event      decode-event
-   :finalize          finalize
-   :normalize-error   normalize-error
-   :supports-model?   (fn [model] (= :openai-completions (:api model)))
-   :transform-context (fn [_model context] context)})
+  {:api                    :openai-completions
+   :build-request          build-request
+   :open-stream            open-stream
+   :decode-event           decode-event
+   :finalize               finalize
+   :normalize-error        normalize-error
+   :supports-model?        (fn [model] (= :openai-completions (:api model)))
+   :normalize-tool-call-id normalize-tool-call-id
+   :transform-options      {:id-normalization-profile :openai-completions}
+   :transform-context      (fn [_model context] context)})
