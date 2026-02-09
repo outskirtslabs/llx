@@ -3,6 +3,7 @@
    [babashka.json :as json]
    [llx-ai.client :as client]
    [llx-ai.client.jvm :as jvm]
+   [llx-ai.event-stream :as event-stream]
    [llx-ai.schema :as schema]))
 
 (def demo-model
@@ -51,6 +52,28 @@
     {:response response
      :request  @seen-request}))
 
+(defn stub-stream
+  []
+  (let [env    {:http/request (fn [_request]
+                                {:status 200
+                                 :body   (java.io.ByteArrayInputStream.
+                                          (.getBytes
+                                           (str "data: " (json/write-str {:choices [{:delta {:content "hello "}}]}) "\n"
+                                                "data: " (json/write-str {:choices [{:delta {:content "stream"} :finish_reason "stop"}]
+                                                                          :usage   {:prompt_tokens     2
+                                                                                    :completion_tokens 2
+                                                                                    :total_tokens      4}}) "\n"
+                                                "data: [DONE]\n")
+                                           "UTF-8"))})
+               :json/encode  json/write-str
+               :json/decode  (fn [s _opts] (json/read-str s {:key-fn keyword}))
+               :clock/now-ms (fn [] 1730000000000)
+               :id/new       (fn [] "id-1")
+               :env/get      (fn [_k] nil)}
+        stream (client/stream env demo-model demo-context {:api-key "demo-key" :max-output-tokens 64})]
+    {:events (event-stream/drain! stream)
+     :result (event-stream/result stream)}))
+
 (comment
   (schema/valid? :llx/model demo-model)
   (schema/valid? :llx/message (first (:messages demo-context)))
@@ -61,6 +84,10 @@
   (jvm/complete ollama-model
                 {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
                 {:max-output-tokens 64 :temperature 0.0})
+  (let [stream (jvm/stream ollama-model
+                           {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
+                           {:max-output-tokens 64 :temperature 0.0})]
+    (event-stream/drain! stream)
+    (event-stream/result stream))
   ;;
   )
-

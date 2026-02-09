@@ -18,3 +18,9 @@
    (complete (default-env) model context opts))
   ([env model context opts]
    (client/complete env model context opts)))
+
+(defn stream
+  ([model context opts]
+   (stream (default-env) model context opts))
+  ([env model context opts]
+   (client/stream env model context opts)))

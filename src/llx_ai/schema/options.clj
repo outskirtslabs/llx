@@ -7,7 +7,7 @@
   (try
     (m/schema x)
     true
-    (catch #?(:clj Exception :cljs :default) _
+    (catch Exception _
       false)))
 
 (def schemas

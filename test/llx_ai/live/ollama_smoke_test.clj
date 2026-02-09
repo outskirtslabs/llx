@@ -1,6 +1,7 @@
 (ns llx-ai.live.ollama-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.event-stream :as event-stream]
    [llx-ai.client.jvm :as client]))
 
 (def live-model
@@ -15,16 +16,28 @@
    :capabilities   {:reasoning? false :input #{:text}}})
 
 (deftest live-ollama-complete
-  (let [run-live? (= "1" (System/getenv "LLX_RUN_LIVE_TESTS"))]
-    (if run-live?
-      (testing "real Ollama OpenAI-compatible call returns canonical assistant response"
-        (let [out (client/complete live-model
-                                   {:messages [{:role      :user
-                                                :content   "reply with exactly: llx ollama smoke ok"
-                                                :timestamp 1}]}
-                                   {:max-output-tokens 64
-                                    :temperature       0.0})]
-          (is (= :assistant (:role out)))
-          (is (#{:stop :length :tool-use} (:stop-reason out)))
-          (is (seq (:content out)))))
-      (is true "skipped live Ollama test; set LLX_RUN_LIVE_TESTS=1"))))
+  (testing "real Ollama OpenAI-compatible call returns canonical assistant response"
+    (let [out (client/complete live-model
+                               {:messages [{:role      :user
+                                            :content   "reply with exactly: llx ollama smoke ok"
+                                            :timestamp 1}]}
+                               {:max-output-tokens 64
+                                :temperature       0.0})]
+      (is (= :assistant (:role out)))
+      (is (#{:stop :length :tool-use} (:stop-reason out)))
+      (is (seq (:content out))))))
+
+(deftest live-ollama-stream
+  (testing "real Ollama OpenAI-compatible stream emits canonical events and terminal assistant result"
+    (let [stream (client/stream live-model
+                                {:messages [{:role      :user
+                                             :content   "reply with exactly: llx ollama stream ok"
+                                             :timestamp 1}]}
+                                {:max-output-tokens 64
+                                 :temperature       0.0})
+          events (event-stream/drain! stream)
+          out    (event-stream/result stream)]
+      (is (= :start (:type (first events))))
+      (is (#{:done :error} (:type (last events))))
+      (is (= :assistant (:role out)))
+      (is (seq (:content out))))))

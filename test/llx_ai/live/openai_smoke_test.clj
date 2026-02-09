@@ -1,10 +1,11 @@
 (ns llx-ai.live.openai-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx-ai.client.jvm :as client]))
+   [llx-ai.client.jvm :as client]
+   [llx-ai.live.env :as live-env]))
 
 (def live-model
-  {:id             (or (System/getenv "LLX_LIVE_OPENAI_MODEL") "")
+  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_MODEL") "gpt-5.2-2025-12-11")
    :name           "Live OpenAI model"
    :provider       :openai
    :api            :openai-completions
@@ -15,10 +16,8 @@
    :capabilities   {:reasoning? false :input #{:text}}})
 
 (deftest live-openai-complete
-  (let [run-live? (= "1" (System/getenv "LLX_RUN_LIVE_TESTS"))
-        api-key   (System/getenv "OPENAI_API_KEY")
-        model-id  (System/getenv "LLX_LIVE_OPENAI_MODEL")]
-    (if (and run-live? api-key model-id)
+  (let [api-key (live-env/get-env "OPENAI_API_KEY")]
+    (if (seq api-key)
       (testing "real OpenAI call returns canonical assistant response"
         (let [out (client/complete live-model
                                    {:messages [{:role      :user
@@ -29,4 +28,4 @@
           (is (= :assistant (:role out)))
           (is (#{:stop :length} (:stop-reason out)))
           (is (seq (:content out)))))
-      (is true "skipped live OpenAI test; set LLX_RUN_LIVE_TESTS=1, OPENAI_API_KEY, LLX_LIVE_OPENAI_MODEL"))))
+      (is true "skipped live OpenAI test; set OPENAI_API_KEY (or provide it in .env)"))))
