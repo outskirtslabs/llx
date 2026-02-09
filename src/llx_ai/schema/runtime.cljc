@@ -16,9 +16,9 @@
    [:map {:closed true}
     [:http/request :llx/fn]
     [:json/encode :llx/fn]
-   [:json/decode :llx/fn]
-   [:clock/now-ms :llx/fn]
-   [:id/new :llx/fn]
+    [:json/decode :llx/fn]
+    [:clock/now-ms :llx/fn]
+    [:id/new :llx/fn]
     [:env/get {:optional true} :llx/fn]
     [:log/debug {:optional true} :llx/fn]
     [:log/warn {:optional true} :llx/fn]

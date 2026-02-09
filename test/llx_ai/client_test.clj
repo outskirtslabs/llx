@@ -1,7 +1,7 @@
 (ns llx-ai.client-test
   (:require
    [babashka.json :as json]
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
    [llx-ai.client :as sut]))
 
 (def base-model

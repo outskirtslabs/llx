@@ -4,7 +4,7 @@
    [llx-ai.client.jvm :as client]))
 
 (def live-model
-  {:id             (or (System/getenv "LLX_LIVE_OLLAMA_MODEL") "gemma3:12b")
+  {:id             (or (System/getenv "LLX_LIVE_OLLAMA_MODEL") "devstral-small-2:latest")
    :name           "Live Ollama model"
    :provider       :openai-compatible
    :api            :openai-completions

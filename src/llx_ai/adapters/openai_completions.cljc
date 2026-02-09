@@ -2,7 +2,9 @@
 
 (defn- trim-trailing-slash
   [s]
-  (if (and (string? s) (.endsWith s "/"))
+  (if (and (string? s)
+           (pos? (count s))
+           (= \/ (nth s (dec (count s)))))
     (subs s 0 (dec (count s)))
     s))
 
@@ -109,7 +111,9 @@
 
 (defn build-request
   [env model context opts]
-  (let [api-key        (or (:api-key opts) (System/getenv "OPENAI_API_KEY"))
+  (let [api-key        (or (:api-key opts)
+                           (when-let [env-get (:env/get env)]
+                             (env-get "OPENAI_API_KEY")))
         needs-api-key? (not= :openai-compatible (:provider model))
         _              (when (and needs-api-key? (not (seq api-key)))
                          (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
