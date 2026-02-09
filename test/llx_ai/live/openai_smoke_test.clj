@@ -17,15 +17,13 @@
 
 (deftest live-openai-complete
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    (if (seq api-key)
-      (testing "real OpenAI call returns canonical assistant response"
-        (let [out (client/complete live-model
-                                   {:messages [{:role      :user
-                                                :content   "reply with exactly: llx smoke ok"
-                                                :timestamp 1}]}
-                                   {:api-key           api-key
-                                    :max-output-tokens 64})]
-          (is (= :assistant (:role out)))
-          (is (#{:stop :length} (:stop-reason out)))
-          (is (seq (:content out)))))
-      (is true "skipped live OpenAI test; set OPENAI_API_KEY (or provide it in .env)"))))
+    (testing "real OpenAI call returns canonical assistant response"
+      (let [out (client/complete live-model
+                                 {:messages [{:role      :user
+                                              :content   "reply with exactly: llx smoke ok"
+                                              :timestamp 1}]}
+                                 {:api-key           api-key
+                                  :max-output-tokens 64})]
+        (is (= :assistant (:role out)))
+        (is (#{:stop :length} (:stop-reason out)))
+        (is (seq (:content out)))))))

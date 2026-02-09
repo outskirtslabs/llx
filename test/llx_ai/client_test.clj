@@ -3,6 +3,7 @@
    [babashka.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
+   [llx-ai.adapters.anthropic-messages :as anthropic-messages]
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client :as sut]
@@ -352,3 +353,74 @@
            call-id))
     (is (re-matches #"[A-Za-z0-9]{9}" call-id))
     (is (not (str/includes? call-id "|")))))
+
+(deftest complete-anthropic-messages-dispatches-through-registry
+  (let [seen-request (atom nil)
+        model        {:id             "claude-sonnet-4-5"
+                      :name           "Claude Sonnet 4.5"
+                      :provider       :anthropic
+                      :api            :anthropic-messages
+                      :base-url       "https://api.anthropic.com"
+                      :context-window 200000
+                      :max-tokens     8192
+                      :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                      :capabilities   {:reasoning? true :input #{:text}}}
+        env          (stub-env (fn [request]
+                                 (reset! seen-request request)
+                                 {:status 200
+                                  :body   (json/write-str
+                                           {:content     [{:type "text" :text "hello from claude"}]
+                                            :stop_reason "end_turn"
+                                            :usage       {:input_tokens 4 :output_tokens 3}})}))
+        out          (sut/complete env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                   {:api-key "anthropic-test-key"})
+        payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
+    (is (= "https://api.anthropic.com/v1/messages" (:url @seen-request)))
+    (is (= "anthropic-test-key" (get-in @seen-request [:headers "x-api-key"])))
+    (is (= "claude-sonnet-4-5" (:model payload)))
+    (is (= [{:role "user" :content "say hi"}] (:messages payload)))
+    (is (= :assistant (:role out)))
+    (is (= :stop (:stop-reason out)))))
+
+(deftest stream-anthropic-messages-dispatches-through-registry
+  (let [model  {:id             "claude-sonnet-4-5"
+                :name           "Claude Sonnet 4.5"
+                :provider       :anthropic
+                :api            :anthropic-messages
+                :base-url       "https://api.anthropic.com"
+                :context-window 200000
+                :max-tokens     8192
+                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                :capabilities   {:reasoning? true :input #{:text}}}
+        env    (stub-env (fn [_request]
+                           {:status 200
+                            :body   (sse-body
+                                     [(str "data: " (json/write-str {:type    "message_start"
+                                                                     :message {:usage {:input_tokens 1 :output_tokens 0}}}))
+                                      (str "data: " (json/write-str {:type          "content_block_start"
+                                                                     :index         0
+                                                                     :content_block {:type "text"}}))
+                                      (str "data: " (json/write-str {:type  "content_block_delta"
+                                                                     :index 0
+                                                                     :delta {:type "text_delta" :text "hello"}}))
+                                      (str "data: " (json/write-str {:type "content_block_stop" :index 0}))
+                                      (str "data: " (json/write-str {:type  "message_delta"
+                                                                     :delta {:stop_reason "end_turn"}
+                                                                     :usage {:input_tokens 1 :output_tokens 1}}))
+                                      "data: [DONE]"])}))
+        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                           {:api-key "anthropic-test-key"})
+        events (event-stream/drain! stream)
+        out    (event-stream/result stream)]
+    (is (= [:start :text-start :text-delta :text-end :done]
+           (mapv :type events)))
+    (is (= "hello" (get-in out [:content 0 :text])))
+    (is (= :stop (:stop-reason out)))))
+
+(deftest anthropic-normalization-hook-sanitizes-tool-call-id
+  (let [normalized (anthropic-messages/normalize-tool-call-id
+                    "call|tool/result?bad"
+                    {:provider :anthropic :api :anthropic-messages :id "claude-sonnet-4-5"}
+                    nil)]
+    (is (re-matches #"[A-Za-z0-9_-]+" normalized))
+    (is (<= (count normalized) 64))))

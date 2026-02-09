@@ -1,0 +1,49 @@
+{:system-prompt "You are helpful."
+ :tools         [{:name         "calculate"
+                  :description  "Calculate a value."
+                  :input-schema {:type       "object"
+                                 :properties {:x {:type "number"}}
+                                 :required   ["x"]}}]
+ :messages      [{:role      :user
+                  :content   [{:type :text :text "Please solve this."}
+                              {:type :image :data "aGVsbG8=" :mime-type "image/png"}
+                              {:type :text :text "  "}]
+                  :timestamp 1}
+                 {:role        :assistant
+                  :content     [{:type :text :text "I will think first."}
+                                {:type :thinking :thinking "internal without signature"}
+                                {:type :thinking :thinking "signed thought" :signature "sig_123"}
+                                {:type      :tool-call
+                                 :id        "toolu_AAA"
+                                 :name      "calculate"
+                                 :arguments {:x 42}}]
+                  :api         :anthropic-messages
+                  :provider    :anthropic
+                  :model       "claude-sonnet-4-5"
+                  :usage       {:input        2
+                                :output       3
+                                :cache-read   0
+                                :cache-write  0
+                                :total-tokens 5
+                                :cost         {:input       0.0
+                                               :output      0.0
+                                               :cache-read  0.0
+                                               :cache-write 0.0
+                                               :total       0.0}}
+                  :stop-reason :tool-use
+                  :timestamp   2}
+                 {:role         :tool-result
+                  :tool-call-id "toolu_AAA"
+                  :tool-name    "calculate"
+                  :content      [{:type :text :text "42"}]
+                  :is-error?    false
+                  :timestamp    3}
+                 {:role         :tool-result
+                  :tool-call-id "toolu_BBB"
+                  :tool-name    "calculate"
+                  :content      [{:type :text :text "41"}]
+                  :is-error?    true
+                  :timestamp    4}
+                 {:role      :user
+                  :content   "continue"
+                  :timestamp 5}]}

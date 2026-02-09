@@ -24,55 +24,19 @@
          :provider :openai-compatible
          :base-url "http://localhost:11434/v1"))
 
+(def anthropic-model
+  {:id             "claude-sonnet-4-5"
+   :name           "Claude Sonnet 4.5"
+   :provider       :anthropic
+   :api            :anthropic-messages
+   :base-url       "https://api.anthropic.com"
+   :context-window 200000
+   :max-tokens     8192
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? true :input #{:text}}})
+
 (def demo-context
   {:messages [{:role :user :content "say hello from llx" :timestamp 1}]})
-
-(defn schema-check
-  [])
-
-(defn stub-complete
-  []
-  (let [seen-request (atom nil)
-        env          {:http/request (fn [request]
-                                      (reset! seen-request request)
-                                      {:status 200
-                                       :body   (json/write-str
-                                                {:choices [{:finish_reason "stop"
-                                                            :message       {:role    "assistant"
-                                                                            :content "hello from stub"}}]
-                                                 :usage   {:prompt_tokens     7
-                                                           :completion_tokens 3
-                                                           :total_tokens      10}})})
-                      :json/encode  json/write-str
-                      :json/decode  (fn [s _opts] (json/read-str s {:key-fn keyword}))
-                      :clock/now-ms (fn [] 1730000000000)
-                      :id/new       (fn [] "id-1")
-                      :env/get      (fn [_k] nil)}
-        response     (client/complete env demo-model demo-context {:api-key "demo-key" :max-output-tokens 64})]
-    {:response response
-     :request  @seen-request}))
-
-(defn stub-stream
-  []
-  (let [env    {:http/request (fn [_request]
-                                {:status 200
-                                 :body   (java.io.ByteArrayInputStream.
-                                          (.getBytes
-                                           (str "data: " (json/write-str {:choices [{:delta {:content "hello "}}]}) "\n"
-                                                "data: " (json/write-str {:choices [{:delta {:content "stream"} :finish_reason "stop"}]
-                                                                          :usage   {:prompt_tokens     2
-                                                                                    :completion_tokens 2
-                                                                                    :total_tokens      4}}) "\n"
-                                                "data: [DONE]\n")
-                                           "UTF-8"))})
-               :json/encode  json/write-str
-               :json/decode  (fn [s _opts] (json/read-str s {:key-fn keyword}))
-               :clock/now-ms (fn [] 1730000000000)
-               :id/new       (fn [] "id-1")
-               :env/get      (fn [_k] nil)}
-        stream (client/stream env demo-model demo-context {:api-key "demo-key" :max-output-tokens 64})]
-    {:events (event-stream/drain! stream)
-     :result (event-stream/result stream)}))
 
 (comment
   (schema/valid? :llx/model demo-model)
@@ -84,10 +48,19 @@
   (jvm/complete ollama-model
                 {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
                 {:max-output-tokens 64 :temperature 0.0})
+  (jvm/complete anthropic-model
+                {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
+                {:max-output-tokens 128})
   (let [stream (jvm/stream ollama-model
                            {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 64 :temperature 0.0})]
     (event-stream/drain! stream)
     (event-stream/result stream))
+  (when-let [api-key (System/getenv "ANTHROPIC_API_KEY")]
+    (let [stream (jvm/stream anthropic-model
+                             {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
+                             {:api-key api-key :max-output-tokens 128})]
+      (event-stream/drain! stream)
+      (event-stream/result stream)))
   ;;
   )
