@@ -657,6 +657,35 @@
         (stream-simple env base-model context {})
         (is (= 16384 (:max-output-tokens @seen-opts*)))))))
 
+(deftest simple-opts-clamps-xhigh-for-non-xhigh-model
+  (let [seen-opts*   (atom nil)
+        expected-out {:fake-stream true}]
+    (with-redefs [sut/stream (fn [_env _model _context opts]
+                               (reset! seen-opts* opts)
+                               expected-out)]
+      (sut/stream-simple (stub-env (fn [_] (throw (ex-info "unexpected" {}))))
+                         base-model
+                         {:messages [{:role :user :content "hello" :timestamp 1}]}
+                         {:reasoning :xhigh :api-key "x"})
+      (is (= {:level :high} (:reasoning @seen-opts*))))))
+
+(deftest simple-opts-preserves-xhigh-for-xhigh-model
+  (let [seen-opts*   (atom nil)
+        expected-out {:fake-stream true}
+        xhigh-model  (assoc base-model
+                            :id "claude-opus-4-6"
+                            :api :anthropic-messages
+                            :provider :anthropic
+                            :capabilities {:reasoning? true :input #{:text}})]
+    (with-redefs [sut/stream (fn [_env _model _context opts]
+                               (reset! seen-opts* opts)
+                               expected-out)]
+      (sut/stream-simple (stub-env (fn [_] (throw (ex-info "unexpected" {}))))
+                         xhigh-model
+                         {:messages [{:role :user :content "hello" :timestamp 1}]}
+                         {:reasoning :xhigh :api-key "x"})
+      (is (= {:level :xhigh} (:reasoning @seen-opts*))))))
+
 (deftest complete-simple-exists
   (let [complete-simple (ns-resolve 'llx-ai.client 'complete-simple)]
     (is (ifn? complete-simple))))

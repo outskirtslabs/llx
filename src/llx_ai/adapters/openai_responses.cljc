@@ -392,6 +392,12 @@
                 :events [{:type :thinking-delta :thinking delta}]})
              {:state state :events []})
 
+           ;; No-op: intermediate event for when a new summary part is added to the
+           ;; reasoning item. We accumulate text via the text.delta events and
+           ;; reconstruct from the output_item.done event, so this is unused.
+           "response.reasoning_summary_part.added"
+           {:state state :events []}
+
            "response.reasoning_summary_part.done"
            (if (= :thinking (get-in state [:current-block :kind]))
              (let [idx        (get-in state [:current-block :index])

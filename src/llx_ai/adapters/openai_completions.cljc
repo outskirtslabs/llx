@@ -82,10 +82,14 @@
                         (str/includes? base-url "mistral.ai")
                         (str/includes? base-url "chutes.ai"))
         mistral?    (or (= provider :mistral)
-                        (str/includes? base-url "mistral.ai"))]
+                        (str/includes? base-url "mistral.ai"))
+        grok?       (or (= provider :xai) (str/includes? base-url "x.ai"))
+        zai?        (or (= provider :zai) (str/includes? base-url "api.z.ai"))]
     {:store?                                (not nonstandard)
      :supports-usage-stream?                true
      :supports-strict-tools?                true
+     :supports-reasoning-effort?            (not (or grok? zai?))
+     :thinking-format                       (cond zai? :zai :else :openai)
      :token-field                           (if mistral? :max_tokens :max_completion_tokens)
      :requires-tool-result-name?            mistral?
      :requires-assistant-after-tool-result? false
@@ -131,29 +135,49 @@
     (case (:role message)
       :user {:role    "user"
              :content (convert-user-content model (:content message))}
-      :assistant (let [msg          {:role "assistant"}
-                       base-text    (assistant-content->string (:content message))
-                       thinking     (->> (:content message)
-                                         (filter #(= :thinking (:type %)))
-                                         (map :thinking)
-                                         (remove str/blank?)
-                                         (str/join "\n\n"))
-                       text-content (if (and (:requires-thinking-as-text? compat-profile) (seq thinking))
-                                      (if (seq base-text)
-                                        (str thinking "\n\n" base-text)
-                                        thinking)
-                                      base-text)
-                       tool-calls   (->> (:content message)
-                                         (filter #(= :tool-call (:type %)))
-                                         (mapv (fn [tool-call]
-                                                 {:id       (:id tool-call)
-                                                  :type     "function"
-                                                  :function {:name      (:name tool-call)
-                                                             :arguments ((:json/encode env) (or (:arguments tool-call) {}))}})))]
-                   (cond
-                     (seq tool-calls) (assoc msg :content (or text-content "") :tool_calls tool-calls)
-                     (some? text-content) (assoc msg :content text-content)
-                     :else nil))
+      :assistant (let [msg               {:role "assistant"}
+                       base-text         (assistant-content->string (:content message))
+                       thinking-blocks   (->> (:content message)
+                                              (filter #(= :thinking (:type %)))
+                                              (filter #(not (str/blank? (:thinking %)))))
+                       thinking          (->> thinking-blocks
+                                              (map :thinking)
+                                              (str/join "\n\n"))
+                       text-content      (if (and (:requires-thinking-as-text? compat-profile) (seq thinking))
+                                           (if (seq base-text)
+                                             (str thinking "\n\n" base-text)
+                                             thinking)
+                                           base-text)
+                       tool-calls        (->> (:content message)
+                                              (filter #(= :tool-call (:type %)))
+                                              (mapv (fn [tool-call]
+                                                      {:id       (:id tool-call)
+                                                       :type     "function"
+                                                       :function {:name      (:name tool-call)
+                                                                  :arguments ((:json/encode env) (or (:arguments tool-call) {}))}})))
+                       reasoning-details (->> (:content message)
+                                              (filter #(= :tool-call (:type %)))
+                                              (keep (fn [tc]
+                                                      (when (:signature tc)
+                                                        (parse-json-safe env (:signature tc)))))
+                                              vec)
+                       first-sig         (when (seq thinking-blocks)
+                                           (:signature (first thinking-blocks)))
+                       msg               (cond
+                                           (seq tool-calls) (assoc msg :content (or text-content "") :tool_calls tool-calls)
+                                           (some? text-content) (assoc msg :content text-content)
+                                           :else nil)
+                       msg               (when msg
+                                           (cond-> msg
+                                             (and (seq thinking-blocks)
+                                                  (not (:requires-thinking-as-text? compat-profile))
+                                                  (seq first-sig))
+                                             (assoc (keyword first-sig)
+                                                    (->> thinking-blocks (map :thinking) (str/join "\n")))
+
+                                             (seq reasoning-details)
+                                             (assoc :reasoning_details reasoning-details)))]
+                   msg)
       :tool-result (cond-> {:role         "tool"
                             :tool_call_id (:tool-call-id message)
                             :content      (let [text (tool-result-content->string (:content message))]
@@ -251,36 +275,56 @@
         (build-request env model context opts false))
        ([env model context opts stream?]
         [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
-        (let [compat-profile (resolve-compat model)
-              api-key        (or (:api-key opts)
-                                 (env-api-key env (:provider model)))
-              needs-api-key? (not= :openai-compatible (:provider model))
-              _              (when (and needs-api-key? (not (seq api-key)))
-                               (throw (ex-info (missing-api-key-message (:provider model))
-                                               {:provider (:provider model)})))
-              payload        (cond-> {:model    (:id model)
-                                      :messages (convert-messages env model context)
-                                      :stream   stream?}
-                               (and stream? (:supports-usage-stream? compat-profile))
-                               (assoc :stream_options {:include_usage true})
+        (let [compat-profile   (resolve-compat model)
+              api-key          (or (:api-key opts)
+                                   (env-api-key env (:provider model)))
+              needs-api-key?   (not= :openai-compatible (:provider model))
+              _                (when (and needs-api-key? (not (seq api-key)))
+                                 (throw (ex-info (missing-api-key-message (:provider model))
+                                                 {:provider (:provider model)})))
+              reasoning-level  (get-in opts [:reasoning :level])
+              reasoning-model? (true? (get-in model [:capabilities :reasoning?]))
+              thinking-format  (or (:thinking-format compat-profile) :openai)
+              payload          (cond-> {:model    (:id model)
+                                        :messages (convert-messages env model context)
+                                        :stream   stream?}
+                                 (and stream? (:supports-usage-stream? compat-profile))
+                                 (assoc :stream_options {:include_usage true})
 
-                               (:store? compat-profile)
-                               (assoc :store false)
+                                 (:store? compat-profile)
+                                 (assoc :store false)
 
-                               (:max-output-tokens opts)
-                               (assoc (or (:token-field compat-profile) :max_completion_tokens)
-                                      (:max-output-tokens opts))
+                                 (:max-output-tokens opts)
+                                 (assoc (or (:token-field compat-profile) :max_completion_tokens)
+                                        (:max-output-tokens opts))
 
-                               (contains? opts :temperature) (assoc :temperature (:temperature opts))
-                               (contains? opts :top-p) (assoc :top_p (:top-p opts))
-                               (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools model (or (:tools context) (:tools opts))))
-                               (:tool-choice opts) (assoc :tool_choice (tool-choice->wire (:tool-choice opts))))
-              body           ((:json/encode env) payload)
-              base-url       (trim-trailing-slash (:base-url model))
-              headers        (cond-> {"Content-Type" "application/json"}
-                               (seq api-key) (assoc "Authorization" (str "Bearer " api-key))
-                               (:headers model) (merge (:headers model))
-                               (:headers opts) (merge (:headers opts)))]
+                                 (and reasoning-level reasoning-model?
+                                      (= :zai thinking-format))
+                                 (assoc :thinking {:type "enabled"})
+
+                                 (and (not reasoning-level) reasoning-model?
+                                      (= :zai thinking-format))
+                                 (assoc :thinking {:type "disabled"})
+
+                                 (and reasoning-level reasoning-model?
+                                      (= :qwen thinking-format))
+                                 (assoc :enable_thinking true)
+
+                                 (and reasoning-level reasoning-model?
+                                      (not (#{:zai :qwen} thinking-format))
+                                      (:supports-reasoning-effort? compat-profile))
+                                 (assoc :reasoning_effort (name reasoning-level))
+
+                                 (contains? opts :temperature) (assoc :temperature (:temperature opts))
+                                 (contains? opts :top-p) (assoc :top_p (:top-p opts))
+                                 (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools model (or (:tools context) (:tools opts))))
+                                 (:tool-choice opts) (assoc :tool_choice (tool-choice->wire (:tool-choice opts))))
+              body             ((:json/encode env) payload)
+              base-url         (trim-trailing-slash (:base-url model))
+              headers          (cond-> {"Content-Type" "application/json"}
+                                 (seq api-key) (assoc "Authorization" (str "Bearer " api-key))
+                                 (:headers model) (merge (:headers model))
+                                 (:headers opts) (merge (:headers opts)))]
           {:method  :post
            :url     (str base-url "/chat/completions")
            :headers headers
@@ -374,6 +418,8 @@
     (case kind
       :text {:state  (assoc state :current-block nil)
              :events [{:type :text-end}]}
+      :thinking {:state  (assoc state :current-block nil)
+                 :events [{:type :thinking-end}]}
       :tool-call (let [tool-call (get-in state [:assistant-message :content index])]
                    {:state  (assoc state :current-block nil)
                     :events [{:type      :toolcall-end
@@ -390,6 +436,26 @@
                  (update-in [:assistant-message :content] conj {:type :text :text ""})
                  (assoc :current-block {:kind :text :index index}))
      :events [{:type :text-start}]}))
+
+(defn- start-thinking-block
+  [state signature]
+  (let [index (count (get-in state [:assistant-message :content]))]
+    {:state  (-> state
+                 (update-in [:assistant-message :content] conj
+                            {:type      :thinking         :thinking ""
+                             :signature (or signature "")})
+                 (assoc :current-block {:kind :thinking :index index}))
+     :events [{:type :thinking-start}]}))
+
+(defn- ensure-active-thinking-block
+  ([state]
+   (ensure-active-thinking-block state nil))
+  ([state signature]
+   (if (= :thinking (get-in state [:current-block :kind]))
+     {:state state :events []}
+     (let [{state1 :state end-events :events}   (finish-current-block state)
+           {state2 :state start-events :events} (start-thinking-block state1 signature)]
+       {:state state2 :events (into [] (concat end-events start-events))}))))
 
 (defn- start-toolcall-block
   [state tool-index id name]
@@ -427,69 +493,132 @@
     fallback
     value))
 
+(defn- extract-reasoning-delta
+  [delta]
+  (or (when-let [v (:reasoning_content delta)] (when (seq v) {:text v :field "reasoning_content"}))
+      (when-let [v (:reasoning delta)] (when (seq v) {:text v :field "reasoning"}))
+      (when-let [v (:reasoning_text delta)] (when (seq v) {:text v :field "reasoning_text"}))))
+
+(defn- apply-reasoning-delta
+  [state events reasoning-delta-map]
+  (let [text                                  (:text reasoning-delta-map)
+        field                                 (:field reasoning-delta-map)
+        {state1 :state ensure-events :events} (ensure-active-thinking-block state field)
+        index                                 (get-in state1 [:current-block :index])]
+    {:state  (update-in state1 [:assistant-message :content index :thinking] str text)
+     :events (into events (concat ensure-events [{:type :thinking-delta :thinking text}]))}))
+
+(defn- apply-text-delta
+  [state events text-delta]
+  (let [{state1 :state ensure-events :events} (ensure-active-text-block state)
+        index                                 (get-in state1 [:current-block :index])]
+    {:state  (update-in state1 [:assistant-message :content index :text] str text-delta)
+     :events (into events (concat ensure-events [{:type :text-delta :text text-delta}]))}))
+
+(defn- apply-tool-call-delta
+  [env state events tool-call]
+  (let [tool-index                            (long (or (:index tool-call) 0))
+        prior-tool                            (get-in state [:toolcall-state tool-index]
+                                                      {:id "" :name "" :partial-args ""})
+        id                                    (non-empty-or (:id tool-call)
+                                                            (non-empty-or (:id prior-tool) ((:id/new env))))
+        name                                  (non-empty-or (get-in tool-call [:function :name])
+                                                            (non-empty-or (:name prior-tool) "tool"))
+        {state1 :state ensure-events :events} (ensure-active-toolcall-block state tool-index id name)
+        args-delta                            (or (get-in tool-call [:function :arguments]) "")
+        partial-args                          (str (:partial-args prior-tool) args-delta)
+        parsed-args                           (parse-json-safe env partial-args)
+        index                                 (get-in state1 [:current-block :index])]
+    {:state  (-> state1
+                 (assoc-in [:assistant-message :content index :id] id)
+                 (assoc-in [:assistant-message :content index :name] name)
+                 (assoc-in [:assistant-message :content index :arguments] parsed-args)
+                 (assoc-in [:toolcall-state tool-index] {:id id :name name :partial-args partial-args}))
+     :events (into events
+                   (concat ensure-events
+                           [{:type      :toolcall-delta
+                             :id        id
+                             :name      name
+                             :arguments parsed-args}]))}))
+
+(defn- parse-chunk
+  [env raw-chunk]
+  (cond
+    (map? raw-chunk) raw-chunk
+    (string? raw-chunk) (parse-json-safe env raw-chunk)
+    :else {}))
+
+(defn- apply-chunk-metadata
+  [state chunk]
+  (let [state  (if-let [usage (:usage chunk)]
+                 (assoc-in state [:assistant-message :usage] (usage->canonical usage))
+                 state)
+        choice (first (:choices chunk))
+        state  (if-let [finish-reason (:finish_reason choice)]
+                 (assoc-in state [:assistant-message :stop-reason] (map-stop-reason finish-reason))
+                 state)]
+    {:state state :delta (:delta choice)}))
+
+(defn- apply-reasoning-details
+  [env state delta]
+  (if-let [details (:reasoning_details delta)]
+    (if (sequential? details)
+      (reduce
+       (fn [s detail]
+         (if (and (= "reasoning.encrypted" (:type detail))
+                  (:id detail)
+                  (:data detail))
+           (let [matching-idx (->> (get-in s [:assistant-message :content])
+                                   (keep-indexed (fn [i block]
+                                                   (when (and (= :tool-call (:type block))
+                                                              (= (:id detail) (:id block)))
+                                                     i)))
+                                   first)]
+             (if matching-idx
+               (assoc-in s [:assistant-message :content matching-idx :signature]
+                         ((:json/encode env) detail))
+               s))
+           s))
+       state
+       details)
+      state)
+    state))
+
+(defn- process-deltas
+  [env state delta]
+  (loop [state           state
+         events          []
+         reasoning-delta (extract-reasoning-delta delta)
+         text-delta      (:content delta)
+         tool-calls      (or (:tool_calls delta) [])]
+    (cond
+      (map? reasoning-delta)
+      (let [{:keys [state events]} (apply-reasoning-delta state events reasoning-delta)]
+        (recur state events nil text-delta tool-calls))
+
+      (and (string? text-delta) (seq text-delta))
+      (let [{:keys [state events]} (apply-text-delta state events text-delta)]
+        (recur state events nil nil tool-calls))
+
+      (seq tool-calls)
+      (let [{:keys [state events]} (apply-tool-call-delta env state events (first tool-calls))]
+        (recur state events nil nil (rest tool-calls)))
+
+      :else
+      (let [state (apply-reasoning-details env state delta)]
+        {:state state :events events}))))
+
 (>defn decode-event
        [env state raw-chunk]
        [:llx/env :llx/runtime-stream-state :llx/raw-stream-chunk => :llx/runtime-decode-event-result]
        (let [state (if (:assistant-message state)
                      state
                      (init-stream-state env (:model state)))
-             chunk (cond
-                     (map? raw-chunk) raw-chunk
-                     (string? raw-chunk) (parse-json-safe env raw-chunk)
-                     :else {})]
+             chunk (parse-chunk env raw-chunk)]
          (if-not (seq chunk)
            {:state state :events []}
-           (let [state  (if-let [usage (:usage chunk)]
-                          (assoc-in state [:assistant-message :usage] (usage->canonical usage))
-                          state)
-                 choice (first (:choices chunk))
-                 state  (if-let [finish-reason (:finish_reason choice)]
-                          (assoc-in state [:assistant-message :stop-reason] (map-stop-reason finish-reason))
-                          state)
-                 delta  (:delta choice)]
-             (loop [state      state
-                    events     []
-                    text-delta (:content delta)
-                    tool-calls (or (:tool_calls delta) [])]
-               (cond
-                 (and (string? text-delta) (seq text-delta))
-                 (let [{state1 :state ensure-events :events} (ensure-active-text-block state)
-                       index                                 (get-in state1 [:current-block :index])]
-                   (recur (update-in state1 [:assistant-message :content index :text] str text-delta)
-                          (into events (concat ensure-events [{:type :text-delta :text text-delta}]))
-                          nil
-                          tool-calls))
-
-                 (seq tool-calls)
-                 (let [tool-call                             (first tool-calls)
-                       tool-index                            (long (or (:index tool-call) 0))
-                       prior-tool                            (get-in state [:toolcall-state tool-index]
-                                                                     {:id "" :name "" :partial-args ""})
-                       id                                    (non-empty-or (:id tool-call)
-                                                                           (non-empty-or (:id prior-tool) ((:id/new env))))
-                       name                                  (non-empty-or (get-in tool-call [:function :name])
-                                                                           (non-empty-or (:name prior-tool) "tool"))
-                       {state1 :state ensure-events :events} (ensure-active-toolcall-block state tool-index id name)
-                       args-delta                            (or (get-in tool-call [:function :arguments]) "")
-                       partial-args                          (str (:partial-args prior-tool) args-delta)
-                       parsed-args                           (parse-json-safe env partial-args)
-                       index                                 (get-in state1 [:current-block :index])]
-                   (recur (-> state1
-                              (assoc-in [:assistant-message :content index :id] id)
-                              (assoc-in [:assistant-message :content index :name] name)
-                              (assoc-in [:assistant-message :content index :arguments] parsed-args)
-                              (assoc-in [:toolcall-state tool-index] {:id id :name name :partial-args partial-args}))
-                          (into events
-                                (concat ensure-events
-                                        [{:type      :toolcall-delta
-                                          :id        id
-                                          :name      name
-                                          :arguments parsed-args}]))
-                          nil
-                          (rest tool-calls)))
-
-                 :else
-                 {:state state :events events}))))))
+           (let [{:keys [state delta]} (apply-chunk-metadata state chunk)]
+             (process-deltas env state delta)))))
 
 (>defn finalize
        [env state-or-response]

@@ -220,3 +220,150 @@
                           {:messages [{:role :user :content "ping" :timestamp 1}]}
                           {}
                           false))))
+
+(def reasoning-model
+  {:id             "qwq-32b"
+   :name           "QWQ 32B"
+   :provider       :openai-compatible
+   :api            :openai-completions
+   :base-url       "http://localhost:11434/v1"
+   :context-window 32768
+   :max-tokens     4096
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? true :input #{:text}}})
+
+(deftest build-request-includes-reasoning-effort-for-reasoning-model
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) reasoning-model context
+                                   {:reasoning {:level :medium}}
+                                   false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= "medium" (:reasoning_effort payload)))))
+
+(deftest build-request-omits-reasoning-effort-when-model-lacks-reasoning
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) openai-compatible-model context
+                                   {:reasoning {:level :medium}}
+                                   false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (nil? (:reasoning_effort payload)))))
+
+(deftest decode-event-emits-thinking-events-for-reasoning-content
+  (let [env                    (stub-env)
+        state                  (sut/init-stream-state env reasoning-model)
+        chunk                  {:choices [{:delta {:reasoning_content "thinking..."}}]}
+        {:keys [state events]} (sut/decode-event env state (json/write-str chunk))]
+    (is (= [:thinking-start :thinking-delta] (mapv :type events)))
+    (is (= "thinking..." (:thinking (second events))))
+    (is (= "thinking..." (get-in state [:assistant-message :content 0 :thinking])))))
+
+(deftest decode-event-tracks-thinking-signature
+  (let [state           (sut/init-stream-state (stub-env) reasoning-model)
+        chunk           {:choices [{:delta {:reasoning_content "thinking..."}}]}
+        {:keys [state]} (sut/decode-event (stub-env) state (json/write-str chunk))]
+    (is (= {:type :thinking :thinking "thinking..." :signature "reasoning_content"}
+           (get-in state [:assistant-message :content 0])))))
+
+(deftest decode-event-extracts-reasoning-details-to-tool-call-signature
+  (let [state           (sut/init-stream-state (stub-env) reasoning-model)
+        chunk           {:choices [{:delta {:tool_calls        [{:index    0
+                                                                 :id       "detail_id_1"
+                                                                 :type     "function"
+                                                                 :function {:name      "search"
+                                                                            :arguments "{\"q\":\"foo\"}"}}]
+                                            :reasoning_details [{:type "reasoning.encrypted"
+                                                                 :id   "detail_id_1"
+                                                                 :data "encrypted-data"}]}}]}
+        {:keys [state]} (sut/decode-event (stub-env) state (json/write-str chunk))
+        tool-block      (first (filter #(= :tool-call (:type %))
+                                       (get-in state [:assistant-message :content])))
+        parsed          (when (:signature tool-block)
+                          (json/read-str (:signature tool-block) {:key-fn keyword}))]
+    (is (= {:type "reasoning.encrypted" :id "detail_id_1" :data "encrypted-data"}
+           parsed))))
+
+(deftest convert-message-restores-thinking-field-from-signature
+  (let [message {:role        :assistant
+                 :content     [{:type :thinking :thinking "deep thought" :signature "reasoning_content"}
+                               {:type :text :text "answer"}]
+                 :api         :openai-completions
+                 :provider    :openai
+                 :model       "gpt-4o-mini"
+                 :usage       {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                               :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                 :stop-reason :stop
+                 :timestamp   1}
+        model   (assoc openai-model :capabilities {:reasoning? true :input #{:text}})
+        result  (#'sut/convert-message (stub-env) model message)]
+    (is (= {:role "assistant" :content "answer" :reasoning_content "deep thought"}
+           result))))
+
+(deftest convert-message-reconstructs-reasoning-details-from-tool-signatures
+  (let [detail  {:type "reasoning.encrypted" :id "tc_1" :data "enc"}
+        message {:role        :assistant
+                 :content     [{:type      :tool-call              :id "tc_1" :name "search"
+                                :arguments {:q "foo"}
+                                :signature (json/write-str detail)}]
+                 :api         :openai-completions
+                 :provider    :openai
+                 :model       "gpt-4o-mini"
+                 :usage       {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                               :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                 :stop-reason :tool-use
+                 :timestamp   1}
+        result  (#'sut/convert-message (stub-env) openai-model message)]
+    (is (= {:role              "assistant"
+            :content           ""
+            :tool_calls        [{:id       "tc_1"
+                                 :type     "function"
+                                 :function {:name "search" :arguments "{\"q\":\"foo\"}"}}]
+            :reasoning_details [{:type "reasoning.encrypted" :id "tc_1" :data "enc"}]}
+           result))))
+
+(deftest build-request-zai-thinking-format-sends-thinking-object
+  (let [zai-model (assoc reasoning-model
+                         :base-url "https://api.z.ai/v1"
+                         :compat {:thinking-format :zai})
+        request   (sut/build-request (stub-env) zai-model
+                                     {:messages [{:role :user :content "think" :timestamp 1}]}
+                                     {:reasoning {:level :medium}} false)
+        payload   (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:thinking {:type "enabled"}}
+           (select-keys payload [:thinking :reasoning_effort])))))
+
+(deftest build-request-zai-disables-thinking-when-no-reasoning
+  (let [zai-model (assoc reasoning-model
+                         :base-url "https://api.z.ai/v1"
+                         :compat {:thinking-format :zai})
+        request   (sut/build-request (stub-env) zai-model
+                                     {:messages [{:role :user :content "chat" :timestamp 1}]}
+                                     {} false)
+        payload   (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:thinking {:type "disabled"}}
+           (select-keys payload [:thinking :reasoning_effort])))))
+
+(deftest build-request-qwen-thinking-format-sends-enable-thinking
+  (let [qwen-model (assoc reasoning-model
+                          :compat {:thinking-format :qwen})
+        request    (sut/build-request (stub-env) qwen-model
+                                      {:messages [{:role :user :content "think" :timestamp 1}]}
+                                      {:reasoning {:level :high}} false)
+        payload    (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:enable_thinking true}
+           (select-keys payload [:enable_thinking :reasoning_effort])))))
+
+(deftest decode-event-thinking-to-text-transition
+  (let [env                             (stub-env)
+        state0                          (sut/init-stream-state env reasoning-model)
+        chunk1                          {:choices [{:delta {:reasoning_content "reason"}}]}
+        chunk2                          {:choices [{:delta {:content "answer"}}]}
+        {state1 :state events1 :events} (sut/decode-event env state0 (json/write-str chunk1))
+        {state2 :state events2 :events} (sut/decode-event env state1 (json/write-str chunk2))
+        finalized                       (sut/finalize env state2)]
+    (is (= [:thinking-start :thinking-delta] (mapv :type events1)))
+    (is (= [:thinking-end :text-start :text-delta] (mapv :type events2)))
+    (is (= "answer" (:text (nth events2 2))))
+    (is (= :thinking (get-in finalized [:assistant-message :content 0 :type])))
+    (is (= "reason" (get-in finalized [:assistant-message :content 0 :thinking])))
+    (is (= :text (get-in finalized [:assistant-message :content 1 :type])))
+    (is (= "answer" (get-in finalized [:assistant-message :content 1 :text])))))

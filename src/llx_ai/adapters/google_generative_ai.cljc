@@ -265,19 +265,55 @@
     :any "ANY"
     "AUTO"))
 
+(defn- gemini-3-pro-model?
+  [model]
+  (str/includes? (or (:id model) "") "3-pro"))
+
+(defn- gemini-3-flash-model?
+  [model]
+  (str/includes? (or (:id model) "") "3-flash"))
+
+(defn- gemini3-thinking-level
+  [effort model]
+  (if (gemini-3-pro-model? model)
+    (case effort
+      (:minimal :low) "LOW"
+      (:medium :high) "HIGH"
+      "HIGH")
+    (case effort
+      :minimal "MINIMAL"
+      :low     "LOW"
+      :medium  "MEDIUM"
+      :high    "HIGH"
+      "MEDIUM")))
+
+(defn- google-thinking-budget
+  [model effort]
+  (let [pro-budgets   {:minimal 128 :low 2048 :medium 8192 :high 32768}
+        flash-budgets {:minimal 128 :low 2048 :medium 8192 :high 24576}]
+    (cond
+      (str/includes? (or (:id model) "") "2.5-pro")
+      (get pro-budgets effort 8192)
+
+      (str/includes? (or (:id model) "") "2.5-flash")
+      (get flash-budgets effort 8192)
+
+      :else -1)))
+
 (defn- reasoning->thinking-config
   [model reasoning]
   (when (and (true? (get-in model [:capabilities :reasoning?]))
              (map? reasoning))
-    (let [effort (or (:effort reasoning) :medium)
-          budget (case effort
-                   :minimal 128
-                   :low 2048
-                   :medium 8192
-                   :high 24576
-                   8192)]
-      {:includeThoughts true
-       :thinkingBudget  budget})))
+    (let [effort (or (:level reasoning) (:effort reasoning) :medium)]
+      (cond
+        (or (gemini-3-pro-model? model) (gemini-3-flash-model? model))
+        {:includeThoughts true
+         :thinkingLevel   (gemini3-thinking-level effort model)}
+
+        :else
+        (let [budget (google-thinking-budget model effort)]
+          {:includeThoughts true
+           :thinkingBudget  budget})))))
 
 (>defn build-request
        ([env model context opts]

@@ -181,6 +181,33 @@
         (recur (rest remaining) out))
       out)))
 
+(defn- supports-adaptive-thinking?
+  [model-id]
+  (or (str/includes? (or model-id "") "opus-4-6")
+      (str/includes? (or model-id "") "opus-4.6")))
+
+(defn- map-reasoning-level->effort
+  [level]
+  (case level
+    :minimal "low"
+    :low     "low"
+    :medium  "medium"
+    :high    "high"
+    :xhigh   "max"
+    "high"))
+
+(defn- adjust-max-tokens-for-thinking
+  [base-max-tokens model-max-tokens reasoning-level]
+  (let [budgets         {:minimal 1024 :low 2048 :medium 8192 :high 16384}
+        level           (if (= :xhigh reasoning-level) :high reasoning-level)
+        thinking-budget (get budgets level 8192)
+        max-tokens      (min (+ base-max-tokens thinking-budget) model-max-tokens)
+        min-output      1024
+        thinking-budget (if (<= max-tokens thinking-budget)
+                          (max 0 (- max-tokens min-output))
+                          thinking-budget)]
+    {:max-tokens max-tokens :thinking-budget thinking-budget}))
+
 (defn- convert-tools
   [tools]
   (->> tools
@@ -196,38 +223,58 @@
         (build-request env model context opts false))
        ([env model context opts stream?]
         [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
-        (let [api-key  (or (:api-key opts)
-                           (when-let [env-get (:env/get env)]
-                             (env-get "ANTHROPIC_API_KEY")))
-              _        (when-not (seq api-key)
-                         (throw (ex-info "Anthropic API key is required" {:provider (:provider model)})))
-              payload  (cond-> {:model      (:id model)
-                                :messages   (convert-messages model context)
-                                :max_tokens (or (:max-output-tokens opts)
-                                                (max 1 (long (/ (:max-tokens model) 3))))
-                                :stream     stream?}
-                         (seq (:system-prompt context))
-                         (assoc :system [{:type "text" :text (:system-prompt context)}])
+        (let [api-key          (or (:api-key opts)
+                                   (when-let [env-get (:env/get env)]
+                                     (env-get "ANTHROPIC_API_KEY")))
+              _                (when-not (seq api-key)
+                                 (throw (ex-info "Anthropic API key is required" {:provider (:provider model)})))
+              reasoning-level  (get-in opts [:reasoning :level])
+              reasoning-model? (true? (get-in model [:capabilities :reasoning?]))
+              adaptive?        (and reasoning-level reasoning-model?
+                                    (supports-adaptive-thinking? (:id model)))
+              budget?          (and reasoning-level reasoning-model?
+                                    (not adaptive?))
+              base-max         (or (:max-output-tokens opts)
+                                   (max 1 (long (/ (:max-tokens model) 3))))
+              adjusted         (when budget?
+                                 (adjust-max-tokens-for-thinking
+                                  base-max (:max-tokens model) reasoning-level))
+              payload          (cond-> {:model      (:id model)
+                                        :messages   (convert-messages model context)
+                                        :max_tokens (if adjusted
+                                                      (:max-tokens adjusted)
+                                                      base-max)
+                                        :stream     stream?}
+                                 (seq (:system-prompt context))
+                                 (assoc :system [{:type "text" :text (:system-prompt context)}])
 
-                         (contains? opts :temperature)
-                         (assoc :temperature (:temperature opts))
+                                 (contains? opts :temperature)
+                                 (assoc :temperature (:temperature opts))
 
-                         (seq (:tools context))
-                         (assoc :tools (convert-tools (:tools context)))
+                                 (seq (:tools context))
+                                 (assoc :tools (convert-tools (:tools context)))
 
-                         (seq (:tools opts))
-                         (assoc :tools (convert-tools (:tools opts)))
+                                 (seq (:tools opts))
+                                 (assoc :tools (convert-tools (:tools opts)))
 
-                         (:tool-choice opts)
-                         (assoc :tool_choice (if (keyword? (:tool-choice opts))
-                                               {:type (name (:tool-choice opts))}
-                                               {:type (:tool-choice opts)})))
-              base-url (trim-trailing-slash (:base-url model))
-              headers  (cond-> {"Content-Type"      "application/json"
-                                "anthropic-version" "2023-06-01"
-                                "x-api-key"         api-key}
-                         (:headers model) (merge (:headers model))
-                         (:headers opts) (merge (:headers opts)))]
+                                 (:tool-choice opts)
+                                 (assoc :tool_choice (if (keyword? (:tool-choice opts))
+                                                       {:type (name (:tool-choice opts))}
+                                                       {:type (:tool-choice opts)}))
+
+                                 adaptive?
+                                 (assoc :thinking {:type "adaptive"}
+                                        :output_config {:effort (map-reasoning-level->effort reasoning-level)})
+
+                                 budget?
+                                 (assoc :thinking {:type          "enabled"
+                                                   :budget_tokens (:thinking-budget adjusted)}))
+              base-url         (trim-trailing-slash (:base-url model))
+              headers          (cond-> {"Content-Type"      "application/json"
+                                        "anthropic-version" "2023-06-01"
+                                        "x-api-key"         api-key}
+                                 (:headers model) (merge (:headers model))
+                                 (:headers opts) (merge (:headers opts)))]
           {:method  :post
            :url     (str base-url "/v1/messages")
            :headers headers

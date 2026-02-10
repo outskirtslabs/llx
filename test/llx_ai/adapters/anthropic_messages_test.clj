@@ -127,6 +127,57 @@
     (is (= "tool_result" (get-in payload [:messages 1 :content 0 :type])))
     (is (= "image" (get-in payload [:messages 1 :content 0 :content 0 :type])))))
 
+(def anthropic-opus-model
+  {:id             "claude-opus-4-6-20250801"
+   :name           "Claude Opus 4.6"
+   :provider       :anthropic
+   :api            :anthropic-messages
+   :base-url       "https://api.anthropic.com"
+   :context-window 200000
+   :max-tokens     32000
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? true :input #{:text :image}}})
+
+(deftest build-request-enables-adaptive-thinking-for-opus-4-6
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-opus-model context
+                                   {:api-key "k" :reasoning {:level :medium}} false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:thinking      {:type "adaptive"}
+            :output_config {:effort "medium"}
+            :max_tokens    10666
+            :model         "claude-opus-4-6-20250801"
+            :stream        false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-enables-budget-thinking-for-older-reasoning-model
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-model context
+                                   {:api-key "k" :reasoning {:level :medium}} false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:thinking   {:type "enabled" :budget_tokens 7168}
+            :max_tokens 8192
+            :model      "claude-sonnet-4-5"
+            :stream     false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-omits-thinking-when-no-reasoning-opts
+  (let [context {:messages [{:role :user :content "just chat" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-model context
+                                   {:api-key "k"} false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:max_tokens 2730 :model "claude-sonnet-4-5" :stream false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-omits-thinking-when-model-not-reasoning
+  (let [non-reasoning-model (assoc-in anthropic-model [:capabilities :reasoning?] false)
+        context             {:messages [{:role :user :content "chat" :timestamp 1}]}
+        request             (sut/build-request (stub-env) non-reasoning-model context
+                                               {:api-key "k" :reasoning {:level :high}} false)
+        payload             (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:max_tokens 2730 :model "claude-sonnet-4-5" :stream false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
 (deftest decode-event-stream-contract
   (let [env                                                                  (stub-env)
         chunks                                                               (fixture "stream_events")

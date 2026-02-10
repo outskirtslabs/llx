@@ -243,6 +243,43 @@
             :timestamp     1730000000000}
            out))))
 
+(def google-gemini3-pro-model
+  (assoc google-model :id "gemini-3-pro-preview"))
+
+(def google-25-pro-model
+  (assoc google-model :id "gemini-2.5-pro-preview"))
+
+(defn- thinking-config
+  [model reasoning-level]
+  (let [req     (sut/build-request (stub-env) model
+                                   {:messages [{:role :user :content "think" :timestamp 1}]}
+                                   (if reasoning-level {:reasoning {:level reasoning-level}} {})
+                                   false)
+        payload (json/read-str (:body req) {:key-fn keyword})]
+    (get-in payload [:generationConfig :thinkingConfig])))
+
+(deftest reasoning-config-gemini-3-pro-uses-level
+  (is (= {:includeThoughts true :thinkingLevel "HIGH"}
+         (thinking-config google-gemini3-pro-model :medium))))
+
+(deftest reasoning-config-gemini-3-flash-uses-level
+  (is (= {:includeThoughts true :thinkingLevel "LOW"}
+         (thinking-config google-gemini3-model :low))))
+
+(deftest reasoning-config-gemini-3-pro-clamps-low-effort
+  (is (= {:includeThoughts true :thinkingLevel "LOW"}
+         (thinking-config google-gemini3-pro-model :low))))
+
+(deftest reasoning-config-gemini-25-pro-budget-differs-from-flash
+  (is (= {:includeThoughts true :thinkingBudget 32768}
+         (thinking-config google-25-pro-model :high)))
+  (is (= {:includeThoughts true :thinkingBudget 24576}
+         (thinking-config google-model :high))))
+
+(deftest reasoning-config-omitted-when-model-not-reasoning
+  (is (nil? (thinking-config (assoc-in google-model [:capabilities :reasoning?] false)
+                             :high))))
+
 (deftest map-stop-reason-fail-fast-on-unknown
   (testing "unknown finish reason in stream decode fails fast"
     (is (thrown-with-msg?

@@ -16,9 +16,10 @@
   {:name         "math_operation"
    :description  "Perform basic arithmetic operations"
    :input-schema [:map {:closed true}
-                  [:a :int]
-                  [:b :int]
-                  [:operation [:enum "add" "subtract" "multiply" "divide"]]]})
+                  [:a {:description "First number"} :int]
+                  [:b {:description "Second number"} :int]
+                  [:operation {:description "The operation to perform. One of 'add', 'subtract', 'multiply', 'divide'."}
+                   [:enum "add" "subtract" "multiply" "divide"]]]})
 
 (def ^:private test-image-base64
   (let [f (File. "test/llx_ai/fixtures/test-image.png")]
@@ -77,51 +78,32 @@
       (is (str/includes? (extract-text second-r) "Goodbye test successful")))))
 
 (defn- handle-tool-call!
-  "Stream with calculator tool. Walk events asserting toolcall-start/-delta/-end
-   shapes, argument parsing, and final result stop-reason."
+  "Stream with calculator tool. Verify the library emits the expected event
+   sequence and produces a well-shaped tool-call result."
   [model opts]
-  (let [stream    (client/stream model
-                                 {:system-prompt "You are a helpful assistant that uses tools when asked."
-                                  :messages      [{:role      :user
-                                                   :content   "Calculate 15 + 27 using the math_operation tool."
-                                                   :timestamp (System/currentTimeMillis)}]
-                                  :tools         [tool-spec]}
-                                 opts)
-        events    (event-stream/drain! stream)
-        result    (event-stream/result stream)
-        saw-start (atom false)
-        saw-delta (atom false)
-        saw-end   (atom false)]
-    (doseq [evt events]
-      (case (:type evt)
-        :toolcall-start
-        (do (reset! saw-start true)
-            (is (= "math_operation" (:name evt)))
-            (is (seq (:id evt))))
-
-        :toolcall-delta
-        (do (reset! saw-delta true)
-            (is (= "math_operation" (:name evt)))
-            (is (some? (:arguments evt)))
-            (is (map? (:arguments evt))))
-
-        :toolcall-end
-        (do (reset! saw-end true)
-            (let [args (:arguments evt)]
-              (is (= 15 (:a args)))
-              (is (= 27 (:b args)))
-              (is (contains? #{"add" "subtract" "multiply" "divide"} (:operation args)))))
-
-        nil))
-
-    (is @saw-start "expected :toolcall-start event")
-    (is @saw-delta "expected :toolcall-delta event")
-    (is @saw-end "expected :toolcall-end event")
-    (is (= :tool-use (:stop-reason result)))
-    (let [tc-block (some #(when (= :tool-call (:type %)) %) (:content result))]
-      (is (some? tc-block) "result should contain a :tool-call content block")
-      (is (= "math_operation" (:name tc-block)))
-      (is (seq (:id tc-block))))))
+  (let [stream   (client/stream model
+                                {:system-prompt "You are a helpful assistant that uses tools when asked."
+                                 :messages      [{:role      :user
+                                                  :content   "Calculate 15 + 27 using the math_operation tool."
+                                                  :timestamp (System/currentTimeMillis)}]
+                                 :tools         [tool-spec]}
+                                opts)
+        events   (event-stream/drain! stream)
+        result   (event-stream/result stream)
+        types    (set (map :type events))
+        tc-block (some #(when (= :tool-call (:type %)) %) (:content result))
+        args     (:arguments tc-block)]
+    (is (every? types #{:toolcall-start :toolcall-delta :toolcall-end})
+        (str "expected toolcall-start/-delta/-end in event types, got " types))
+    (is (= :tool-use (:stop-reason result))
+        (str "expected :tool-use stop-reason, got " (:stop-reason result)))
+    (is (some? tc-block) "result should contain a :tool-call content block")
+    (is (= "math_operation" (:name tc-block)))
+    (is (seq (:id tc-block)) "tool-call block should have a non-empty :id")
+    (is (= 15 (:a args)) (str "expected a=15, got " (:a args)))
+    (is (= 27 (:b args)) (str "expected b=27, got " (:b args)))
+    (is (contains? #{"add" "subtract" "multiply" "divide"} (:operation args))
+        (str "expected valid operation enum, got " (pr-str (:operation args))))))
 
 (defn- handle-streaming!
   "Stream 'count from 1 to 3'. Assert text-start/-delta/-end all seen,
@@ -299,13 +281,13 @@
     (testing "handle-thinking"
       (handle-thinking! models/openai-responses (assoc opts
                                                        :max-output-tokens 2048
-                                                       :reasoning {:level :high :effort :high})))
+                                                       :reasoning {:level :high :effort :high :summary :detailed})))
     (testing "handle-image"
       (handle-image! models/openai-responses opts))
     (testing "multi-turn"
       (multi-turn! models/openai-responses (assoc opts
                                                   :max-output-tokens 2048
-                                                  :reasoning {:level :high :effort :high})))))
+                                                  :reasoning {:level :high :effort :high :summary :detailed})))))
 
 (deftest live-parity-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")

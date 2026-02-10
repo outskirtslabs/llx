@@ -25,7 +25,8 @@
     [:requires-thinking-as-text? {:optional true} :boolean]
     [:token-field {:optional true} [:enum :max_tokens :max_completion_tokens]]
     [:tool-result-role {:optional true} [:enum :tool :function]]
-    [:thinking-format {:optional true} [:enum :reasoning_content :reasoning :text]]
+    [:thinking-format {:optional true} [:enum :reasoning_content :reasoning :text :openai :zai :qwen]]
+    [:supports-reasoning-effort? {:optional true} :boolean]
     [:tool-id-format {:optional true} [:enum :any :mistral-9-alnum]]]
 
    :llx/model

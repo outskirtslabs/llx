@@ -6,6 +6,7 @@
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.event-stream :as event-stream]
+   [llx-ai.models :as models]
    [llx-ai.registry :as registry]
    [llx-ai.schema :as schema]
    [llx-ai.transform-messages :as transform-messages]))
@@ -43,8 +44,10 @@
       default-registry))
 
 (defn- clamp-reasoning-level
-  [level]
-  (if (= :xhigh level) :high level))
+  [model level]
+  (if (and (= :xhigh level) (not (models/supports-xhigh? model)))
+    :high
+    level))
 
 (defn- simple-opts->request-opts
   [model simple-opts]
@@ -52,7 +55,7 @@
         max-output-tokens (or (:max-tokens simple-opts)
                               (min (long (:max-tokens model)) 32000))
         reasoning-level   (or (:reasoning simple-opts) (:reasoning-effort simple-opts))
-        reasoning-level   (some-> reasoning-level clamp-reasoning-level)]
+        reasoning-level   (when reasoning-level (clamp-reasoning-level model reasoning-level))]
     (cond-> {:max-output-tokens max-output-tokens}
       (contains? simple-opts :temperature) (assoc :temperature (:temperature simple-opts))
       (contains? simple-opts :top-p) (assoc :top-p (:top-p simple-opts))
@@ -159,7 +162,7 @@
   | `:temperature` | Sampling temperature. |
   | `:top-p` | Nucleus sampling probability. |
   | `:max-tokens` | Requested output cap; maps to `:max-output-tokens`. |
-  | `:reasoning` | Reasoning level keyword; `:xhigh` is clamped to `:high`. |
+  | `:reasoning` | Reasoning level keyword; `:xhigh` clamped to `:high` unless model supports it. |
   | `:reasoning-effort` | Alias for `:reasoning`. |
   | `:api-key` | Provider API key override. |
   | `:headers` | Additional request headers. |
