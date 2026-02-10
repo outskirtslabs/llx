@@ -119,7 +119,7 @@
             message       (or (get-in body [:error :message]) body-str)
             provider-code (get-in body [:error :type])
             request-id    (get headers "x-request-id")
-            retry-after   (errors/extract-retry-after headers)]
+            retry-after   (errors/extract-retry-after-hint headers message)]
         (throw (errors/http-status->error
                 status provider message
                 :provider-code provider-code

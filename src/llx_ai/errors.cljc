@@ -188,14 +188,16 @@
 
 (defn http-status->error
   [status provider message & {:keys [provider-code retry-after request-id body]}]
-  (let [status (long status)]
+  (let [status (long status)
+        quota? (or (str/includes? (str/lower-case (str body)) "quota")
+                   (str/includes? (str/lower-case (str message)) "quota"))]
     (case status
       400 (invalid-request message :provider provider :http-status status :context {:body body})
       401 (authentication-error provider message :http-status status)
       403 (authorization-error provider message :http-status status)
       404 (model-not-found provider message :http-status status)
       408 (timeout-error provider message :request-id request-id)
-      429 (if (and body (str/includes? (str body) "quota"))
+      429 (if (and quota? (nil? retry-after))
             (quota-exceeded provider message :http-status status)
             (rate-limit provider message :http-status status
                         :retry-after retry-after :request-id request-id
@@ -229,6 +231,20 @@
       (when (pos? seconds)
         (min seconds (double max-seconds))))))
 
+(defn extract-retry-after-from-message
+  [message & {:keys [max-seconds] :or {max-seconds 60}}]
+  (let [text (some-> message str)]
+    (when-let [[_ raw] (and (seq (or text ""))
+                            (re-find #"(?i)please\s+retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s" text))]
+      (when-let [seconds (parse-retry-after-value raw "retry-after")]
+        (when (pos? seconds)
+          (min seconds (double max-seconds)))))))
+
+(defn extract-retry-after-hint
+  [headers message & {:keys [max-seconds] :or {max-seconds 60}}]
+  (or (extract-retry-after headers :max-seconds max-seconds)
+      (extract-retry-after-from-message message :max-seconds max-seconds)))
+
 (defn llx-error?
   [ex]
   (and (instance? #?(:clj clojure.lang.ExceptionInfo :cljs ExceptionInfo) ex)
@@ -243,6 +259,16 @@
   [ex]
   (and (llx-error? ex)
        (= :llx/rate-limit (:type (ex-data ex)))))
+
+(defn quota-exceeded-error?
+  [ex]
+  (and (llx-error? ex)
+       (= :llx/quota-exceeded (:type (ex-data ex)))))
+
+(defn rate-limited-error?
+  [ex]
+  (or (rate-limit-error? ex)
+      (quota-exceeded-error? ex)))
 
 (defn timeout-error?
   [ex]

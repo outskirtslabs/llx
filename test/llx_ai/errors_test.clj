@@ -197,6 +197,15 @@
     (is (sut/rate-limit-error? (sut/rate-limit "openai" "rate limit")))
     (is (not (sut/rate-limit-error? (sut/server-error "openai" "server error")))))
 
+  (testing "quota-exceeded-error?"
+    (is (sut/quota-exceeded-error? (sut/quota-exceeded "openai" "quota exceeded")))
+    (is (not (sut/quota-exceeded-error? (sut/rate-limit "openai" "rate limit")))))
+
+  (testing "rate-limited-error?"
+    (is (sut/rate-limited-error? (sut/rate-limit "openai" "rate limit")))
+    (is (sut/rate-limited-error? (sut/quota-exceeded "openai" "quota exceeded")))
+    (is (not (sut/rate-limited-error? (sut/server-error "openai" "server error")))))
+
   (testing "timeout-error?"
     (is (sut/timeout-error? (sut/timeout-error "openai" "timeout")))
     (is (not (sut/timeout-error? (sut/rate-limit "openai" "rate limit")))))
