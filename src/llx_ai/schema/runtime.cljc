@@ -28,7 +28,8 @@
     [:env/get {:optional true} :llx/fn]
     [:log/debug {:optional true} :llx/fn]
     [:log/warn {:optional true} :llx/fn]
-    [:log/error {:optional true} :llx/fn]]
+    [:log/error {:optional true} :llx/fn]
+    [:thread/sleep {:optional true} :llx/fn]]
 
    :llx/http-response-map
    [:map
@@ -102,7 +103,8 @@
     [:model :llx/model]
     [:request :llx/adapter-request-map]
     [:out :map]
-    [:state* :any]]
+    [:state* :any]
+    [:request-opts {:optional true} [:maybe :llx/request-options]]]
 
    :llx/runtime-run-stream-args
    :llx/runtime-run-stream-input})

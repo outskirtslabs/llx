@@ -5,6 +5,7 @@
    [llx-ai.adapters.google-generative-ai :as google-generative-ai]
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.adapters.openai-responses :as openai-responses]
+   [llx-ai.errors :as errors]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.models :as models]
    [llx-ai.registry :as registry]
@@ -97,6 +98,29 @@
       (transform-context-fn model transformed)
       transformed)))
 
+(defn- check-response-status!
+  [env model response]
+  (let [status (long (or (:status response) 0))]
+    (when (or (< status 200) (>= status 300))
+      (let [body-str      (cond
+                            (string? (:body response)) (:body response)
+                            (nil? (:body response)) ""
+                            :else (if-let [f (:http/read-body-string env)]
+                                    (f (:body response)) ""))
+            body          ((:json/decode-safe env) body-str {})
+            headers       (:headers response)
+            provider      (name (or (:provider model) "unknown"))
+            message       (or (get-in body [:error :message]) body-str)
+            provider-code (get-in body [:error :type])
+            request-id    (get headers "x-request-id")
+            retry-after   (errors/extract-retry-after headers)]
+        (throw (errors/http-status->error
+                status provider message
+                :provider-code provider-code
+                :retry-after retry-after
+                :request-id request-id
+                :body body))))))
+
 (>defn complete
        "Runs a non-streaming completion request and returns the canonical assistant message."
        [env model context opts]
@@ -115,7 +139,17 @@
              request                     (schema/assert-valid!
                                           :llx/adapter-request-map
                                           ((:build-request adapter) env model context request-opts false))
-             response                    ((:http/request env) request)
+             max-retries                 (get request-opts :max-retries 2)
+             sleep-fn                    (or (:thread/sleep env)
+                                             (when (pos? max-retries)
+                                               (throw (ex-info "Retry requested but env is missing :thread/sleep"
+                                                               {:type        :llx/config-error
+                                                                :max-retries max-retries}))))
+             do-request                  (fn []
+                                           (let [response ((:http/request env) request)]
+                                             (check-response-status! env model response)
+                                             response))
+             response                    (errors/retry-loop do-request max-retries sleep-fn)
              {:keys [assistant-message]} (schema/assert-valid!
                                           :llx/runtime-finalize-result
                                           ((:finalize adapter) env {:model model :response response}))]
@@ -144,12 +178,13 @@
              run-stream!               (:stream/run! env)]
          (when-not run-stream!
            (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
-         (run-stream! {:adapter adapter
-                       :env     env
-                       :model   model
-                       :request request
-                       :out     out
-                       :state*  state*})
+         (run-stream! {:adapter      adapter
+                       :env          env
+                       :model        model
+                       :request      request
+                       :out          out
+                       :state*       state*
+                       :request-opts request-opts})
          out))
 
 (defn stream-simple

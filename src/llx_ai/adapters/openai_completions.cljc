@@ -2,6 +2,7 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [llx-ai.errors :as errors]
    [llx-ai.schema :as schema]))
 (schema/registry)
 
@@ -666,16 +667,25 @@
        (let [response ((:http/request env) request-map)
              status   (long (or (:status response) 0))]
          (when (or (< status 200) (>= status 300))
-           (let [body-string (cond
-                               (string? (:body response)) (:body response)
-                               (nil? (:body response)) ""
-                               :else (if-let [read-body-string (:http/read-body-string env)]
-                                       (read-body-string (:body response))
-                                       ""))
-                 body        (parse-json-safe env body-string)]
-             (throw (ex-info "OpenAI completions request failed"
-                             {:status status
-                              :error  (or (get-in body [:error :message]) body-string)}))))
+           (let [body-string   (cond
+                                 (string? (:body response)) (:body response)
+                                 (nil? (:body response)) ""
+                                 :else (if-let [read-body-string (:http/read-body-string env)]
+                                         (read-body-string (:body response))
+                                         ""))
+                 body          (parse-json-safe env body-string)
+                 headers       (:headers response)
+                 message       (or (get-in body [:error :message]) body-string)
+                 provider-code (get-in body [:error :type])
+                 request-id    (get headers "x-request-id")
+                 retry-after   (errors/extract-retry-after headers)
+                 provider      (name (or (:provider _model) "unknown"))]
+             (throw (errors/http-status->error
+                     status provider message
+                     :provider-code provider-code
+                     :retry-after retry-after
+                     :request-id request-id
+                     :body body))))
          response))
 
 (defn- mistral-target?

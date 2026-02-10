@@ -3,6 +3,7 @@
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [llx-ai.errors :as errors]
    [llx-ai.event-stream :as event-stream]
    [llx-ai.schema :as schema]))
 
@@ -53,19 +54,25 @@
         (event-stream/end! out)))))
 
 (>defn run-stream!
-       [{:keys [adapter env model request out state*]}]
+       [{:keys [adapter env model request out state* request-opts]}]
        [:llx/runtime-run-stream-input => any?]
        (schema/assert-valid! :llx/runtime-run-stream-input
-                             {:adapter adapter
-                              :env     env
-                              :model   model
-                              :request request
-                              :out     out
-                              :state*  state*})
+                             {:adapter      adapter
+                              :env          env
+                              :model        model
+                              :request      request
+                              :out          out
+                              :state*       state*
+                              :request-opts request-opts})
        ;; TODO use virtual thread
        (future
          (try
-           (let [response ((:open-stream adapter) env model request)]
+           (let [max-retries (get request-opts :max-retries 2)
+                 sleep-fn    (or (:thread/sleep env) (fn [ms] (Thread/sleep (long ms))))
+                 response    (errors/retry-loop
+                              #((:open-stream adapter) env model request)
+                              max-retries
+                              sleep-fn)]
              (event-stream/push! out {:type :start})
              (with-open [reader (io/reader (:body response))]
                (doseq [line (line-seq reader)]

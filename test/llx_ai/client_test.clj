@@ -38,7 +38,8 @@
    :stream/run!           runtime/run-stream!
    :registry              sut/default-registry
    :clock/now-ms          (fn [] 1730000000000)
-   :id/new                (fn [] "id-1")})
+   :id/new                (fn [] "id-1")
+   :thread/sleep          (fn [_ms])})
 
 (defn- sse-body
   [events]
@@ -123,11 +124,16 @@
   (let [env     (stub-env (fn [_request]
                             {:status 401
                              :body   (json/write-str {:error {:message "bad key"}})}))
-        context {:messages [{:role :user :content "hi" :timestamp 1}]}]
-    (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
-         #"OpenAI completions request failed"
-         (sut/complete env base-model context {:api-key "bad"})))))
+        context {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex      (try
+                  (sut/complete env base-model context {:api-key "bad"})
+                  (catch clojure.lang.ExceptionInfo e e))]
+    (is (= {:type         :llx/authentication-error
+            :message      "bad key"
+            :recoverable? false
+            :provider     "openai"
+            :http-status  401}
+           (ex-data ex)))))
 
 (deftest complete-openai-compatible-without-api-key
   (let [seen-request (atom nil)
@@ -689,3 +695,107 @@
 (deftest complete-simple-exists
   (let [complete-simple (ns-resolve 'llx-ai.client 'complete-simple)]
     (is (ifn? complete-simple))))
+
+(deftest complete-retries-on-transient-error
+  (let [call-count (atom 0)
+        env        (stub-env (fn [_request]
+                               (swap! call-count inc)
+                               (if (= 1 @call-count)
+                                 {:status 503
+                                  :body   (json/write-str {:error {:message "service unavailable"}})}
+                                 {:status 200
+                                  :body   (json/write-str
+                                           {:choices [{:finish_reason "stop"
+                                                       :message       {:role    "assistant"
+                                                                       :content "ok"}}]
+                                            :usage   {:prompt_tokens     1
+                                                      :completion_tokens 1
+                                                      :total_tokens      2}})})))
+        context    {:messages [{:role :user :content "hi" :timestamp 1}]}
+        out        (sut/complete env base-model context {:api-key "x" :max-retries 2})]
+    (is (= 2 @call-count))
+    (is (= :stop (:stop-reason out)))
+    (is (= [{:type :text :text "ok"}] (:content out)))))
+
+(deftest complete-does-not-retry-on-client-error
+  (let [call-count (atom 0)
+        env        (stub-env (fn [_request]
+                               (swap! call-count inc)
+                               {:status 401
+                                :body   (json/write-str {:error {:message "unauthorized"}})}))
+        context    {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex         (try
+                     (sut/complete env base-model context {:api-key "bad" :max-retries 2})
+                     (catch clojure.lang.ExceptionInfo e e))]
+    (is (= {:type         :llx/authentication-error
+            :message      "unauthorized"
+            :recoverable? false
+            :provider     "openai"
+            :http-status  401}
+           (ex-data ex)))
+    (is (= 1 @call-count))))
+
+(deftest complete-respects-max-retries-zero
+  (let [call-count (atom 0)
+        env        (stub-env (fn [_request]
+                               (swap! call-count inc)
+                               {:status 503
+                                :body   (json/write-str {:error {:message "service unavailable"}})}))
+        context    {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex         (try
+                     (sut/complete env base-model context {:api-key "x" :max-retries 0})
+                     (catch clojure.lang.ExceptionInfo e e))]
+    (is (= {:type         :llx/server-error
+            :message      "service unavailable"
+            :recoverable? true
+            :provider     "openai"
+            :http-status  503}
+           (ex-data ex)))
+    (is (= 1 @call-count))))
+
+(deftest complete-throws-config-error-when-retries-requested-without-sleep
+  (let [env-no-sleep (dissoc (stub-env (fn [_] {:status 200 :body "{}"})) :thread/sleep)
+        context      {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex           (try
+                       (sut/complete env-no-sleep base-model context {:api-key "x" :max-retries 2})
+                       (catch clojure.lang.ExceptionInfo e e))]
+    (is (= {:type        :llx/config-error
+            :max-retries 2}
+           (ex-data ex)))))
+
+(deftest complete-without-sleep-succeeds-when-max-retries-zero
+  (let [env-no-sleep (dissoc (stub-env (fn [_]
+                                         {:status 200
+                                          :body   (json/write-str
+                                                   {:choices [{:finish_reason "stop"
+                                                               :message       {:role    "assistant"
+                                                                               :content "ok"}}]
+                                                    :usage   {:prompt_tokens     1
+                                                              :completion_tokens 1
+                                                              :total_tokens      2}})}))
+                             :thread/sleep)
+        context      {:messages [{:role :user :content "hi" :timestamp 1}]}
+        out          (sut/complete env-no-sleep base-model context {:api-key "x" :max-retries 0})]
+    (is (= :stop (:stop-reason out)))))
+
+(deftest stream-retries-open-stream-on-transient-error
+  (let [call-count (atom 0)
+        env        (stub-env (fn [_request]
+                               (swap! call-count inc)
+                               (if (= 1 @call-count)
+                                 {:status 503
+                                  :body   (json/write-str {:error {:message "service unavailable"}})}
+                                 {:status  200
+                                  :headers {"content-type" "text/event-stream"}
+                                  :body    (sse-body
+                                            ["data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"hi\"},\"index\":0}]}"
+                                             "data: {\"choices\":[{\"delta\":{\"content\":\" there\"},\"index\":0,\"finish_reason\":\"stop\"}]}"
+                                             "data: [DONE]"])})))
+        stream     (sut/stream env base-model
+                               {:messages [{:role :user :content "hi" :timestamp 1}]}
+                               {:api-key "x" :max-retries 2})
+        events     (event-stream/drain! stream)
+        out        (event-stream/result stream)]
+    (is (= 2 @call-count))
+    (is (= :done (:type (last events))))
+    (is (= :stop (:stop-reason out)))))

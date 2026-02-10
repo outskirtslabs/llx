@@ -199,15 +199,20 @@
                                               :totalTokenCount      2}})}}))))
 
 (deftest open-stream-non-2xx-throws-structured-error
-  (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
-       #"Google generative ai request failed"
-       (sut/open-stream
-        (stub-env {:http/request (fn [_]
-                                   {:status 401
-                                    :body   (json/write-str {:error {:message "bad key"}})})})
-        google-model
-        {:method :post :url "https://example.invalid"}))))
+  (let [ex (try
+             (sut/open-stream
+              (stub-env {:http/request (fn [_]
+                                         {:status 401
+                                          :body   (json/write-str {:error {:message "bad key"}})})})
+              google-model
+              {:method :post :url "https://example.invalid"})
+             (catch clojure.lang.ExceptionInfo e e))]
+    (is (= {:type         :llx/authentication-error
+            :message      "bad key"
+            :recoverable? false
+            :provider     "google"
+            :http-status  401}
+           (ex-data ex)))))
 
 (deftest stream-error-normalization-contract
   (let [out (sut/normalize-error
