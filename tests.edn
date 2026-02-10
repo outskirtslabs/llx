@@ -11,13 +11,13 @@
                                    ]
   ;;:kaocha-retry.plugin/retry?                 false
   ;;:kaocha-retry.plugin/max-retries            3
-  ;;:kaocha-retry.plugin/retrying-tests-regexes ["llx-ai\\.live\\."]
+  ;;:kaocha-retry.plugin/retrying-tests-regexes ["llx\\.ai\\.live\\."]
 
   :kaocha/reporter                [kaocha.report/dots]
   #_[kaocha.report/documentation]
   :tests                          [{:id          :unit
                                     :test-paths  ["test"]
-                                    :ns-patterns ["^(?!llx-ai\\.live\\.).*-test$"]}
+                                    :ns-patterns ["^(?!llx\\.ai\\.live\\.).*-test$"]}
                                    {:id          :live
                                     :test-paths  ["test"]
-                                    :ns-patterns ["^llx-ai\\.live\\..*-test$"]}]}
+                                    :ns-patterns ["^llx\\.ai\\.live\\..*-test$"]}]}
