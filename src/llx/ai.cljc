@@ -7,32 +7,44 @@
    [llx.ai.impl.utils.unicode :as impl.unicode]))
 
 (defn complete
-  "Runs a non-streaming completion request and returns a canonical assistant message.
+  "Runs one non-streaming assistant turn and returns a canonical assistant message.
 
-  This public API always requires an explicit `env` argument."
+  `env` is required and provides runtime hooks (HTTP, JSON, clock, IDs, retries).
+
+  Use this function when you need full canonical/provider-specific request control.
+
+  Options:
+
+  | key                  | description                                                 |
+  |----------------------|-------------------------------------------------------------|
+  | `:max-output-tokens` | Requested output token cap.                                 |
+  | `:temperature`       | Sampling temperature.                                       |
+  | `:top-p`             | Nucleus sampling probability.                               |
+  | `:reasoning`         | Canonical reasoning map, for example `{:level :high}`.      |
+  | `:api-key`           | Provider API key override for this call.                    |
+  | `:headers`           | Additional provider request headers.                        |
+  | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
+  | `:metadata`          | Request metadata map forwarded to adapter payload builders. |
+  | `:registry`          | Per-call adapter registry override.                         |
+  | `:max-retries`       | Retry count for transient failures (default `2`).           |
+
+  Additional provider-specific option keys are passed through to the selected adapter."
   [env model context opts]
   (impl.client/complete env model context opts))
 
 (defn stream
-  "Runs a streaming completion request and returns an LLX event stream.
+  "Runs one streaming assistant turn and returns an LLX stream handle.
 
-  This public API always requires an explicit `env` argument."
+  `env` is required and provides runtime hooks (HTTP, JSON, clock, IDs, retries).
+
+  Use this function when you need full canonical/provider-specific request control.
+
+  Consume events and terminal callbacks via [[llx.ai.stream/consume!]].
+  Stream production starts when the stream is consumed.
+
+  For Promesa CSP channel consumption, see [[llx.ai.promesa.csp/stream]]."
   [env model context opts]
   (impl.client/stream env model context opts))
-
-(defn complete-simple
-  "Runs [[complete]] with normalized simple options.
-
-  This public API always requires an explicit `env` argument."
-  [env model context simple-opts]
-  (impl.client/complete-simple env model context simple-opts))
-
-(defn stream-simple
-  "Runs [[stream]] with normalized simple options.
-
-  This public API always requires an explicit `env` argument."
-  [env model context simple-opts]
-  (impl.client/stream-simple env model context simple-opts))
 
 (defn get-model
   "Returns the model definition for `provider` and `model-id`, or `nil` when absent."

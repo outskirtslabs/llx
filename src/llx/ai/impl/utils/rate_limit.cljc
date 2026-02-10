@@ -1,18 +1,18 @@
 (ns llx.ai.impl.utils.rate-limit)
 
 (def ^:private rate-limit-patterns
-  [#"rate limit"
-   #"rate-limit"
-   #"too many requests"
-   #"quota exceeded"
-   #"please retry in \d+(\.\d+)?s"
-   #"\b429\b"])
+  [#"(?i)rate limit"
+   #"(?i)rate-limit"
+   #"(?i)too many requests"
+   #"(?i)quota exceeded"
+   #"(?i)please retry in \d+(\.\d+)?s"
+   #"(?i)\b429\b"])
 
 (defn- rate-limit-pattern-match?
   [error-message]
   (boolean
    (and (string? error-message)
-        (some #(re-find (re-pattern (str "(?i)" (.pattern %))) error-message)
+        (some #(re-find % error-message)
               rate-limit-patterns))))
 
 (defn rate-limited?

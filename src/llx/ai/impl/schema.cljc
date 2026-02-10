@@ -10,7 +10,7 @@
    [llx.ai.impl.schema.message :as message]
    [llx.ai.impl.schema.model :as model]
    [llx.ai.impl.schema.options :as options]
-   [llx.ai.impl.schema.runtime :as runtime]))
+   [llx.ai.schema.runtime :as runtime]))
 
 (defn custom-schemas
   []

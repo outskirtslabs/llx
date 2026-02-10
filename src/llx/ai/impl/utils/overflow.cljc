@@ -1,21 +1,21 @@
 (ns llx.ai.impl.utils.overflow)
 
 (def ^:private overflow-patterns
-  [#"prompt is too long"
-   #"input is too long for requested model"
-   #"exceeds the context window"
-   #"input token count.*exceeds the maximum"
-   #"maximum prompt length is \d+"
-   #"reduce the length of the messages"
-   #"maximum context length is \d+ tokens"
-   #"exceeds the limit of \d+"
-   #"exceeds the available context size"
-   #"greater than the context length"
-   #"context window exceeds limit"
-   #"exceeded model token limit"
-   #"context[_ ]length[_ ]exceeded"
-   #"too many tokens"
-   #"token limit exceeded"])
+  [#"(?i)prompt is too long"
+   #"(?i)input is too long for requested model"
+   #"(?i)exceeds the context window"
+   #"(?i)input token count.*exceeds the maximum"
+   #"(?i)maximum prompt length is \d+"
+   #"(?i)reduce the length of the messages"
+   #"(?i)maximum context length is \d+ tokens"
+   #"(?i)exceeds the limit of \d+"
+   #"(?i)exceeds the available context size"
+   #"(?i)greater than the context length"
+   #"(?i)context window exceeds limit"
+   #"(?i)exceeded model token limit"
+   #"(?i)context[_ ]length[_ ]exceeded"
+   #"(?i)too many tokens"
+   #"(?i)token limit exceeded"])
 
 (defn- overflow-status-no-body?
   [error-message]
@@ -27,7 +27,7 @@
   [error-message]
   (boolean
    (and (string? error-message)
-        (some #(re-find (re-pattern (str "(?i)" (.pattern %))) error-message) overflow-patterns))))
+        (some #(re-find % error-message) overflow-patterns))))
 
 (defn context-overflow?
   "Returns true when `assistant-message` appears to be a context-window overflow.

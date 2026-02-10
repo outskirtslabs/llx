@@ -1,7 +1,7 @@
 (ns llx.ai.demo
   (:require
    [llx.ai.impl.client.jvm :as jvm]
-   [llx.ai.impl.event-stream :as event-stream]
+   [llx.ai.stream :as stream]
    [llx.ai.impl.schema :as schema]))
 
 (set! *warn-on-reflection* true)
@@ -60,6 +60,23 @@
 (def demo-context
   {:messages [{:role :user :content "say hello from llx" :timestamp 1}]})
 
+(defn- collect-stream!
+  [st]
+  (let [events* (atom [])
+        result* (promise)
+        close*  (promise)]
+    (stream/consume! st
+                       {:on-event  (fn [event]
+                                     (swap! events* conj event))
+                        :on-result (fn [assistant-message]
+                                     (deliver result* assistant-message))
+                        :on-close  (fn [_close-meta]
+                                     (deliver close* true))})
+    (deref close* 60000 false)
+    (let [result (deref result* 1000 nil)]
+      {:events @events*
+       :result result})))
+
 (comment
   (schema/valid? :llx/model openai-model)
   (schema/valid? :llx/message (first (:messages demo-context)))
@@ -76,13 +93,11 @@
   (let [stream (jvm/stream ollama-model
                            {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 64 :temperature 0.0})]
-    (event-stream/drain! stream)
-    (event-stream/result stream))
+    (collect-stream! stream))
   (let [stream (jvm/stream anthropic-model
                            {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 128})]
-    (event-stream/drain! stream)
-    (event-stream/result stream))
+    (collect-stream! stream))
   (jvm/complete google-model
                 {:messages [{:role :user :content "reply with exactly: llx google demo ok" :timestamp 1}]}
                 {:max-output-tokens 96
@@ -94,13 +109,11 @@
                            {:messages [{:role :user :content "reply with exactly: llx google stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 96
                             :reasoning         {:level :high :effort :high :summary :detailed}})]
-    (event-stream/drain! stream)
-    (event-stream/result stream))
+    (collect-stream! stream))
   (let [stream (jvm/stream mistral-model
                            {:messages [{:role :user :content "reply with exactly: llx mistral stream demo ok" :timestamp 1}]}
                            {:max-output-tokens 96})]
-    (event-stream/drain! stream)
-    (event-stream/result stream))
+    (collect-stream! stream))
   ;; Handoff: Anthropic -> Google
   (let [user1  {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
         step-1 (jvm/complete anthropic-model
@@ -172,8 +185,7 @@
                              {:messages [{:role :user :content "reply with exactly: llx openai responses stream demo ok" :timestamp 1}]}
                              {:max-output-tokens 96
                               :reasoning         {:level :high :effort :high :summary :detailed}})]
-      (event-stream/drain! stream)
-      (event-stream/result stream))
+      (collect-stream! stream))
 
     ;; Handoff: OpenAI Responses -> Anthropic
     (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}

@@ -82,15 +82,3 @@
    (stream (default-env) model context opts))
   ([env model context opts]
    (client/stream env model context opts)))
-
-(defn stream-simple
-  ([model context simple-opts]
-   (stream-simple (default-env) model context simple-opts))
-  ([env model context simple-opts]
-   (client/stream-simple env model context simple-opts)))
-
-(defn complete-simple
-  ([model context simple-opts]
-   (complete-simple (default-env) model context simple-opts))
-  ([env model context simple-opts]
-   (client/complete-simple env model context simple-opts)))

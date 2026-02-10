@@ -2,11 +2,28 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.client.jvm :as client]
-   [llx.ai.impl.event-stream :as event-stream]
+   [llx.ai.stream :as stream]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]))
 
 (set! *warn-on-reflection* true)
+
+(defn- collect-stream!
+  [st]
+  (let [events* (atom [])
+        result* (promise)
+        close*  (promise)]
+    (stream/consume! st
+                     {:on-event  (fn [event]
+                                   (swap! events* conj event))
+                      :on-result (fn [assistant-message]
+                                   (deliver result* assistant-message))
+                      :on-close  (fn [_close-meta]
+                                   (deliver close* true))})
+    (deref close* 60000 false)
+    (let [result (deref result* 1000 nil)]
+      {:events @events*
+       :result result})))
 
 (defn- assert-complete-ok [out]
   (is (= :assistant (:role out)))
@@ -14,12 +31,11 @@
   (is (seq (:content out))))
 
 (defn- assert-stream-ok [stream]
-  (let [events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [{:keys [events result]} (collect-stream! stream)]
     (is (= :start (:type (first events))))
     (is (#{:done :error} (:type (last events))))
-    (is (= :assistant (:role out)))
-    (is (seq (:content out)))))
+    (is (= :assistant (:role result)))
+    (is (seq (:content result)))))
 
 (deftest live-anthropic-smoke
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]

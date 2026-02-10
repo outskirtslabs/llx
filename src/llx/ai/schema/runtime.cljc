@@ -1,4 +1,4 @@
-(ns llx.ai.impl.schema.runtime)
+(ns llx.ai.schema.runtime)
 
 (def schemas
   {:llx/adapter
@@ -61,13 +61,13 @@
    :llx/raw-stream-chunk
    [:or :string :map]
 
-   :llx/event-stream-map
+   :llx/stream-map
    [:map
-    [:queue :any]
-    [:closed? :any]
-    [:is-complete? :llx/fn]
-    [:extract-result :llx/fn]
-    [:result* :any]]
+    [:llx.ai.stream/type :keyword]
+    [:state* :any]
+    [:cancel-fn {:optional true} :llx/fn]
+    [:clock/now-ms :llx/fn]
+    [:lock :any]]
 
    :llx/registry-entry
    [:map {:closed true}
@@ -104,7 +104,7 @@
     [:env :llx/env]
     [:model :llx/model]
     [:request :llx/adapter-request-map]
-    [:out :map]
+    [:out :llx/stream-map]
     [:state* :any]
     [:request-opts {:optional true} [:maybe :llx/request-options]]]
 

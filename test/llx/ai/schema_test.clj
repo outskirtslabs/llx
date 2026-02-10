@@ -219,17 +219,19 @@
                                 :env     valid-env
                                 :model   valid-model
                                 :request {:method :post :url "https://example.invalid"}
-                                :out     {:queue          :q
-                                          :closed?        (atom false)
-                                          :is-complete?   (fn [_] false)
-                                          :extract-result (fn [event] event)
-                                          :result*        (promise)}
+                                :out     {:llx.ai.stream/type :llx.ai.stream/stream
+                                          :state*             (atom {})
+                                          :clock/now-ms       (fn [] 0)
+                                          :lock               (atom nil)}
                                 :state*  (atom {:model valid-model})}
         valid-run-stream-args  {:adapter valid-adapter
                                 :env     valid-env
                                 :model   valid-model
                                 :request {:method :post :url "https://example.invalid"}
-                                :out     {:queue :q}
+                                :out     {:llx.ai.stream/type :llx.ai.stream/stream
+                                          :state*             (atom {})
+                                          :clock/now-ms       (fn [] 0)
+                                          :lock               (atom nil)}
                                 :state*  (atom {:model valid-model})}]
     (testing "accepts runtime adapter boundary maps"
       (is (sut/valid? :llx/http-response-map valid-http-response))
@@ -243,12 +245,11 @@
       (is (sut/valid? :llx/runtime-normalize-error-partial {:assistant-message valid-assistant}))
       (is (sut/valid? :llx/raw-stream-chunk "{\"type\":\"delta\"}"))
       (is (sut/valid? :llx/raw-stream-chunk {:type :delta}))
-      (is (sut/valid? :llx/event-stream-map
-                      {:queue          :q
-                       :closed?        (atom false)
-                       :is-complete?   (fn [_] false)
-                       :extract-result (fn [_] nil)
-                       :result*        (promise)}))
+      (is (sut/valid? :llx/stream-map
+                      {:llx.ai.stream/type :llx.ai.stream/stream
+                       :state*             (atom {})
+                       :clock/now-ms       (fn [] 0)
+                       :lock               (atom nil)}))
       (is (sut/valid? :llx/registry-entry {:adapter valid-adapter}))
       (is (sut/valid? :llx/registry-map {:llx.registry/adapters {:openai-completions {:adapter valid-adapter}}}))
       (is (sut/valid? :llx/runtime-decode-event-result valid-event-transition))
@@ -261,7 +262,7 @@
       (is (not (sut/valid? :llx/runtime-finalize-input {:response {:status "200"}})))
       (is (not (sut/valid? :llx/runtime-normalize-error-partial {:model "gpt-5"})))
       (is (not (sut/valid? :llx/raw-stream-chunk 42)))
-      (is (not (sut/valid? :llx/event-stream-map {:queue :q :closed? (atom false) :is-complete? (fn [_] false)})))
+      (is (not (sut/valid? :llx/stream-map {:state* (atom {}) :clock/now-ms (fn [] 0)})))
       (is (not (sut/valid? :llx/registry-entry {:adapter valid-adapter :source-id :x :extra true})))
       (is (not (sut/valid? :llx/runtime-decode-event-result {:state {} :events [{:type :toolcall-delta :id "c1" :name "tool"}]})))
       (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []})))

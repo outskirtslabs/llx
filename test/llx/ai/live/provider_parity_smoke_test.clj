@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.client.jvm :as client]
-   [llx.ai.impl.event-stream :as event-stream]
+   [llx.ai.stream :as stream]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models])
   (:import
@@ -11,6 +11,23 @@
    [java.io File]))
 
 (set! *warn-on-reflection* true)
+
+(defn- collect-stream!
+  [st]
+  (let [events* (atom [])
+        result* (promise)
+        close*  (promise)]
+    (stream/consume! st
+                     {:on-event  (fn [event]
+                                   (swap! events* conj event))
+                      :on-result (fn [assistant-message]
+                                   (deliver result* assistant-message))
+                      :on-close  (fn [_close-meta]
+                                   (deliver close* true))})
+    (deref close* 60000 false)
+    (let [result (deref result* 1000 nil)]
+      {:events @events*
+       :result result})))
 
 (def tool-spec
   {:name         "math_operation"
@@ -81,18 +98,19 @@
   "Stream with calculator tool. Verify the library emits the expected event
    sequence and produces a well-shaped tool-call result."
   [model opts]
-  (let [stream   (client/stream model
-                                {:system-prompt "You are a helpful assistant that uses tools when asked."
-                                 :messages      [{:role      :user
-                                                  :content   "Calculate 15 + 27 using the math_operation tool."
-                                                  :timestamp (System/currentTimeMillis)}]
-                                 :tools         [tool-spec]}
-                                opts)
-        events   (event-stream/drain! stream)
-        result   (event-stream/result stream)
-        types    (set (map :type events))
-        tc-block (some #(when (= :tool-call (:type %)) %) (:content result))
-        args     (:arguments tc-block)]
+  (let [stream    (client/stream model
+                                 {:system-prompt "You are a helpful assistant that uses tools when asked."
+                                  :messages      [{:role      :user
+                                                   :content   "Calculate 15 + 27 using the math_operation tool."
+                                                   :timestamp (System/currentTimeMillis)}]
+                                  :tools         [tool-spec]}
+                                 opts)
+        collected (collect-stream! stream)
+        events    (:events collected)
+        result    (:result collected)
+        types     (set (map :type events))
+        tc-block  (some #(when (= :tool-call (:type %)) %) (:content result))
+        args      (:arguments tc-block)]
     (is (every? types #{:toolcall-start :toolcall-delta :toolcall-end})
         (str "expected toolcall-start/-delta/-end in event types, got " types))
     (is (= :tool-use (:stop-reason result))
@@ -115,8 +133,9 @@
                                                     :content   "Count from 1 to 3"
                                                     :timestamp (System/currentTimeMillis)}]}
                                   opts)
-        events     (event-stream/drain! stream)
-        result     (event-stream/result stream)
+        collected  (collect-stream! stream)
+        events     (:events collected)
+        result     (:result collected)
         types      (set (map :type events))
         text-accum (apply str (keep :text (filter #(= :text-delta (:type %)) events)))]
     (is (contains? types :text-start) "expected :text-start event")
@@ -138,8 +157,9 @@
                                                         :content   (str "Think long and hard about " rand-num " + 27. Think step by step. Then output the result.")
                                                         :timestamp (System/currentTimeMillis)}]}
                                       opts)
-        events         (event-stream/drain! stream)
-        result         (event-stream/result stream)
+        collected      (collect-stream! stream)
+        events         (:events collected)
+        result         (:result collected)
         types          (set (map :type events))
         thinking-accum (apply str (keep :thinking (filter #(= :thinking-delta (:type %)) events)))]
     (is (= :stop (:stop-reason result))

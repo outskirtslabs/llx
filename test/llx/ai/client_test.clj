@@ -6,7 +6,7 @@
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
-   [llx.ai.impl.event-stream :as event-stream]
+   [llx.ai.stream :as stream]
    [llx.ai.live.models :as live-models]
    [llx.ai.test-util :as util]
    [llx.ai.impl.client :as sut]
@@ -49,6 +49,23 @@
   [events]
   (let [payload (str (str/join "\n" events) "\n")]
     (java.io.ByteArrayInputStream. (.getBytes payload "UTF-8"))))
+
+(defn- collect-stream!
+  [st]
+  (let [events* (atom [])
+        result* (promise)
+        close*  (promise)]
+    (stream/consume! st
+                     {:on-event  (fn [event]
+                                   (swap! events* conj event))
+                      :on-result (fn [assistant-message]
+                                   (deliver result* assistant-message))
+                      :on-close  (fn [close-meta]
+                                   (deliver close* close-meta))})
+    (deref close* 1000 ::timeout)
+    (let [result (deref result* 1000 nil)]
+      {:events @events*
+       :result result})))
 
 (deftest complete-openai-completions-happy-path
   (let [seen-request (atom nil)
@@ -229,8 +246,9 @@
                                                                                      :total_tokens      5}}))
                                             "data: [DONE]"])}))
         stream       (sut/stream env base-model {:messages [{:role :user :content "say hello" :timestamp 1}]} {:api-key "x"})
-        events       (event-stream/drain! stream)
-        out          (event-stream/result stream)]
+        collected    (collect-stream! stream)
+        events       (:events collected)
+        out          (:result collected)]
     (is
      (= [:start :text-start :text-delta :text-delta :text-end :done]
         (mapv :type events)))
@@ -252,23 +270,24 @@
         (get-in (json/read-str (:body @seen-request) {:key-fn keyword}) [:stream])))))
 
 (deftest stream-openai-completions-tool-call-contract
-  (let [env    (stub-env (fn [_request]
-                           {:status 200
-                            :body   (sse-body
-                                     [(str "data: " (json/write-str {:choices [{:delta {:tool_calls [{:index    0
-                                                                                                      :id       "call_1"
-                                                                                                      :type     "function"
-                                                                                                      :function {:name      "search"
-                                                                                                                 :arguments "{\"q\":\"f"}}]}}]}))
-                                      (str "data: " (json/write-str {:choices [{:delta {:tool_calls [{:index    0
-                                                                                                      :function {:arguments "oo\"}"}}]}}]}))
-                                      (str "data: " (json/write-str {:choices [{:delta         {}
-                                                                                :finish_reason "tool_calls"}]}))
-                                      "data: [DONE]"])}))
-        model  (assoc base-model :id "gpt-tool")
-        stream (sut/stream env model {:messages [{:role :user :content "run search" :timestamp 1}]} {:api-key "x"})
-        events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [env       (stub-env (fn [_request]
+                              {:status 200
+                               :body   (sse-body
+                                        [(str "data: " (json/write-str {:choices [{:delta {:tool_calls [{:index    0
+                                                                                                         :id       "call_1"
+                                                                                                         :type     "function"
+                                                                                                         :function {:name      "search"
+                                                                                                                    :arguments "{\"q\":\"f"}}]}}]}))
+                                         (str "data: " (json/write-str {:choices [{:delta {:tool_calls [{:index    0
+                                                                                                         :function {:arguments "oo\"}"}}]}}]}))
+                                         (str "data: " (json/write-str {:choices [{:delta         {}
+                                                                                   :finish_reason "tool_calls"}]}))
+                                         "data: [DONE]"])}))
+        model     (assoc base-model :id "gpt-tool")
+        stream    (sut/stream env model {:messages [{:role :user :content "run search" :timestamp 1}]} {:api-key "x"})
+        collected (collect-stream! stream)
+        events    (:events collected)
+        out       (:result collected)]
     (is
      (= [:start :toolcall-start :toolcall-delta :toolcall-delta :toolcall-end :done]
         (mapv :type events)))
@@ -284,12 +303,13 @@
         (select-keys out [:stop-reason :content])))))
 
 (deftest stream-openai-completions-terminal-error-contract
-  (let [env    (stub-env (fn [_request]
-                           {:status 500
-                            :body   (json/write-str {:error {:message "boom"}})}))
-        stream (sut/stream env base-model {:messages [{:role :user :content "hi" :timestamp 1}]} {:api-key "x"})
-        events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [env       (stub-env (fn [_request]
+                              {:status 500
+                               :body   (json/write-str {:error {:message "boom"}})}))
+        stream    (sut/stream env base-model {:messages [{:role :user :content "hi" :timestamp 1}]} {:api-key "x"})
+        collected (collect-stream! stream)
+        events    (:events collected)
+        out       (:result collected)]
     (is (= [:error] (mapv :type events)))
     (is (= :error (:stop-reason out)))
     (is (string? (:error-message out)))
@@ -528,67 +548,69 @@
     (is (= 0.28 (get-in google-out [:usage :cost :total])))))
 
 (deftest stream-anthropic-messages-dispatches-through-registry
-  (let [model  {:id             "claude-sonnet-4-5"
-                :name           "Claude Sonnet 4.5"
-                :provider       :anthropic
-                :api            :anthropic-messages
-                :base-url       "https://api.anthropic.com"
-                :context-window 200000
-                :max-tokens     8192
-                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-                :capabilities   {:reasoning? true :input #{:text}}}
-        env    (stub-env (fn [_request]
-                           {:status 200
-                            :body   (sse-body
-                                     [(str "data: " (json/write-str {:type    "message_start"
-                                                                     :message {:usage {:input_tokens 1 :output_tokens 0}}}))
-                                      (str "data: " (json/write-str {:type          "content_block_start"
-                                                                     :index         0
-                                                                     :content_block {:type "text"}}))
-                                      (str "data: " (json/write-str {:type  "content_block_delta"
-                                                                     :index 0
-                                                                     :delta {:type "text_delta" :text "hello"}}))
-                                      (str "data: " (json/write-str {:type "content_block_stop" :index 0}))
-                                      (str "data: " (json/write-str {:type  "message_delta"
-                                                                     :delta {:stop_reason "end_turn"}
-                                                                     :usage {:input_tokens 1 :output_tokens 1}}))
-                                      "data: [DONE]"])}))
-        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                           {:api-key "anthropic-test-key"})
-        events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [model     {:id             "claude-sonnet-4-5"
+                   :name           "Claude Sonnet 4.5"
+                   :provider       :anthropic
+                   :api            :anthropic-messages
+                   :base-url       "https://api.anthropic.com"
+                   :context-window 200000
+                   :max-tokens     8192
+                   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                   :capabilities   {:reasoning? true :input #{:text}}}
+        env       (stub-env (fn [_request]
+                              {:status 200
+                               :body   (sse-body
+                                        [(str "data: " (json/write-str {:type    "message_start"
+                                                                        :message {:usage {:input_tokens 1 :output_tokens 0}}}))
+                                         (str "data: " (json/write-str {:type          "content_block_start"
+                                                                        :index         0
+                                                                        :content_block {:type "text"}}))
+                                         (str "data: " (json/write-str {:type  "content_block_delta"
+                                                                        :index 0
+                                                                        :delta {:type "text_delta" :text "hello"}}))
+                                         (str "data: " (json/write-str {:type "content_block_stop" :index 0}))
+                                         (str "data: " (json/write-str {:type  "message_delta"
+                                                                        :delta {:stop_reason "end_turn"}
+                                                                        :usage {:input_tokens 1 :output_tokens 1}}))
+                                         "data: [DONE]"])}))
+        stream    (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                              {:api-key "anthropic-test-key"})
+        collected (collect-stream! stream)
+        events    (:events collected)
+        out       (:result collected)]
     (is (= [:start :text-start :text-delta :text-end :done]
            (mapv :type events)))
     (is (= "hello" (get-in out [:content 0 :text])))
     (is (= :stop (:stop-reason out)))))
 
 (deftest stream-google-generative-ai-dispatches-through-registry
-  (let [model  {:id             "gemini-2.5-flash"
-                :name           "Gemini 2.5 Flash"
-                :provider       :google
-                :api            :google-generative-ai
-                :base-url       "https://generativelanguage.googleapis.com/v1beta"
-                :context-window 1048576
-                :max-tokens     8192
-                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-                :capabilities   {:reasoning? true :input #{:text}}}
-        env    (-> (stub-env (fn [_request]
-                               {:status 200
-                                :body   (sse-body
-                                         [(str "data: " (json/write-str {:candidates [{:content {:parts [{:text "hello "}]}}]}))
-                                          (str "data: " (json/write-str {:candidates    [{:content      {:parts [{:text "world"}]}
-                                                                                          :finishReason "STOP"}]
-                                                                         :usageMetadata {:promptTokenCount     3
-                                                                                         :candidatesTokenCount 2
-                                                                                         :totalTokenCount      5}}))
-                                          "data: [DONE]"])}))
-                   (assoc :env/get (fn [k]
-                                     (case k
-                                       "GEMINI_API_KEY" "google-key"
-                                       nil))))
-        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {})
-        events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [model     {:id             "gemini-2.5-flash"
+                   :name           "Gemini 2.5 Flash"
+                   :provider       :google
+                   :api            :google-generative-ai
+                   :base-url       "https://generativelanguage.googleapis.com/v1beta"
+                   :context-window 1048576
+                   :max-tokens     8192
+                   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                   :capabilities   {:reasoning? true :input #{:text}}}
+        env       (-> (stub-env (fn [_request]
+                                  {:status 200
+                                   :body   (sse-body
+                                            [(str "data: " (json/write-str {:candidates [{:content {:parts [{:text "hello "}]}}]}))
+                                             (str "data: " (json/write-str {:candidates    [{:content      {:parts [{:text "world"}]}
+                                                                                             :finishReason "STOP"}]
+                                                                            :usageMetadata {:promptTokenCount     3
+                                                                                            :candidatesTokenCount 2
+                                                                                            :totalTokenCount      5}}))
+                                             "data: [DONE]"])}))
+                      (assoc :env/get (fn [k]
+                                        (case k
+                                          "GEMINI_API_KEY" "google-key"
+                                          nil))))
+        stream    (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {})
+        collected (collect-stream! stream)
+        events    (:events collected)
+        out       (:result collected)]
     (is (= [:start :text-start :text-delta :text-delta :text-end :done]
            (mapv :type events)))
     (is (= "hello world" (get-in out [:content 0 :text])))
@@ -636,38 +658,39 @@
     (is (= "hello from responses" (get-in out [:content 0 :text])))))
 
 (deftest stream-openai-responses-dispatches-through-registry
-  (let [model  {:id             "gpt-5-mini"
-                :name           "GPT-5 Mini"
-                :provider       :openai
-                :api            :openai-responses
-                :base-url       "https://api.openai.com/v1"
-                :context-window 400000
-                :max-tokens     128000
-                :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-                :capabilities   {:reasoning? true :input #{:text}}}
-        env    (stub-env (fn [_request]
-                           {:status 200
-                            :body   (sse-body
-                                     [(str "data: " (json/write-str {:type "response.output_item.added"
-                                                                     :item {:type    "message"
-                                                                            :id      "msg_1"
-                                                                            :content []}}))
-                                      (str "data: " (json/write-str {:type "response.content_part.added"
-                                                                     :part {:type "output_text" :text ""}}))
-                                      (str "data: " (json/write-str {:type  "response.output_text.delta"
-                                                                     :delta "hello"}))
-                                      (str "data: " (json/write-str {:type "response.output_item.done"
-                                                                     :item {:type    "message"
-                                                                            :id      "msg_1"
-                                                                            :content [{:type "output_text" :text "hello"}]}}))
-                                      (str "data: " (json/write-str {:type     "response.completed"
-                                                                     :response {:status "completed"
-                                                                                :usage  {:input_tokens 2 :output_tokens 1 :total_tokens 3}}}))
-                                      "data: [DONE]"])}))
-        stream (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                           {:api-key "openai-test-key"})
-        events (event-stream/drain! stream)
-        out    (event-stream/result stream)]
+  (let [model     {:id             "gpt-5-mini"
+                   :name           "GPT-5 Mini"
+                   :provider       :openai
+                   :api            :openai-responses
+                   :base-url       "https://api.openai.com/v1"
+                   :context-window 400000
+                   :max-tokens     128000
+                   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+                   :capabilities   {:reasoning? true :input #{:text}}}
+        env       (stub-env (fn [_request]
+                              {:status 200
+                               :body   (sse-body
+                                        [(str "data: " (json/write-str {:type "response.output_item.added"
+                                                                        :item {:type    "message"
+                                                                               :id      "msg_1"
+                                                                               :content []}}))
+                                         (str "data: " (json/write-str {:type "response.content_part.added"
+                                                                        :part {:type "output_text" :text ""}}))
+                                         (str "data: " (json/write-str {:type  "response.output_text.delta"
+                                                                        :delta "hello"}))
+                                         (str "data: " (json/write-str {:type "response.output_item.done"
+                                                                        :item {:type    "message"
+                                                                               :id      "msg_1"
+                                                                               :content [{:type "output_text" :text "hello"}]}}))
+                                         (str "data: " (json/write-str {:type     "response.completed"
+                                                                        :response {:status "completed"
+                                                                                   :usage  {:input_tokens 2 :output_tokens 1 :total_tokens 3}}}))
+                                         "data: [DONE]"])}))
+        stream    (sut/stream env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                              {:api-key "openai-test-key"})
+        collected (collect-stream! stream)
+        events    (:events collected)
+        out       (:result collected)]
     (is (= [:start :text-start :text-delta :text-end :done]
            (mapv :type events)))
     (is (= "hello" (get-in out [:content 0 :text])))
@@ -737,67 +760,6 @@
          clojure.lang.ExceptionInfo
          #"Schema validation failed"
          (sut/complete env base-model context {:api-key "x"})))))
-
-(deftest stream-simple-exists-and-normalizes-simple-options
-  (let [stream-simple (ns-resolve 'llx.ai.impl.client 'stream-simple)
-        seen-opts*    (atom nil)
-        expected-out  {:fake-stream true}
-        env           (stub-env (fn [_] (throw (ex-info "unexpected request" {}))))
-        context       {:messages [{:role :user :content "hello" :timestamp 1}]}]
-    (is (ifn? stream-simple))
-    (when (ifn? stream-simple)
-      (with-redefs [sut/stream (fn [_env _model _context opts]
-                                 (reset! seen-opts* opts)
-                                 expected-out)]
-        (is (= expected-out
-               (stream-simple env
-                              base-model
-                              context
-                              {:temperature 0.25
-                               :max-tokens  2048
-                               :reasoning   :xhigh
-                               :api-key     "test-key"})))
-        (is (= 0.25 (:temperature @seen-opts*)))
-        (is (= 2048 (:max-output-tokens @seen-opts*)))
-        (is (= {:level :high} (:reasoning @seen-opts*))))
-      (with-redefs [sut/stream (fn [_env _model _context opts]
-                                 (reset! seen-opts* opts)
-                                 expected-out)]
-        (stream-simple env base-model context {})
-        (is (= 16384 (:max-output-tokens @seen-opts*)))))))
-
-(deftest simple-opts-clamps-xhigh-for-non-xhigh-model
-  (let [seen-opts*   (atom nil)
-        expected-out {:fake-stream true}]
-    (with-redefs [sut/stream (fn [_env _model _context opts]
-                               (reset! seen-opts* opts)
-                               expected-out)]
-      (sut/stream-simple (stub-env (fn [_] (throw (ex-info "unexpected" {}))))
-                         base-model
-                         {:messages [{:role :user :content "hello" :timestamp 1}]}
-                         {:reasoning :xhigh :api-key "x"})
-      (is (= {:level :high} (:reasoning @seen-opts*))))))
-
-(deftest simple-opts-preserves-xhigh-for-xhigh-model
-  (let [seen-opts*   (atom nil)
-        expected-out {:fake-stream true}
-        xhigh-model  (assoc base-model
-                            :id "claude-opus-4-6"
-                            :api :anthropic-messages
-                            :provider :anthropic
-                            :capabilities {:reasoning? true :input #{:text}})]
-    (with-redefs [sut/stream (fn [_env _model _context opts]
-                               (reset! seen-opts* opts)
-                               expected-out)]
-      (sut/stream-simple (stub-env (fn [_] (throw (ex-info "unexpected" {}))))
-                         xhigh-model
-                         {:messages [{:role :user :content "hello" :timestamp 1}]}
-                         {:reasoning :xhigh :api-key "x"})
-      (is (= {:level :xhigh} (:reasoning @seen-opts*))))))
-
-(deftest complete-simple-exists
-  (let [complete-simple (ns-resolve 'llx.ai.impl.client 'complete-simple)]
-    (is (ifn? complete-simple))))
 
 (deftest complete-retries-on-transient-error
   (let [call-count (atom 0)
@@ -976,8 +938,9 @@
         stream     (sut/stream env base-model
                                {:messages [{:role :user :content "hi" :timestamp 1}]}
                                {:api-key "x" :max-retries 2})
-        events     (event-stream/drain! stream)
-        out        (event-stream/result stream)]
+        collected  (collect-stream! stream)
+        events     (:events collected)
+        out        (:result collected)]
     (is (= 2 @call-count))
     (is (= :done (:type (last events))))
     (is (= :stop (:stop-reason out)))))

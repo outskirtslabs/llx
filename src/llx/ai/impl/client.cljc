@@ -6,11 +6,11 @@
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
    [llx.ai.impl.errors :as errors]
-   [llx.ai.impl.event-stream :as event-stream]
    [llx.ai.impl.models :as models]
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.transform-messages :as transform-messages]
+   [llx.ai.stream :as stream]
    [taoensso.trove :as trove]))
 
 (def ^:private builtins-source-id "llx.ai.impl.client/builtins")
@@ -44,29 +44,6 @@
   (or registry-override
       (:registry env)
       default-registry))
-
-(defn- clamp-reasoning-level
-  [model level]
-  (if (and (= :xhigh level) (not (models/supports-xhigh? model)))
-    :high
-    level))
-
-(defn- simple-opts->request-opts
-  [model simple-opts]
-  (let [simple-opts       (or simple-opts {})
-        max-output-tokens (or (:max-tokens simple-opts)
-                              (min (long (:max-tokens model)) 32000))
-        reasoning-level   (or (:reasoning simple-opts) (:reasoning-effort simple-opts))
-        reasoning-level   (when reasoning-level (clamp-reasoning-level model reasoning-level))]
-    (cond-> {:max-output-tokens max-output-tokens}
-      (contains? simple-opts :temperature) (assoc :temperature (:temperature simple-opts))
-      (contains? simple-opts :top-p) (assoc :top-p (:top-p simple-opts))
-      (contains? simple-opts :api-key) (assoc :api-key (:api-key simple-opts))
-      (contains? simple-opts :headers) (assoc :headers (:headers simple-opts))
-      (contains? simple-opts :signal) (assoc :signal (:signal simple-opts))
-      (contains? simple-opts :metadata) (assoc :metadata (:metadata simple-opts))
-      (contains? simple-opts :registry) (assoc :registry (:registry simple-opts))
-      reasoning-level (assoc :reasoning {:level reasoning-level}))))
 
 (defn- assert-reasoning-level!
   [model opts]
@@ -221,7 +198,7 @@
 (>defn stream
        "Runs a streaming completion request and returns an LLX event-stream map."
        [env model context opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/event-stream-map]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/stream-map]
        (let [_                         (schema/assert-valid! [:maybe :llx/request-options] opts)
              opts                      (or opts {})
              {:keys [registry-override
@@ -238,9 +215,21 @@
              request                   (schema/assert-valid!
                                         :llx/adapter-request-map
                                         ((:build-request adapter) call-env model context request-opts true))
-             out                       (event-stream/assistant-message-stream)
              state*                    (atom {:model model})
-             run-stream!               (:stream/run! env)]
+             run-stream!               (:stream/run! env)
+             out                       (let [out* (atom nil)
+                                             st   (stream/create
+                                                   {:clock/now-ms (:clock/now-ms env)
+                                                    :start-fn     (fn []
+                                                                    (run-stream! {:adapter      adapter
+                                                                                  :env          call-env
+                                                                                  :model        model
+                                                                                  :request      request
+                                                                                  :out          @out*
+                                                                                  :state*       state*
+                                                                                  :request-opts request-opts}))})]
+                                         (reset! out* st)
+                                         st)]
          (when-not run-stream!
            (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
          (trove/log! {:level :info
@@ -254,13 +243,6 @@
                               :has-tools?         (boolean (seq (:tools context)))
                               :has-system-prompt? (boolean (seq (:system-prompt context)))}})
          (try
-           (run-stream! {:adapter      adapter
-                         :env          call-env
-                         :model        model
-                         :request      request
-                         :out          out
-                         :state*       state*
-                         :request-opts request-opts})
            out
            (catch #?(:clj Exception :cljs :default) ex
              (trove/log! {:level :error
@@ -276,30 +258,3 @@
                                   :request-id    (get (ex-data ex) :request-id)
                                   :provider-code (get (ex-data ex) :provider-code)}})
              (throw ex)))))
-
-(defn stream-simple
-  "Runs [[stream]] with normalized simple options.
-
-  Options:
-
-  | key | description |
-  | --- | --- |
-  | `:temperature` | Sampling temperature. |
-  | `:top-p` | Nucleus sampling probability. |
-  | `:max-tokens` | Requested output cap; maps to `:max-output-tokens`. |
-  | `:reasoning` | Reasoning level keyword; `:xhigh` clamped to `:high` unless model supports it. |
-  | `:reasoning-effort` | Alias for `:reasoning`. |
-  | `:api-key` | Provider API key override. |
-  | `:headers` | Additional request headers. |
-  | `:signal` | Abort signal propagated to runtime. |
-  | `:metadata` | Request metadata map. |
-  | `:registry` | Adapter registry override for this call. |"
-  [env model context simple-opts]
-  (stream env model context (simple-opts->request-opts model simple-opts)))
-
-(defn complete-simple
-  "Runs [[complete]] with normalized simple options.
-
-  Accepts the same option keys as [[stream-simple]]."
-  [env model context simple-opts]
-  (complete env model context (simple-opts->request-opts model simple-opts)))

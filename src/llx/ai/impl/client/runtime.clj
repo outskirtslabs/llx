@@ -4,8 +4,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [llx.ai.impl.errors :as errors]
-   [llx.ai.impl.event-stream :as event-stream]
    [llx.ai.impl.schema :as schema]
+   [llx.ai.stream :as stream]
    [taoensso.trove :as trove]))
 
 (set! *warn-on-reflection* true)
@@ -61,9 +61,12 @@
                          :error-message           (ex-message stream-ex)
                          :normalize-error-failed? normalize-failed?}})
     (try
-      (event-stream/push! out {:type :error :assistant-message assistant-message})
+      (stream/emit-event! out {:type :error :assistant-message assistant-message})
+      (stream/emit-result! out assistant-message)
       (finally
-        (event-stream/end! out)))))
+        (stream/close! out {:reason       :error
+                            :error        stream-ex
+                            :timestamp-ms ((:clock/now-ms env))})))))
 
 (>defn run-stream!
        [{:keys [adapter env model request out state* request-opts]}]
@@ -93,7 +96,7 @@
                                   :provider (:provider model)
                                   :api      (:api model)
                                   :model-id (:id model)}})
-             (event-stream/push! out {:type :start})
+             (stream/emit-event! out {:type :start})
              (let [item-index* (atom 0)]
                (with-open [reader (io/reader (:body response))]
                  (doseq [line (line-seq reader)]
@@ -125,13 +128,13 @@
                        (reset! state* state)
                        (doseq [event events]
                          (schema/assert-valid! :llx/event event)
-                         (event-stream/push! out event)))))))
+                         (stream/emit-event! out event)))))))
              (let [{:keys [assistant-message events]} (schema/assert-valid!
                                                        :llx/runtime-finalize-result
                                                        ((:finalize adapter) env @state*))]
                (doseq [event events]
                  (schema/assert-valid! :llx/event event)
-                 (event-stream/push! out event))
+                 (stream/emit-event! out event))
                (schema/assert-valid! :llx/message-assistant assistant-message)
                (trove/log! {:level :info
                             :id    :llx.obs/stream-done
@@ -142,7 +145,10 @@
                                     :stop-reason         (:stop-reason assistant-message)
                                     :usage               (:usage assistant-message)
                                     :content-block-count (count (:content assistant-message))}})
-               (event-stream/push! out {:type :done :assistant-message assistant-message}))
-             (event-stream/end! out))
+               (stream/emit-event! out {:type :done :assistant-message assistant-message})
+               (stream/emit-result! out assistant-message))
+             (stream/close! out {:reason       :done
+                                 :error        nil
+                                 :timestamp-ms ((:clock/now-ms env))}))
            (catch Exception stream-ex
              (emit-terminal-error! adapter env model out state* stream-ex)))))
