@@ -3,6 +3,7 @@
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
    [llx-ai.errors :as errors]
+   [llx-ai.models :as models]
    [llx-ai.schema :as schema]))
 (schema/registry)
 
@@ -42,7 +43,7 @@
                   :total       0.0}})
 
 (defn- usage->canonical
-  [usage]
+  [model usage]
   (let [cache-read (long (or (:cachedContentTokenCount usage) 0))
         prompt     (long (or (:promptTokenCount usage) 0))
         ;; Google promptTokenCount is the canonical input total.
@@ -51,17 +52,18 @@
         output     (+ (long (or (:candidatesTokenCount usage) 0))
                       (long (or (:thoughtsTokenCount usage) 0)))
         total      (long (or (:totalTokenCount usage)
-                             (+ input output cache-read)))]
+                             (+ input output cache-read)))
+        usage*     {:input        input
+                    :output       output
+                    :cache-read   cache-read
+                    :cache-write  0
+                    :total-tokens total}]
     {:input        input
      :output       output
      :cache-read   cache-read
      :cache-write  0
      :total-tokens total
-     :cost         {:input       0.0
-                    :output      0.0
-                    :cache-read  0.0
-                    :cache-write 0.0
-                    :total       0.0}}))
+     :cost         (models/calculate-cost model usage*)}))
 
 (defn- map-stop-reason
   [finish-reason]
@@ -498,7 +500,7 @@
            {:state state :events []}
            (let [candidate (first (:candidates chunk))
                  state     (if-let [usage (:usageMetadata chunk)]
-                             (assoc-in state [:assistant-message :usage] (usage->canonical usage))
+                             (assoc-in state [:assistant-message :usage] (usage->canonical (:model state) usage))
                              state)]
              (loop [remaining-parts (or (get-in candidate [:content :parts]) [])
                     state           state
@@ -559,7 +561,7 @@
        :api         (:api model)
        :provider    (:provider model)
        :model       (:id model)
-       :usage       (usage->canonical (:usageMetadata body))
+       :usage       (usage->canonical model (:usageMetadata body))
        :stop-reason stop-reason
        :timestamp   ((:clock/now-ms env))})))
 
@@ -620,7 +622,7 @@
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :status])
                  request-id    (get headers "x-request-id")
-                 retry-after   (errors/extract-retry-after headers)
+                 retry-after   (errors/extract-retry-after-hint headers message)
                  provider      (name (or (:provider _model) "unknown"))]
              (throw (errors/http-status->error
                      status provider message

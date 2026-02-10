@@ -20,6 +20,9 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? true :input #{:text :image}}})
 
+(def priced-google-model
+  (assoc google-model :cost {:input 1000.0 :output 2000.0 :cache-read 3000.0 :cache-write 4000.0}))
+
 (def google-text-only-model
   (assoc-in google-model [:capabilities :input] #{:text}))
 
@@ -158,6 +161,32 @@
             :stop-reason :tool-use
             :timestamp   1730000000000}
            (:assistant-message finalized)))))
+
+(deftest finalize-calculates-usage-costs
+  (let [response {:status 200
+                  :body   (json/write-str
+                           {:candidates    [{:content      {:parts [{:text "ok"}]}
+                                             :finishReason "STOP"}]
+                            :usageMetadata {:promptTokenCount        100
+                                            :candidatesTokenCount    50
+                                            :thoughtsTokenCount      25
+                                            :cachedContentTokenCount 10
+                                            :totalTokenCount         185}})}
+        out      (sut/finalize (stub-env) {:model priced-google-model :response response})]
+    (is (= {:input 0.1 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.28}
+           (get-in out [:assistant-message :usage :cost])))))
+
+(deftest decode-event-stream-usage-calculates-costs
+  (let [state {:model priced-google-model}
+        chunk {:candidates    [{:content {:parts [{:text "ok"}]}}]
+               :usageMetadata {:promptTokenCount        100
+                               :candidatesTokenCount    50
+                               :thoughtsTokenCount      25
+                               :cachedContentTokenCount 10
+                               :totalTokenCount         185}}
+        out   (sut/decode-event (stub-env) state (json/write-str chunk))]
+    (is (= {:input 0.1 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.28}
+           (get-in out [:state :assistant-message :usage :cost])))))
 
 (deftest thought-signature-alone-is-not-thinking
   (let [env    (stub-env)
@@ -328,4 +357,3 @@
         usr-text (get-in payload [:contents 0 :parts 0 :text])]
     (is (str/includes? (str usr-text) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
         "valid emoji surrogate pair should be preserved")))
-

@@ -42,6 +42,9 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? false :input #{:text}}})
 
+(def priced-openai-model
+  (assoc openai-model :cost {:input 1000.0 :output 2000.0 :cache-read 3000.0 :cache-write 4000.0}))
+
 (defn- fixture
   [name]
   (-> (str "test/llx_ai/fixtures/openai_completions/" name ".edn")
@@ -259,6 +262,32 @@
     (is (= [:thinking-start :thinking-delta] (mapv :type events)))
     (is (= "thinking..." (:thinking (second events))))
     (is (= "thinking..." (get-in state [:assistant-message :content 0 :thinking])))))
+
+(deftest response->assistant-message-calculates-usage-costs
+  (let [response {:status 200
+                  :body   (json/write-str
+                           {:choices [{:finish_reason "stop"
+                                       :message       {:role "assistant" :content "ok"}}]
+                            :usage   {:prompt_tokens             120
+                                      :prompt_tokens_details     {:cached_tokens 20}
+                                      :completion_tokens         30
+                                      :completion_tokens_details {:reasoning_tokens 10}
+                                      :total_tokens              160}})}
+        out      (sut/response->assistant-message (stub-env) priced-openai-model response)]
+    (is (= {:input 0.1 :output 0.08 :cache-read 0.06 :cache-write 0.0 :total 0.24}
+           (get-in out [:usage :cost])))))
+
+(deftest decode-event-stream-usage-calculates-costs
+  (let [state (sut/init-stream-state (stub-env) priced-openai-model)
+        chunk {:choices [{:delta {:content "ok"}}]
+               :usage   {:prompt_tokens             90
+                         :prompt_tokens_details     {:cached_tokens 30}
+                         :completion_tokens         20
+                         :completion_tokens_details {:reasoning_tokens 10}
+                         :total_tokens              120}}
+        out   (sut/decode-event (stub-env) state (json/write-str chunk))]
+    (is (= {:input 0.06 :output 0.06 :cache-read 0.09 :cache-write 0.0 :total 0.21}
+           (get-in out [:state :assistant-message :usage :cost])))))
 
 (deftest decode-event-tracks-thinking-signature
   (let [state           (sut/init-stream-state (stub-env) reasoning-model)

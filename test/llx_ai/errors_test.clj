@@ -156,6 +156,17 @@
          (ex-data (sut/http-status->error 429 "openai" "Too many requests"
                                           :retry-after 10)))))
 
+(deftest http-status-429-with-quota-and-retry-after-returns-rate-limit
+  (is (= {:type         :llx/rate-limit
+          :message      "quota exceeded, retry later"
+          :recoverable? true
+          :provider     "google"
+          :http-status  429
+          :retry-after  14.9}
+         (ex-data (sut/http-status->error 429 "google" "quota exceeded, retry later"
+                                          :retry-after 14.9
+                                          :body "Quota exceeded")))))
+
 (deftest http-status-unknown-5xx-returns-recoverable-provider-error
   (is (= {:type         :llx/provider-error
           :message      "Custom error"
@@ -309,6 +320,14 @@
 
 (deftest retry-after-ms-takes-priority
   (is (= 5.0 (sut/extract-retry-after {"retry-after-ms" "5000" "retry-after" "30"}))))
+
+(deftest extract-retry-after-from-message-parses-seconds
+  (is (= 14.927068271
+         (sut/extract-retry-after-from-message
+          "Please retry in 14.927068271s."))))
+
+(deftest extract-retry-after-from-message-returns-nil-when-missing
+  (is (nil? (sut/extract-retry-after-from-message "Quota exceeded"))))
 
 (deftest provider-error-with-custom-recoverability
   (is (= {:type         :llx/provider-error

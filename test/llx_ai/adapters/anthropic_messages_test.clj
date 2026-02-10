@@ -20,6 +20,9 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? true :input #{:text :image}}})
 
+(def priced-anthropic-model
+  (assoc anthropic-model :cost {:input 1000.0 :output 2000.0 :cache-read 3000.0 :cache-write 4000.0}))
+
 (defn- fixture
   [name]
   (-> (str "test/llx_ai/fixtures/anthropic/" name ".edn")
@@ -216,6 +219,37 @@
            (get-in finalize-result [:assistant-message :content 2 :arguments])))
     (is (= :tool-use
            (get-in finalize-result [:assistant-message :stop-reason])))))
+
+(deftest finalize-calculates-usage-costs
+  (let [result (sut/finalize
+                (stub-env)
+                {:model    priced-anthropic-model
+                 :response {:status 200
+                            :body   (json/write-str
+                                     {:content     [{:type "text" :text "ok"}]
+                                      :stop_reason "end_turn"
+                                      :usage       {:input_tokens                100
+                                                    :output_tokens               50
+                                                    :cache_read_input_tokens     10
+                                                    :cache_creation_input_tokens 5}})}})]
+    (is (= {:input 0.1 :output 0.1 :cache-read 0.03 :cache-write 0.02 :total 0.25}
+           (get-in result [:assistant-message :usage :cost])))))
+
+(deftest decode-event-stream-usage-calculates-costs
+  (let [env        (stub-env)
+        init-state {:model priced-anthropic-model}
+        start-out  (sut/decode-event env init-state
+                                     (json/write-str {:type    "message_start"
+                                                      :message {:usage {:input_tokens 100}}}))
+        delta-out  (sut/decode-event env (:state start-out)
+                                     (json/write-str {:type  "message_delta"
+                                                      :delta {:stop_reason "end_turn"}
+                                                      :usage {:input_tokens                100
+                                                              :output_tokens               50
+                                                              :cache_read_input_tokens     10
+                                                              :cache_creation_input_tokens 5}}))]
+    (is (= {:input 0.1 :output 0.1 :cache-read 0.03 :cache-write 0.02 :total 0.25}
+           (get-in delta-out [:state :assistant-message :usage :cost])))))
 
 (defn- string-with-unpaired-high
   []

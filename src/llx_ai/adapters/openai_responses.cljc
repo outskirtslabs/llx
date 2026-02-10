@@ -647,7 +647,7 @@
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :type])
                  request-id    (get headers "x-request-id")
-                 retry-after   (errors/extract-retry-after headers)
+                 retry-after   (errors/extract-retry-after-hint headers message)
                  provider      (name (or (:provider _model) "unknown"))]
              (throw (errors/http-status->error
                      status provider message

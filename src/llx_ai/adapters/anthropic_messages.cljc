@@ -3,6 +3,7 @@
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
    [llx-ai.errors :as errors]
+   [llx-ai.models :as models]
    [llx-ai.schema :as schema]))
 (schema/registry)
 
@@ -42,22 +43,23 @@
                   :total       0.0}})
 
 (defn- usage->canonical
-  [usage]
+  [model usage]
   (let [input       (long (or (:input_tokens usage) 0))
         output      (long (or (:output_tokens usage) 0))
         cache-read  (long (or (:cache_read_input_tokens usage) 0))
         cache-write (long (or (:cache_creation_input_tokens usage) 0))
-        total       (+ input output cache-read cache-write)]
+        total       (+ input output cache-read cache-write)
+        usage*      {:input        input
+                     :output       output
+                     :cache-read   cache-read
+                     :cache-write  cache-write
+                     :total-tokens total}]
     {:input        input
      :output       output
      :cache-read   cache-read
      :cache-write  cache-write
      :total-tokens total
-     :cost         {:input       0.0
-                    :output      0.0
-                    :cache-read  0.0
-                    :cache-write 0.0
-                    :total       0.0}}))
+     :cost         (models/calculate-cost model usage*)}))
 
 (defn- map-stop-reason
   [stop-reason]
@@ -326,7 +328,7 @@
                                 :api         (get-in state-or-response [:model :api])
                                 :provider    (get-in state-or-response [:model :provider])
                                 :model       (get-in state-or-response [:model :id])
-                                :usage       (usage->canonical (:usage body))
+                                :usage       (usage->canonical (get-in state-or-response [:model]) (:usage body))
                                 :stop-reason (map-stop-reason (:stop_reason body))
                                 :timestamp   ((:clock/now-ms env))}
             :events            []})
@@ -355,7 +357,7 @@
 (defn- update-usage
   [state usage]
   (if (map? usage)
-    (assoc-in state [:assistant-message :usage] (usage->canonical usage))
+    (assoc-in state [:assistant-message :usage] (usage->canonical (:model state) usage))
     state))
 
 (>defn decode-event
@@ -511,7 +513,7 @@
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :type])
                  request-id    (get headers "x-request-id")
-                 retry-after   (errors/extract-retry-after headers)
+                 retry-after   (errors/extract-retry-after-hint headers message)
                  provider      (name (or (:provider _model) "unknown"))]
              (throw (errors/http-status->error
                      status provider message

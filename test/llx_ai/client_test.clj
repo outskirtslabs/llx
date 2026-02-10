@@ -426,6 +426,57 @@
     (is (= :assistant (:role out)))
     (is (= :stop (:stop-reason out)))))
 
+(deftest complete-adapters-emit-non-zero-cost-when-model-rates-are-non-zero
+  (let [anthropic-model {:id             "claude-sonnet-4-5"
+                         :name           "Claude Sonnet 4.5"
+                         :provider       :anthropic
+                         :api            :anthropic-messages
+                         :base-url       "https://api.anthropic.com"
+                         :context-window 200000
+                         :max-tokens     8192
+                         :cost           {:input 1000.0 :output 2000.0 :cache-read 3000.0 :cache-write 4000.0}
+                         :capabilities   {:reasoning? true :input #{:text}}}
+        anthropic-env   (stub-env (fn [_request]
+                                    {:status 200
+                                     :body   (json/write-str
+                                              {:content     [{:type "text" :text "hi"}]
+                                               :stop_reason "end_turn"
+                                               :usage       {:input_tokens                100
+                                                             :output_tokens               50
+                                                             :cache_read_input_tokens     10
+                                                             :cache_creation_input_tokens 5}})}))
+        anthropic-out   (sut/complete anthropic-env anthropic-model
+                                      {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                      {:api-key "anthropic-test-key"})
+        google-model    {:id             "gemini-2.5-flash"
+                         :name           "Gemini 2.5 Flash"
+                         :provider       :google
+                         :api            :google-generative-ai
+                         :base-url       "https://generativelanguage.googleapis.com/v1beta"
+                         :context-window 1048576
+                         :max-tokens     8192
+                         :cost           {:input 1000.0 :output 2000.0 :cache-read 3000.0 :cache-write 4000.0}
+                         :capabilities   {:reasoning? true :input #{:text}}}
+        google-env      (-> (stub-env (fn [_request]
+                                        {:status 200
+                                         :body   (json/write-str
+                                                  {:candidates    [{:content      {:parts [{:text "hello"}]}
+                                                                    :finishReason "STOP"}]
+                                                   :usageMetadata {:promptTokenCount        100
+                                                                   :candidatesTokenCount    50
+                                                                   :thoughtsTokenCount      25
+                                                                   :cachedContentTokenCount 10
+                                                                   :totalTokenCount         185}})}))
+                            (assoc :env/get (fn [k]
+                                              (case k
+                                                "GEMINI_API_KEY" "google-key"
+                                                nil))))
+        google-out      (sut/complete google-env google-model
+                                      {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                      {})]
+    (is (= 0.25 (get-in anthropic-out [:usage :cost :total])))
+    (is (= 0.28 (get-in google-out [:usage :cost :total])))))
+
 (deftest stream-anthropic-messages-dispatches-through-registry
   (let [model  {:id             "claude-sonnet-4-5"
                 :name           "Claude Sonnet 4.5"
@@ -716,6 +767,31 @@
         context    {:messages [{:role :user :content "hi" :timestamp 1}]}
         out        (sut/complete env base-model context {:api-key "x" :max-retries 2})]
     (is (= 2 @call-count))
+    (is (= :stop (:stop-reason out)))
+    (is (= [{:type :text :text "ok"}] (:content out)))))
+
+(deftest complete-retries-when-429-quota-includes-retry-hint
+  (let [call-count (atom 0)
+        sleep-ms*  (atom [])
+        env        (assoc (stub-env (fn [_request]
+                                      (swap! call-count inc)
+                                      (if (= 1 @call-count)
+                                        {:status 429
+                                         :body   (json/write-str
+                                                  {:error {:message "Quota exceeded. Please retry in 14.927068271s."}})}
+                                        {:status 200
+                                         :body   (json/write-str
+                                                  {:choices [{:finish_reason "stop"
+                                                              :message       {:role    "assistant"
+                                                                              :content "ok"}}]
+                                                   :usage   {:prompt_tokens     1
+                                                             :completion_tokens 1
+                                                             :total_tokens      2}})})))
+                           :thread/sleep (fn [ms] (swap! sleep-ms* conj ms)))
+        context    {:messages [{:role :user :content "hi" :timestamp 1}]}
+        out        (sut/complete env base-model context {:api-key "x" :max-retries 2})]
+    (is (= 2 @call-count))
+    (is (= [14927] @sleep-ms*))
     (is (= :stop (:stop-reason out)))
     (is (= [{:type :text :text "ok"}] (:content out)))))
 
