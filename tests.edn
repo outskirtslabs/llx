@@ -1,22 +1,22 @@
 #kaocha/v1
- {:bindings                     {kaocha.stacktrace/*stacktrace-stop-list* ["kaocha.runner"
-                                                                           "kaocha.plugin.capture_output"
-                                                                           "kaocha.testable"]}
-  :plugins                      [:kaocha.plugin.alpha/info
-                                 :kaocha.plugin/randomize
-                                 :kaocha.plugin/filter
-                                 :kaocha.plugin/capture-output
-                                 :kaocha-retry.plugin/retry]
-
-  :kaocha-retry.plugin/retry?   true
-  :kaocha-retry.plugin/max-retries 3
+ {:bindings                                   {kaocha.stacktrace/*stacktrace-stop-list* ["kaocha.runner"
+                                                                                         "kaocha.plugin.capture_output"
+                                                                                         "kaocha.testable"]}
+  :plugins                                    [:kaocha.plugin.alpha/info
+                                               :kaocha.plugin/randomize
+                                               :kaocha.plugin/filter
+                                               :kaocha.plugin/capture-output
+                                               :kaocha.plugin/profiling
+                                               :kaocha-retry.plugin/retry]
+  :kaocha-retry.plugin/retry?                 true
+  :kaocha-retry.plugin/max-retries            3
   :kaocha-retry.plugin/retrying-tests-regexes ["llx-ai\\.live\\."]
 
-  :kaocha/reporter
-  [kaocha.report/documentation]
-  :tests                        [{:id          :unit
-                                  :test-paths  ["test"]
-                                  :ns-patterns ["^(?!llx-ai\\.live\\.).*-test$"]}
-                                 {:id          :live
-                                  :test-paths  ["test"]
-                                  :ns-patterns ["^llx-ai\\.live\\..*-test$"]}]}
+  :kaocha/reporter                            [kaocha.report/dots]
+  #_[kaocha.report/documentation]
+  :tests                                      [{:id          :unit
+                                                :test-paths  ["test"]
+                                                :ns-patterns ["^(?!llx-ai\\.live\\.).*-test$"]}
+                                               {:id          :live
+                                                :test-paths  ["test"]
+                                                :ns-patterns ["^llx-ai\\.live\\..*-test$"]}]}

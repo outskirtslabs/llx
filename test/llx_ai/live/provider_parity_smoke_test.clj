@@ -1,4 +1,4 @@
-(ns llx-ai.live.provider-parity-smoke-test
+(ns ^{:kaocha/parallelize? true} llx-ai.live.provider-parity-smoke-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
