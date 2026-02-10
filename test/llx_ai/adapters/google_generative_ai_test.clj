@@ -51,25 +51,43 @@
     overrides)))
 
 (deftest build-request-converts-canonical-context-to-google-payload
-  (let [context  (fixture "request_context")
-        request  (sut/build-request (stub-env) google-model context {:max-output-tokens 256 :temperature 0.25} false)
-        payload  (json/read-str (:body request) {:key-fn keyword})
-        contents (:contents payload)]
-    (is (= :post (:method request)))
-    (is (= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" (:url request)))
-    (is (= "google-key" (get-in request [:headers "x-goog-api-key"])))
-    (is (= "Please use the tool for value 21." (get-in contents [0 :parts 0 :text])))
-    (is (= "image/png" (get-in contents [0 :parts 1 :inlineData :mimeType])))
-    (is (= true (get-in contents [1 :parts 0 :thought])))
-    (is (= "Need tool." (get-in contents [1 :parts 0 :text])))
-    (is (= "c2lnX3RoaW5raW5n" (get-in contents [1 :parts 0 :thoughtSignature])))
-    (is (= "double_number" (get-in contents [1 :parts 2 :functionCall :name])))
-    (is (= {:value 21} (get-in contents [1 :parts 2 :functionCall :args])))
-    (is (= "42" (get-in contents [2 :parts 0 :functionResponse :response :output])))
-    (is (= 256 (get-in payload [:generationConfig :maxOutputTokens])))
-    (is (= 0.25 (get-in payload [:generationConfig :temperature])))
-    (is (= "You are a helpful assistant." (:systemInstruction payload)))
-    (is (= "double_number" (get-in payload [:tools 0 :functionDeclarations 0 :name])))))
+  (let [context (fixture "request_context")
+        request (sut/build-request (stub-env) google-model context {:max-output-tokens 256 :temperature 0.25} false)
+        payload (json/read-str (:body request) {:key-fn keyword})]
+    (is (= {:method  :post
+            :url     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            :headers {"Content-Type"   "application/json"
+                      "x-goog-api-key" "google-key"}
+            :as      :string
+            :throw   false}
+           (dissoc request :body)))
+    (is (= {:contents
+            [{:role  "user"
+              :parts [{:text "Please use the tool for value 21."}
+                      {:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}
+             {:role  "model"
+              :parts [{:thought true :text "Need tool." :thoughtSignature "c2lnX3RoaW5raW5n"}
+                      {:text "Calling tool."}
+                      {:functionCall     {:name "double_number" :args {:value 21}}
+                       :thoughtSignature "c2lnX3Rvb2w="}]}
+             {:role  "user"
+              :parts [{:functionResponse {:name "double_number" :response {:output "42"}}}]}
+             {:role  "user"
+              :parts [{:text "Tool result image:"}
+                      {:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}
+             {:role "user" :parts [{:text "Now summarize in one sentence."}]}]
+            :generationConfig
+            {:temperature 0.25 :maxOutputTokens 256}
+            :systemInstruction
+            {:role "user" :parts [{:text "You are a helpful assistant."}]}
+            :tools
+            [{:functionDeclarations
+              [{:name                 "double_number"
+                :description          "Double an integer value."
+                :parametersJsonSchema {:type       "object"
+                                       :properties {:value {:type "integer"}}
+                                       :required   ["value"]}}]}]}
+           payload))))
 
 (deftest build-request-tool-result-image-forwarding-by-model-capability
   (let [context            {:messages [{:role      :user
@@ -81,14 +99,27 @@
                                         :content      [{:type :image :data "aGVsbG8=" :mime-type "image/png"}]
                                         :is-error?    false
                                         :timestamp    2}]}
-        multimodal-request (sut/build-request (stub-env) google-gemini3-model context {} false)
-        multimodal-payload (json/read-str (:body multimodal-request) {:key-fn keyword})
-        text-only-request  (sut/build-request (stub-env) google-text-only-model context {} false)
-        text-only-payload  (json/read-str (:body text-only-request) {:key-fn keyword})]
-    (is (= "image/png" (get-in multimodal-payload [:contents 1 :parts 0 :functionResponse :parts 0 :inlineData :mimeType])))
-    (is (= "(see attached image)" (get-in multimodal-payload [:contents 1 :parts 0 :functionResponse :response :output])))
-    (is (nil? (get-in text-only-payload [:contents 1 :parts 0 :functionResponse :parts])))
-    (is (= "" (get-in text-only-payload [:contents 1 :parts 0 :functionResponse :response :output])))))
+        multimodal-payload (-> (sut/build-request (stub-env) google-gemini3-model context {} false)
+                               :body
+                               (json/read-str {:key-fn keyword}))
+        text-only-payload  (-> (sut/build-request (stub-env) google-text-only-model context {} false)
+                               :body
+                               (json/read-str {:key-fn keyword}))]
+    (testing "gemini-3 multimodal model forwards image in functionResponse parts"
+      (is (= {:contents
+              [{:role "user" :parts [{:text "use the tool"}]}
+               {:role  "user"
+                :parts [{:functionResponse
+                         {:name     "vision"
+                          :response {:output "(see attached image)"}
+                          :parts    [{:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}}]}]}
+             multimodal-payload)))
+    (testing "text-only model drops images from functionResponse"
+      (is (= {:contents
+              [{:role "user" :parts [{:text "use the tool"}]}
+               {:role  "user"
+                :parts [{:functionResponse {:name "vision" :response {:output ""}}}]}]}
+             text-only-payload)))))
 
 (deftest decode-event-stream-contract
   (let [env       (stub-env)
@@ -102,33 +133,41 @@
                            :events []}
                           chunks)
         finalized (sut/finalize env (:state reduced))]
-    (is (= [:thinking-start
-            :thinking-delta
-            :thinking-end
-            :text-start
-            :text-delta
-            :text-end
-            :toolcall-start
-            :toolcall-delta
-            :toolcall-end]
-           (mapv :type (:events reduced))))
-    (is (= "thinking one" (get-in finalized [:assistant-message :content 0 :thinking])))
-    (is (= " text one" (get-in finalized [:assistant-message :content 1 :text])))
-    (is (= {:value 21} (get-in finalized [:assistant-message :content 2 :arguments])))
-    (is (= :tool-use (get-in finalized [:assistant-message :stop-reason])))
-    (is (= {:input 12 :output 5 :cache-read 2 :cache-write 0 :total-tokens 19}
-           (select-keys (get-in finalized [:assistant-message :usage])
-                        [:input :output :cache-read :cache-write :total-tokens])))))
+    (is (= [{:type :thinking-start}
+            {:type :thinking-delta :thinking "thinking one"}
+            {:type :thinking-end}
+            {:type :text-start}
+            {:type :text-delta :text " text one"}
+            {:type :text-end}
+            {:type :toolcall-start :id "call_stream" :name "double_number"}
+            {:type :toolcall-delta :id "call_stream" :name "double_number" :arguments {:value 21}}
+            {:type :toolcall-end :id "call_stream" :name "double_number" :arguments {:value 21}}]
+           (:events reduced)))
+    (is (= {:role        :assistant
+            :content     [{:type :thinking :thinking "thinking one" :signature "sig-a"}
+                          {:type :text :text " text one"}
+                          {:type :tool-call :id "call_stream" :name "double_number" :arguments {:value 21}}]
+            :api         :google-generative-ai
+            :provider    :google
+            :model       "gemini-2.5-flash"
+            :usage       {:input 12                                                                   :output 5 :cache-read 2 :cache-write 0 :total-tokens 19
+                          :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+            :stop-reason :tool-use
+            :timestamp   1730000000000}
+           (:assistant-message finalized)))))
 
 (deftest thought-signature-alone-is-not-thinking
   (let [env    (stub-env)
         state  {:model google-model}
         chunk  {:candidates [{:content {:parts [{:text "plain text" :thoughtSignature "opaque"}]}}]}
         result (sut/decode-event env state (json/write-str chunk))]
-    (is (= [:text-start :text-delta]
-           (mapv :type (:events result))))
-    (is (= :text (get-in result [:state :current-block :kind])))
-    (is (nil? (get-in result [:state :assistant-message :content 0 :signature])))))
+    (is (= [{:type :text-start}
+            {:type :text-delta :text "plain text"}]
+           (:events result)))
+    (is (= {:kind :text :index 0}
+           (get-in result [:state :current-block])))
+    (is (= [{:type :text :text "plain text"}]
+           (get-in result [:state :assistant-message :content])))))
 
 (deftest decode-event-tool-call-missing-args-defaults-to-empty-map
   (let [env    (stub-env)
@@ -136,10 +175,12 @@
                               :finishReason "STOP"}]}
         result (sut/decode-event env {:model google-model} (json/write-str chunk))
         done   (sut/finalize env (:state result))]
-    (is (= [:toolcall-start :toolcall-delta :toolcall-end]
-           (mapv :type (:events result))))
-    (is (= "get_status" (get-in done [:assistant-message :content 0 :name])))
-    (is (= {} (get-in done [:assistant-message :content 0 :arguments])))
+    (is (= [{:type :toolcall-start :id "get_status_generated-id" :name "get_status"}
+            {:type :toolcall-delta :id "get_status_generated-id" :name "get_status" :arguments {}}
+            {:type :toolcall-end :id "get_status_generated-id" :name "get_status" :arguments {}}]
+           (:events result)))
+    (is (= [{:type :tool-call :id "get_status_generated-id" :name "get_status" :arguments {}}]
+           (get-in done [:assistant-message :content])))
     (is (= :tool-use (get-in done [:assistant-message :stop-reason])))))
 
 (deftest finalize-throws-on-unknown-stop-reason
@@ -190,10 +231,17 @@
                                                                :total       0.0}}
                                   :stop-reason :stop
                                   :timestamp   1730000000000}})]
-    (is (= :error (:stop-reason out)))
-    (is (= [{:type :text :text "partial"}] (:content out)))
-    (is (string? (:error-message out)))
-    (is (.contains ^String (:error-message out) "bad gateway"))))
+    (is (= {:role          :assistant
+            :content       [{:type :text :text "partial"}]
+            :api           :google-generative-ai
+            :provider      :google
+            :model         "gemini-2.5-flash"
+            :usage         {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                            :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+            :stop-reason   :error
+            :error-message "stream failed: bad gateway"
+            :timestamp     1730000000000}
+           out))))
 
 (deftest map-stop-reason-fail-fast-on-unknown
   (testing "unknown finish reason in stream decode fails fast"

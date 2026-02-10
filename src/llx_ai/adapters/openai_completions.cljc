@@ -126,7 +126,7 @@
        (str/join "\n")))
 
 (defn- convert-message
-  [model message]
+  [env model message]
   (let [compat-profile (resolve-compat model)]
     (case (:role message)
       :user {:role    "user"
@@ -149,7 +149,7 @@
                                                  {:id       (:id tool-call)
                                                   :type     "function"
                                                   :function {:name      (:name tool-call)
-                                                             :arguments ((fnil pr-str {}) (:arguments tool-call))}})))]
+                                                             :arguments ((:json/encode env) (or (:arguments tool-call) {}))}})))]
                    (cond
                      (seq tool-calls) (assoc msg :content (or text-content "") :tool_calls tool-calls)
                      (some? text-content) (assoc msg :content text-content)
@@ -170,7 +170,7 @@
          (mapv convert-image-block))))
 
 (defn- convert-messages
-  [model context]
+  [env model context]
   (let [system-prompt (:system-prompt context)
         out0          (cond-> []
                         (seq system-prompt)
@@ -181,7 +181,7 @@
         (if (= :tool-result (:role message))
           (let [[batch rest-messages] (split-with #(= :tool-result (:role %)) remaining)
                 out1                  (reduce (fn [acc tool-msg]
-                                                (if-let [converted (convert-message model tool-msg)]
+                                                (if-let [converted (convert-message env model tool-msg)]
                                                   (conj acc converted)
                                                   acc))
                                               out
@@ -197,7 +197,7 @@
                                                               image-blocks)}))]
             (recur rest-messages out2))
           (recur (rest remaining)
-                 (if-let [converted (convert-message model message)]
+                 (if-let [converted (convert-message env model message)]
                    (conj out converted)
                    out)))
         (vec out)))))
@@ -211,7 +211,7 @@
          {:type     "function"
           :function (cond-> {:name        (:name tool)
                              :description (:description tool)
-                             :parameters  (or (:input-schema tool) {})}
+                             :parameters  (schema/malli->json-schema (or (:input-schema tool) {}))}
                       (:supports-strict-tools? compat-profile)
                       (assoc :strict false))})
        tools))))
@@ -259,7 +259,7 @@
                                (throw (ex-info (missing-api-key-message (:provider model))
                                                {:provider (:provider model)})))
               payload        (cond-> {:model    (:id model)
-                                      :messages (convert-messages model context)
+                                      :messages (convert-messages env model context)
                                       :stream   stream?}
                                (and stream? (:supports-usage-stream? compat-profile))
                                (assoc :stream_options {:include_usage true})

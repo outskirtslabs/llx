@@ -3,6 +3,7 @@
    [com.fulcrologic.guardrails.malli.registry :as gr.reg]
    [malli.core :as m]
    [malli.error :as me]
+   [malli.json-schema :as mjs]
    [llx-ai.schema.config :as config]
    [llx-ai.schema.core :as core]
    [llx-ai.schema.event :as event]
@@ -53,3 +54,10 @@
               {:schema schema-id
                :errors (humanize schema-id data)
                :data   data}))))
+
+(defn malli->json-schema
+  "Converts a Malli schema form to a JSON Schema object map."
+  [schema-form]
+  (if (map? schema-form)
+    schema-form
+    (mjs/transform schema-form)))

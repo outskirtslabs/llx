@@ -254,7 +254,7 @@
       (mapv (fn [tool]
               {:name                 (:name tool)
                :description          (:description tool)
-               :parametersJsonSchema (or (:input-schema tool) {})})
+               :parametersJsonSchema (schema/malli->json-schema (or (:input-schema tool) {}))})
             tools)}]))
 
 (defn- tool-choice->mode
@@ -294,7 +294,7 @@
               config          (cond-> {}
                                 (contains? opts :temperature) (assoc :temperature (:temperature opts))
                                 (:max-output-tokens opts) (assoc :maxOutputTokens (:max-output-tokens opts))
-                                (seq (:system-prompt context)) (assoc :systemInstruction (:system-prompt context))
+                                (seq (:system-prompt context)) (assoc :systemInstruction {:role "user" :parts [{:text (:system-prompt context)}]})
                                 (seq (:tools context)) (assoc :tools (convert-tools (:tools context)))
                                 (:tool-choice opts) (assoc :toolConfig {:functionCallingConfig
                                                                         {:mode (tool-choice->mode (:tool-choice opts))}})

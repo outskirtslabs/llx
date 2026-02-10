@@ -187,7 +187,7 @@
        (map (fn [tool]
               {:name         (:name tool)
                :description  (:description tool)
-               :input_schema (or (:input-schema tool) {})}))
+               :input_schema (schema/malli->json-schema (or (:input-schema tool) {}))}))
        vec))
 
 (>defn build-request

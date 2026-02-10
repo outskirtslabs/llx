@@ -170,7 +170,8 @@
               :thinking
               (if-let [sig (:signature block)]
                 (let [reasoning-item (parse-json-safe env sig)]
-                  (if (= "reasoning" (:type reasoning-item))
+                  (if (and (= "reasoning" (:type reasoning-item))
+                           (:encrypted_content reasoning-item))
                     [reasoning-item]
                     []))
                 [])
@@ -264,7 +265,7 @@
                {:type        "function"
                 :name        (:name tool)
                 :description (:description tool)
-                :parameters  (or (:input-schema tool) {})
+                :parameters  (schema/malli->json-schema (or (:input-schema tool) {}))
                 :strict      false}))))
 
 (>defn build-request
@@ -273,39 +274,41 @@
         (build-request env model context opts false))
        ([env model context opts stream?]
         [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
-        (let [api-key (or (:api-key opts)
-                          (when-let [env-get (:env/get env)]
-                            (env-get "OPENAI_API_KEY")))
-              _       (when-not (seq api-key)
-                        (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
-              input   (convert-messages env model context)
-              cache   (normalize-cache-control env (:cache-control opts))
-              payload (cond-> {:model                  (:id model)
-                               :input                  input
-                               :stream                 stream?
-                               :store                  false
-                               :prompt_cache_key       (when-not (= :none cache) (:session-id opts))
-                               :prompt_cache_retention (prompt-cache-retention (:base-url model) cache)}
-                        (:max-output-tokens opts) (assoc :max_output_tokens (:max-output-tokens opts))
-                        (contains? opts :temperature) (assoc :temperature (:temperature opts))
-                        (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools (or (:tools context) (:tools opts))))
-                        (and (true? (get-in model [:capabilities :reasoning?]))
-                             (map? (:reasoning opts)))
-                        (assoc :reasoning {:effort  (name (or (get-in opts [:reasoning :effort]) :medium))
-                                           :summary (name (or (get-in opts [:reasoning :summary]) :auto))}
-                               :include ["reasoning.encrypted_content"])
+        (let [api-key         (or (:api-key opts)
+                                  (when-let [env-get (:env/get env)]
+                                    (env-get "OPENAI_API_KEY")))
+              _               (when-not (seq api-key)
+                                (throw (ex-info "OpenAI API key is required" {:provider (:provider model)})))
+              input           (convert-messages env model context)
+              cache           (normalize-cache-control env (:cache-control opts))
+              cache-key       (when-not (= :none cache) (:session-id opts))
+              cache-retention (prompt-cache-retention (:base-url model) cache)
+              payload         (cond-> {:model  (:id model)
+                                       :input  input
+                                       :stream stream?
+                                       :store  false}
+                                cache-key       (assoc :prompt_cache_key cache-key)
+                                cache-retention (assoc :prompt_cache_retention cache-retention)
+                                (:max-output-tokens opts) (assoc :max_output_tokens (:max-output-tokens opts))
+                                (contains? opts :temperature) (assoc :temperature (:temperature opts))
+                                (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools (or (:tools context) (:tools opts))))
+                                (and (true? (get-in model [:capabilities :reasoning?]))
+                                     (map? (:reasoning opts)))
+                                (assoc :reasoning {:effort  (name (or (get-in opts [:reasoning :effort]) :medium))
+                                                   :summary (name (or (get-in opts [:reasoning :summary]) :auto))}
+                                       :include ["reasoning.encrypted_content"])
 
-                        (and (true? (get-in model [:capabilities :reasoning?]))
-                             (not (map? (:reasoning opts)))
-                             (str/starts-with? (:id model) "gpt-5"))
-                        (update :input conj {:role    "developer"
-                                             :content [{:type "input_text"
-                                                        :text "# Juice: 0 !important"}]}))
-              body    ((:json/encode env) payload)
-              headers (cond-> {"Content-Type"  "application/json"
-                               "Authorization" (str "Bearer " api-key)}
-                        (:headers model) (merge (:headers model))
-                        (:headers opts) (merge (:headers opts)))]
+                                (and (true? (get-in model [:capabilities :reasoning?]))
+                                     (not (map? (:reasoning opts)))
+                                     (str/starts-with? (:id model) "gpt-5"))
+                                (update :input conj {:role    "developer"
+                                                     :content [{:type "input_text"
+                                                                :text "# Juice: 0 !important"}]}))
+              body            ((:json/encode env) payload)
+              headers         (cond-> {"Content-Type"  "application/json"
+                                       "Authorization" (str "Bearer " api-key)}
+                                (:headers model) (merge (:headers model))
+                                (:headers opts) (merge (:headers opts)))]
           {:method  :post
            :url     (str (trim-trailing-slash (:base-url model)) "/responses")
            :headers headers
