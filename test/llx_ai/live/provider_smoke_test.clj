@@ -1,4 +1,4 @@
-(ns llx-ai.live.provider-smoke-test
+(ns ^{:kaocha/parallelize? true} llx-ai.live.provider-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx-ai.client.jvm :as client]

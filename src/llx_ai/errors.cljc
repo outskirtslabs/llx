@@ -8,7 +8,10 @@
     :llx/invalid-request
     :llx/model-not-found
     :llx/quota-exceeded
-    :llx/content-filter})
+    :llx/content-filter
+    :llx/unsupported-reasoning-level
+    :llx/tool-not-found
+    :llx/validation-error})
 
 (def transient-errors
   #{:llx/rate-limit
@@ -148,6 +151,40 @@
                              :provider-code provider-code
                              :recoverable? (boolean recoverable?)
                              :request-id request-id)))
+
+(defn unsupported-reasoning-level
+  [model-id requested-level]
+  (let [msg (str "Model " model-id " does not support reasoning level " (name requested-level))]
+    (ex-info msg
+             {:type            :llx/unsupported-reasoning-level
+              :message         msg
+              :model-id        model-id
+              :requested-level requested-level
+              :recoverable?    false})))
+
+(defn tool-not-found
+  [tool-name available-tools]
+  (let [sorted (sort available-tools)
+        msg    (str "Tool not found: " tool-name ". Available tools: " (pr-str sorted))]
+    (ex-info msg
+             {:type            :llx/tool-not-found
+              :message         msg
+              :tool-name       tool-name
+              :available-tools sorted
+              :recoverable?    false})))
+
+(defn validation-error
+  [tool-name args errors]
+  (let [msg (str "Validation failed for tool " tool-name ": "
+                 (pr-str errors) ". "
+                 "Received arguments: " (pr-str args))]
+    (ex-info msg
+             {:type         :llx/validation-error
+              :message      msg
+              :tool-name    tool-name
+              :arguments    args
+              :errors       errors
+              :recoverable? false})))
 
 (defn http-status->error
   [status provider message & {:keys [provider-code retry-after request-id body]}]

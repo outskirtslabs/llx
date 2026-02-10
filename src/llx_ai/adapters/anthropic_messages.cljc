@@ -279,7 +279,7 @@
           {:method  :post
            :url     (str base-url "/v1/messages")
            :headers headers
-           :body    ((:json/encode env) payload)
+           :body    ((:json/encode env) ((:unicode/sanitize-payload env) payload))
            :as      (if stream? :stream :string)
            :throw   false})))
 

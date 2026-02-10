@@ -8,24 +8,26 @@
    [llx-ai.client.runtime :as runtime]
    [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.registry :as registry]
-   [llx-ai.adapters.openai-completions :as openai-completions]))
+   [llx-ai.adapters.openai-completions :as openai-completions]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
 (defn- stub-env
   [handler]
-  {:http/request          handler
-   :json/encode           json/write-str
-   :json/decode           (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :json/decode-safe      (fn [s _opts]
-                            (try
-                              (json/read-str s {:key-fn keyword})
-                              (catch Exception _ nil)))
-   :http/read-body-string (fn [body] (slurp body))
-   :stream/run!           (fn [_] nil)
-   :registry              client/default-registry
-   :clock/now-ms          (constantly 1730000000000)
-   :id/new                (constantly "id-1")})
+  {:http/request             handler
+   :json/encode              json/write-str
+   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :json/decode-safe         (fn [s _opts]
+                               (try
+                                 (json/read-str s {:key-fn keyword})
+                                 (catch Exception _ nil)))
+   :http/read-body-string    (fn [body] (slurp body))
+   :stream/run!              (fn [_] nil)
+   :registry                 client/default-registry
+   :clock/now-ms             (constantly 1730000000000)
+   :id/new                   (constantly "id-1")
+   :unicode/sanitize-payload unicode/sanitize-payload})
 
 (def bad-contract-re #"Validation Error|Schema validation failed")
 

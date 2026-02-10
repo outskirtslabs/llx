@@ -67,6 +67,12 @@
       (contains? simple-opts :registry) (assoc :registry (:registry simple-opts))
       reasoning-level (assoc :reasoning {:level reasoning-level}))))
 
+(defn- assert-reasoning-level!
+  [model opts]
+  (when (= :xhigh (get-in opts [:reasoning :level]))
+    (when-not (models/supports-xhigh? model)
+      (throw (errors/unsupported-reasoning-level (:id model) :xhigh)))))
+
 (defn- select-adapter
   [resolved-registry model]
   (let [api     (:api model)
@@ -132,6 +138,7 @@
              _                           (schema/assert-valid! :llx/env env)
              _                           (schema/assert-valid! :llx/model model)
              _                           (schema/assert-valid! :llx/request-options request-opts)
+             _                           (assert-reasoning-level! model request-opts)
              context                     (assert-context! context)
              resolved-registry           (resolve-call-registry env registry-override)
              adapter                     (select-adapter resolved-registry model)
@@ -166,6 +173,7 @@
              _                         (schema/assert-valid! :llx/env env)
              _                         (schema/assert-valid! :llx/model model)
              _                         (schema/assert-valid! :llx/request-options request-opts)
+             _                         (assert-reasoning-level! model request-opts)
              context                   (assert-context! context)
              resolved-registry         (resolve-call-registry env registry-override)
              adapter                   (select-adapter resolved-registry model)

@@ -1,5 +1,6 @@
 (ns llx-ai.utils.tool-validation-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx-ai.utils.tool-validation :as sut]))
 
@@ -24,7 +25,7 @@
                (catch clojure.lang.ExceptionInfo e
                  e))]
       (is (some? ex))
-      (is (= :tool-not-found (-> ex ex-data :type)))
+      (is (= :llx/tool-not-found (-> ex ex-data :type)))
       (is (= "unknown-tool" (-> ex ex-data :tool-name)))
       (is (= ["search"] (-> ex ex-data :available-tools)))))
   (testing "validation errors are structured"
@@ -34,7 +35,7 @@
                (catch clojure.lang.ExceptionInfo e
                  e))]
       (is (some? ex))
-      (is (= :validation-error (-> ex ex-data :type)))
+      (is (= :llx/validation-error (-> ex ex-data :type)))
       (is (= "search" (-> ex ex-data :tool-name)))
       (is (map? (-> ex ex-data :errors)))
       (is (= {:q 123} (-> ex ex-data :arguments)))))
@@ -46,4 +47,24 @@
                  e))]
       (is (some? ex))
       (is (map? (-> ex ex-data :errors)))
-      (is (some? (-> ex ex-data :errors :q))))))
+      (is (some? (-> ex ex-data :errors :q)))))
+  (testing "human-readable error message includes tool name and arguments"
+    (let [ex (try
+               (sut/validate-tool-call tools {:name "search" :arguments {:q 123}})
+               nil
+               (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? ex))
+      (is (str/includes? (ex-message ex) "search")
+          "error message should mention tool name")
+      (is (str/includes? (ex-message ex) "Validation failed")
+          "error message should include 'Validation failed' prefix")
+      (is (str/includes? (ex-message ex) "Received arguments")
+          "error message should include 'Received arguments' section")))
+  (testing "tool-not-found error message includes tool name"
+    (let [ex (try
+               (sut/validate-tool-call tools {:name "unknown" :arguments {}})
+               nil
+               (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? ex))
+      (is (str/includes? (ex-message ex) "unknown")
+          "error message should mention unknown tool name"))))

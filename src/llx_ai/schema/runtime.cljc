@@ -29,7 +29,8 @@
     [:log/debug {:optional true} :llx/fn]
     [:log/warn {:optional true} :llx/fn]
     [:log/error {:optional true} :llx/fn]
-    [:thread/sleep {:optional true} :llx/fn]]
+    [:thread/sleep {:optional true} :llx/fn]
+    [:unicode/sanitize-payload :llx/fn]]
 
    :llx/http-response-map
    [:map

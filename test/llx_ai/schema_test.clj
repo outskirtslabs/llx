@@ -77,11 +77,12 @@
    :normalize-error (fn [_env _ex _partial])})
 
 (def valid-env
-  {:http/request (fn [_request-map])
-   :json/encode  (fn [_x])
-   :json/decode  (fn [_s _opts])
-   :clock/now-ms (fn [] 0)
-   :id/new       (fn [] "id")})
+  {:http/request             (fn [_request-map])
+   :json/encode              (fn [_x])
+   :json/decode              (fn [_s _opts])
+   :clock/now-ms             (fn [] 0)
+   :id/new                   (fn [] "id")
+   :unicode/sanitize-payload identity})
 
 (deftest model-schema
   (testing "accepts a valid model"

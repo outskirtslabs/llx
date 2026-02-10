@@ -2,8 +2,10 @@
   (:require
    [babashka.json :as json]
    [clojure.edn :as edn]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is]]
-   [llx-ai.adapters.anthropic-messages :as sut]))
+   [llx-ai.adapters.anthropic-messages :as sut]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -26,15 +28,16 @@
 
 (defn- stub-env
   []
-  {:http/request     (fn [_] {:status 200 :body "{}"})
-   :json/encode      json/write-str
-   :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :json/decode-safe (fn [s _opts]
-                       (try
-                         (json/read-str s {:key-fn keyword})
-                         (catch Exception _ nil)))
-   :clock/now-ms     (fn [] 1730000000000)
-   :id/new           (fn [] "id-1")})
+  {:http/request             (fn [_] {:status 200 :body "{}"})
+   :json/encode              json/write-str
+   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :json/decode-safe         (fn [s _opts]
+                               (try
+                                 (json/read-str s {:key-fn keyword})
+                                 (catch Exception _ nil)))
+   :clock/now-ms             (fn [] 1730000000000)
+   :id/new                   (fn [] "id-1")
+   :unicode/sanitize-payload unicode/sanitize-payload})
 
 (deftest build-request-converts-canonical-context-to-anthropic-payload
   (let [context  (fixture "request_context")
@@ -213,3 +216,34 @@
            (get-in finalize-result [:assistant-message :content 2 :arguments])))
     (is (= :tool-use
            (get-in finalize-result [:assistant-message :stop-reason])))))
+
+(defn- string-with-unpaired-high
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+
+(defn- valid-emoji-string
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+
+(deftest build-request-sanitizes-unpaired-surrogates-in-user-and-system
+  (let [env         (stub-env)
+        context     {:system-prompt (string-with-unpaired-high)
+                     :messages      [{:role :user :content (string-with-unpaired-high) :timestamp 1}]}
+        request     (sut/build-request env anthropic-model context {:api-key "x"} false)
+        payload     (json/read-str (:body request) {:key-fn keyword})
+        sys-text    (get-in payload [:system 0 :text])
+        usr-content (get-in payload [:messages 0 :content])]
+    (is (not (str/includes? (str sys-text) (String. (char-array [(char 0xD83D)]))))
+        "system prompt should not contain unpaired high surrogate")
+    (is (not (str/includes? (str usr-content) (String. (char-array [(char 0xD83D)]))))
+        "user text should not contain unpaired high surrogate")))
+
+(deftest build-request-preserves-valid-emoji-surrogate-pairs
+  (let [env         (stub-env)
+        emoji       (valid-emoji-string)
+        context     {:messages [{:role :user :content emoji :timestamp 1}]}
+        request     (sut/build-request env anthropic-model context {:api-key "x"} false)
+        payload     (json/read-str (:body request) {:key-fn keyword})
+        usr-content (get-in payload [:messages 0 :content])]
+    (is (str/includes? (str usr-content) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
+        "valid emoji surrogate pair should be preserved")))

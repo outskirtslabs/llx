@@ -3,7 +3,8 @@
    [babashka.json :as json]
    [clojure.test :refer [deftest is testing]]
    [llx-ai.client.runtime :as sut]
-   [llx-ai.event-stream :as event-stream]))
+   [llx-ai.event-stream :as event-stream]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -36,12 +37,13 @@
 
 (defn- stub-env
   []
-  {:http/request          (fn [_request] {:status 200 :body nil})
-   :json/encode           json/write-str
-   :json/decode           (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :clock/now-ms          (constantly 1730000000000)
-   :id/new                (constantly "id-1")
-   :http/read-body-string (fn [_body] "")})
+  {:http/request             (fn [_request] {:status 200 :body nil})
+   :json/encode              json/write-str
+   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :clock/now-ms             (constantly 1730000000000)
+   :id/new                   (constantly "id-1")
+   :http/read-body-string    (fn [_body] "")
+   :unicode/sanitize-payload unicode/sanitize-payload})
 
 (defn- take-events-with-timeout
   [stream timeout-ms]

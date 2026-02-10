@@ -9,7 +9,8 @@
    [llx-ai.event-stream :as event-stream]
    [llx-ai.client :as sut]
    [llx-ai.client.runtime :as runtime]
-   [llx-ai.registry :as registry]))
+   [llx-ai.registry :as registry]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -26,20 +27,21 @@
 
 (defn stub-env
   [handler]
-  {:http/request          handler
-   :json/encode           json/write-str
-   :json/decode           (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :json/decode-safe      (fn [s _opts]
-                            (try
-                              (json/read-str s {:key-fn keyword})
-                              (catch Exception _
-                                nil)))
-   :http/read-body-string (fn [body] (slurp body))
-   :stream/run!           runtime/run-stream!
-   :registry              sut/default-registry
-   :clock/now-ms          (fn [] 1730000000000)
-   :id/new                (fn [] "id-1")
-   :thread/sleep          (fn [_ms])})
+  {:http/request             handler
+   :json/encode              json/write-str
+   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :json/decode-safe         (fn [s _opts]
+                               (try
+                                 (json/read-str s {:key-fn keyword})
+                                 (catch Exception _
+                                   nil)))
+   :http/read-body-string    (fn [body] (slurp body))
+   :stream/run!              runtime/run-stream!
+   :registry                 sut/default-registry
+   :clock/now-ms             (fn [] 1730000000000)
+   :id/new                   (fn [] "id-1")
+   :thread/sleep             (fn [_ms])
+   :unicode/sanitize-payload unicode/sanitize-payload})
 
 (defn- sse-body
   [events]
@@ -776,6 +778,60 @@
                              :thread/sleep)
         context      {:messages [{:role :user :content "hi" :timestamp 1}]}
         out          (sut/complete env-no-sleep base-model context {:api-key "x" :max-retries 0})]
+    (is (= :stop (:stop-reason out)))))
+
+(deftest complete-rejects-unsupported-xhigh-with-structured-error
+  (let [env     (stub-env (fn [_request]
+                            {:status 200
+                             :body   (json/write-str
+                                      {:choices [{:finish_reason "stop"
+                                                  :message       {:role    "assistant"
+                                                                  :content "should not reach"}}]
+                                       :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
+        context {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex      (try
+                  (sut/complete env base-model context
+                                {:api-key   "x"
+                                 :reasoning {:level :xhigh}})
+                  nil
+                  (catch clojure.lang.ExceptionInfo e e))]
+    (is (some? ex) "should throw for unsupported :xhigh")
+    (is (= :llx/unsupported-reasoning-level (-> ex ex-data :type)))
+    (is (= :xhigh (-> ex ex-data :requested-level)))
+    (is (= "gpt-4o-mini" (-> ex ex-data :model-id)))
+    (is (false? (-> ex ex-data :recoverable?)))))
+
+(deftest stream-rejects-unsupported-xhigh-with-structured-error
+  (let [env     (stub-env (fn [_request]
+                            {:status 200
+                             :body   (sse-body ["data: [DONE]"])}))
+        context {:messages [{:role :user :content "hi" :timestamp 1}]}
+        ex      (try
+                  (sut/stream env base-model context
+                              {:api-key   "x"
+                               :reasoning {:level :xhigh}})
+                  nil
+                  (catch clojure.lang.ExceptionInfo e e))]
+    (is (some? ex) "should throw for unsupported :xhigh")
+    (is (= :llx/unsupported-reasoning-level (-> ex ex-data :type)))))
+
+(deftest complete-allows-xhigh-for-supported-model
+  (let [xhigh-model (assoc base-model
+                           :id "claude-opus-4-6"
+                           :api :anthropic-messages
+                           :provider :anthropic
+                           :capabilities {:reasoning? true :input #{:text}})
+        env         (stub-env (fn [_request]
+                                {:status 200
+                                 :body   (json/write-str
+                                          {:content     [{:type "text" :text "ok"}]
+                                           :stop_reason "end_turn"
+                                           :usage       {:input_tokens 1 :output_tokens 1}})}))
+        context     {:messages [{:role :user :content "hi" :timestamp 1}]}
+        out         (sut/complete env xhigh-model context
+                                  {:api-key   "x"
+                                   :reasoning {:level :xhigh}})]
+    (is (= :assistant (:role out)))
     (is (= :stop (:stop-reason out)))))
 
 (deftest stream-retries-open-stream-on-transient-error

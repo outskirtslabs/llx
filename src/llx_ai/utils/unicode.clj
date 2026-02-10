@@ -1,4 +1,6 @@
-(ns llx-ai.utils.unicode)
+(ns llx-ai.utils.unicode
+  (:require
+   [clojure.walk :as walk]))
 
 (defn sanitize-surrogates
   "Removes unpaired UTF-16 surrogate code units from `text`.
@@ -32,3 +34,8 @@
             (do
               (.append sb ch)
               (recur (inc i) sb))))))))
+
+(defn sanitize-payload
+  "Recursively walks a data structure, applying `sanitize-surrogates` to all strings."
+  [data]
+  (walk/postwalk #(if (string? %) (sanitize-surrogates %) %) data))

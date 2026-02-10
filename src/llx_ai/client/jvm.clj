@@ -5,7 +5,8 @@
    [clojure.string :as str]
    [llx-ai.client :as client]
    [llx-ai.client.runtime :as runtime]
-   [llx-ai.errors :as errors])
+   [llx-ai.errors :as errors]
+   [llx-ai.utils.unicode :as unicode])
   (:import
    (java.io IOException)
    (java.net ConnectException SocketTimeoutException UnknownHostException)
@@ -53,21 +54,22 @@
 
 (defn default-env
   []
-  {:http/request          wrapped-http-request
-   :json/encode           json/write-str
-   :json/decode           (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :json/decode-safe      (fn [s _opts]
-                            (try
-                              (json/read-str s {:key-fn keyword})
-                              (catch Exception _
-                                nil)))
-   :http/read-body-string (fn [body] (slurp body))
-   :stream/run!           runtime/run-stream!
-   :registry              client/default-registry
-   :clock/now-ms          (fn [] (System/currentTimeMillis))
-   :id/new                (fn [] (str (java.util.UUID/randomUUID)))
-   :env/get               (fn [k] (System/getenv k))
-   :thread/sleep          (fn [ms] (Thread/sleep (long ms)))})
+  {:http/request             wrapped-http-request
+   :json/encode              json/write-str
+   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+   :json/decode-safe         (fn [s _opts]
+                               (try
+                                 (json/read-str s {:key-fn keyword})
+                                 (catch Exception _
+                                   nil)))
+   :http/read-body-string    (fn [body] (slurp body))
+   :stream/run!              runtime/run-stream!
+   :registry                 client/default-registry
+   :clock/now-ms             (fn [] (System/currentTimeMillis))
+   :id/new                   (fn [] (str (java.util.UUID/randomUUID)))
+   :env/get                  (fn [k] (System/getenv k))
+   :thread/sleep             (fn [ms] (Thread/sleep (long ms)))
+   :unicode/sanitize-payload unicode/sanitize-payload})
 
 (defn complete
   ([model context opts]

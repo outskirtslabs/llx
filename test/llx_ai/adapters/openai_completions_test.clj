@@ -2,8 +2,10 @@
   (:require
    [babashka.json :as json]
    [clojure.edn :as edn]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [llx-ai.adapters.openai-completions :as sut]))
+   [llx-ai.adapters.openai-completions :as sut]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -51,15 +53,16 @@
    (stub-env {}))
   ([overrides]
    (merge
-    {:http/request     (fn [_] {:status 200 :body "{}"})
-     :json/encode      json/write-str
-     :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
-     :json/decode-safe (fn [s _opts]
-                         (try
-                           (json/read-str s {:key-fn keyword})
-                           (catch Exception _ nil)))
-     :clock/now-ms     (fn [] 1730000000000)
-     :id/new           (fn [] "generated-id")}
+    {:http/request             (fn [_] {:status 200 :body "{}"})
+     :json/encode              json/write-str
+     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/decode-safe         (fn [s _opts]
+                                 (try
+                                   (json/read-str s {:key-fn keyword})
+                                   (catch Exception _ nil)))
+     :clock/now-ms             (fn [] 1730000000000)
+     :id/new                   (fn [] "generated-id")
+     :unicode/sanitize-payload unicode/sanitize-payload}
     overrides)))
 
 (deftest build-request-forwards-tools-and-tool-choice-with-compat-token-field
@@ -367,3 +370,62 @@
     (is (= "reason" (get-in finalized [:assistant-message :content 0 :thinking])))
     (is (= :text (get-in finalized [:assistant-message :content 1 :type])))
     (is (= "answer" (get-in finalized [:assistant-message :content 1 :text])))))
+
+(defn- string-with-unpaired-high
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+
+(defn- string-with-unpaired-low
+  []
+  (str "Hello " (String. (char-array [(char 0xDE48)])) " World"))
+
+(defn- valid-emoji-string
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+
+(deftest build-request-sanitizes-unpaired-surrogates-in-user-text
+  (let [env     (stub-env)
+        context {:system-prompt (string-with-unpaired-high)
+                 :messages      [{:role :user :content (string-with-unpaired-low) :timestamp 1}]}
+        request (sut/build-request env openai-model context {:api-key "x"} false)
+        payload (json/read-str (:body request) {:key-fn keyword})
+        sys-msg (first (:messages payload))
+        usr-msg (second (:messages payload))]
+    (is (not (str/includes? (:content sys-msg) (String. (char-array [(char 0xD83D)]))))
+        "system prompt should not contain unpaired high surrogate")
+    (is (not (str/includes? (:content usr-msg) (String. (char-array [(char 0xDE48)]))))
+        "user text should not contain unpaired low surrogate")))
+
+(deftest build-request-preserves-valid-emoji-surrogate-pairs
+  (let [env     (stub-env)
+        emoji   (valid-emoji-string)
+        context {:messages [{:role :user :content emoji :timestamp 1}]}
+        request (sut/build-request env openai-model context {:api-key "x"} false)
+        payload (json/read-str (:body request) {:key-fn keyword})
+        usr-msg (first (:messages payload))]
+    (is (str/includes? (:content usr-msg) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
+        "valid emoji surrogate pair should be preserved")))
+
+(deftest build-request-sanitizes-unpaired-surrogates-in-tool-result-text
+  (let [env      (stub-env)
+        context  {:messages [{:role :user :content "use tool" :timestamp 1}
+                             {:role        :assistant
+                              :content     [{:type :tool-call :id "call_1" :name "t" :arguments {}}]
+                              :api         :openai-completions
+                              :provider    :openai
+                              :model       "gpt-4o-mini"
+                              :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                                            :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                              :stop-reason :tool-use
+                              :timestamp   2}
+                             {:role         :tool-result
+                              :tool-call-id "call_1"
+                              :tool-name    "t"
+                              :content      [{:type :text :text (string-with-unpaired-high)}]
+                              :is-error?    false
+                              :timestamp    3}]}
+        request  (sut/build-request env openai-model context {:api-key "x"} false)
+        payload  (json/read-str (:body request) {:key-fn keyword})
+        tool-msg (nth (:messages payload) 2)]
+    (is (not (str/includes? (:content tool-msg) (String. (char-array [(char 0xD83D)]))))
+        "tool result text should not contain unpaired high surrogate")))

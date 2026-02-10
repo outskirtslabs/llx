@@ -320,7 +320,8 @@
                                  (contains? opts :top-p) (assoc :top_p (:top-p opts))
                                  (seq (or (:tools context) (:tools opts))) (assoc :tools (convert-tools model (or (:tools context) (:tools opts))))
                                  (:tool-choice opts) (assoc :tool_choice (tool-choice->wire (:tool-choice opts))))
-              body             ((:json/encode env) payload)
+              sanitized        ((:unicode/sanitize-payload env) payload)
+              body             ((:json/encode env) sanitized)
               base-url         (trim-trailing-slash (:base-url model))
               headers          (cond-> {"Content-Type" "application/json"}
                                  (seq api-key) (assoc "Authorization" (str "Bearer " api-key))

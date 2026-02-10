@@ -5,7 +5,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx-ai.adapters.openai-responses :as sut]
-   [llx-ai.transform-messages :as transform-messages]))
+   [llx-ai.transform-messages :as transform-messages]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -31,15 +32,16 @@
    (stub-env {}))
   ([overrides]
    (merge
-    {:http/request     (fn [_] {:status 200 :body "{}"})
-     :json/encode      json/write-str
-     :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
-     :json/decode-safe (fn [s _opts]
-                         (try
-                           (json/read-str s {:key-fn keyword})
-                           (catch Exception _ nil)))
-     :clock/now-ms     (fn [] 1730000000000)
-     :id/new           (fn [] "id-1")}
+    {:http/request             (fn [_] {:status 200 :body "{}"})
+     :json/encode              json/write-str
+     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/decode-safe         (fn [s _opts]
+                                 (try
+                                   (json/read-str s {:key-fn keyword})
+                                   (catch Exception _ nil)))
+     :clock/now-ms             (fn [] 1730000000000)
+     :id/new                   (fn [] "id-1")
+     :unicode/sanitize-payload unicode/sanitize-payload}
     overrides)))
 
 (deftest build-request-converts-context-to-openai-responses-input
@@ -290,3 +292,37 @@
     (is (= [{:type :text :text "partial"}] (:content out)))
     (is (string? (:error-message out)))
     (is (.contains ^String (:error-message out) "bad gateway"))))
+
+(defn- string-with-unpaired-high
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+
+(defn- valid-emoji-string
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+
+(deftest build-request-sanitizes-unpaired-surrogates-in-user-text
+  (let [env         (stub-env)
+        context     {:system-prompt (string-with-unpaired-high)
+                     :messages      [{:role :user :content (string-with-unpaired-high) :timestamp 1}]}
+        request     (sut/build-request env openai-responses-model context {:api-key "x"} false)
+        payload     (json/read-str (:body request) {:key-fn keyword})
+        input-items (:input payload)
+        sys-item    (first input-items)
+        usr-item    (second input-items)
+        unpaired    (String. (char-array [(char 0xD83D)]))]
+    (is (not (str/includes? (str (:content sys-item)) unpaired))
+        "system prompt should not contain unpaired high surrogate")
+    (is (not (str/includes? (str (get-in usr-item [:content 0 :text])) unpaired))
+        "user text should not contain unpaired high surrogate")))
+
+(deftest build-request-preserves-valid-emoji-surrogate-pairs
+  (let [env      (stub-env)
+        emoji    (valid-emoji-string)
+        context  {:messages [{:role :user :content emoji :timestamp 1}]}
+        request  (sut/build-request env openai-responses-model context {:api-key "x"} false)
+        payload  (json/read-str (:body request) {:key-fn keyword})
+        usr-item (first (:input payload))
+        pair     (String. (char-array [(char 0xD83D) (char 0xDE48)]))]
+    (is (str/includes? (str (get-in usr-item [:content 0 :text])) pair)
+        "valid emoji surrogate pair should be preserved")))

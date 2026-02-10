@@ -305,7 +305,8 @@
                                 (update :input conj {:role    "developer"
                                                      :content [{:type "input_text"
                                                                 :text "# Juice: 0 !important"}]}))
-              body            ((:json/encode env) payload)
+              sanitized       ((:unicode/sanitize-payload env) payload)
+              body            ((:json/encode env) sanitized)
               headers         (cond-> {"Content-Type"  "application/json"
                                        "Authorization" (str "Bearer " api-key)}
                                 (:headers model) (merge (:headers model))

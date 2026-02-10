@@ -2,8 +2,10 @@
   (:require
    [babashka.json :as json]
    [clojure.edn :as edn]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [llx-ai.adapters.google-generative-ai :as sut]))
+   [llx-ai.adapters.google-generative-ai :as sut]
+   [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
 
@@ -35,19 +37,20 @@
    (stub-env {}))
   ([overrides]
    (merge
-    {:http/request     (fn [_] {:status 200 :body "{}"})
-     :json/encode      json/write-str
-     :json/decode      (fn [s _opts] (json/read-str s {:key-fn keyword}))
-     :json/decode-safe (fn [s _opts]
-                         (try
-                           (json/read-str s {:key-fn keyword})
-                           (catch Exception _ nil)))
-     :clock/now-ms     (fn [] 1730000000000)
-     :id/new           (fn [] "generated-id")
-     :env/get          (fn [k]
-                         (case k
-                           "GEMINI_API_KEY" "google-key"
-                           nil))}
+    {:http/request             (fn [_] {:status 200 :body "{}"})
+     :json/encode              json/write-str
+     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/decode-safe         (fn [s _opts]
+                                 (try
+                                   (json/read-str s {:key-fn keyword})
+                                   (catch Exception _ nil)))
+     :clock/now-ms             (fn [] 1730000000000)
+     :id/new                   (fn [] "generated-id")
+     :env/get                  (fn [k]
+                                 (case k
+                                   "GEMINI_API_KEY" "google-key"
+                                   nil))
+     :unicode/sanitize-payload unicode/sanitize-payload}
     overrides)))
 
 (deftest build-request-converts-canonical-context-to-google-payload
@@ -294,3 +297,35 @@
           (stub-env)
           {:model google-model}
           (json/write-str {:candidates [{:finishReason "UNRECOGNIZED_REASON"}]}))))))
+
+(defn- string-with-unpaired-high
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+
+(defn- valid-emoji-string
+  []
+  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+
+(deftest build-request-sanitizes-unpaired-surrogates-in-user-and-system
+  (let [env      (stub-env)
+        context  {:system-prompt (string-with-unpaired-high)
+                  :messages      [{:role :user :content (string-with-unpaired-high) :timestamp 1}]}
+        request  (sut/build-request env google-model context {} false)
+        payload  (json/read-str (:body request) {:key-fn keyword})
+        sys-text (get-in payload [:systemInstruction :parts 0 :text])
+        usr-text (get-in payload [:contents 0 :parts 0 :text])]
+    (is (not (str/includes? (str sys-text) (String. (char-array [(char 0xD83D)]))))
+        "system prompt should not contain unpaired high surrogate")
+    (is (not (str/includes? (str usr-text) (String. (char-array [(char 0xD83D)]))))
+        "user text should not contain unpaired high surrogate")))
+
+(deftest build-request-preserves-valid-emoji-surrogate-pairs
+  (let [env      (stub-env)
+        emoji    (valid-emoji-string)
+        context  {:messages [{:role :user :content emoji :timestamp 1}]}
+        request  (sut/build-request env google-model context {} false)
+        payload  (json/read-str (:body request) {:key-fn keyword})
+        usr-text (get-in payload [:contents 0 :parts 0 :text])]
+    (is (str/includes? (str usr-text) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
+        "valid emoji surrogate pair should be preserved")))
+
