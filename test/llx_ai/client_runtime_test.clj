@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.client.runtime :as sut]
    [llx-ai.event-stream :as event-stream]
+   [llx-ai.test-util :as util]
    [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
@@ -151,3 +152,79 @@
         (is (= :error (:stop-reason result)))
         (is (string? (:error-message result)))
         (is (re-find #"normalize-error failure" (:error-message result)))))))
+
+(deftest run-stream-emits-stream-lifecycle-trove-signals
+  (util/with-captured-logs [logs*]
+    (let [line    (str "data: " (json/write-str {:type "delta" :text "ok"}) "\n" "data: [DONE]\n")
+          body    (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
+          out     (event-stream/assistant-message-stream)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request] {:body body})
+                   :decode-event    (fn [_env state _payload]
+                                      {:state  state
+                                       :events [{:type :text-start}
+                                                {:type :text-delta :text "ok"}
+                                                {:type :text-end}]})
+                   :finalize        (fn [_env _state]
+                                      {:assistant-message (valid-assistant 1730000000000)
+                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
+      (sut/run-stream! {:adapter      adapter
+                        :env          (assoc (stub-env) :call/id "call_1")
+                        :model        base-model
+                        :request      {:method :post :url "https://example.invalid"}
+                        :out          out
+                        :state*       state*
+                        :request-opts {}})
+      (event-stream/drain! out)
+      (let [start (util/first-event logs* :llx.obs/stream-start)
+            item  (util/first-event logs* :llx.obs/stream-item-received)
+            done  (util/first-event logs* :llx.obs/stream-done)]
+        (is (util/submap?
+             {:id   :llx.obs/stream-start                                                                  :level :info
+              :data {:call-id "call_1" :provider :openai :api :openai-completions :model-id "gpt-4o-mini"}}
+             (util/strip-generated start)))
+        (is (util/submap?
+             {:id   :llx.obs/stream-item-received                                                                        :level :trace
+              :data {:call-id    "call_1" :provider       :openai     :api   :openai-completions :model-id "gpt-4o-mini"
+                     :item-index 0        :llx-event-type :text-start :done? false}}
+             (util/strip-generated item)))
+        (is (util/submap?
+             {:id   :llx.obs/stream-done                                                                                 :level :info
+              :data {:call-id     "call_1" :provider            :openai :api :openai-completions :model-id "gpt-4o-mini"
+                     :stop-reason :stop    :content-block-count 1}}
+             (util/strip-generated done [:usage])))))))
+
+(deftest run-stream-emits-stream-event-error-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [out     (event-stream/assistant-message-stream)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request]
+                                      (throw (ex-info "stream boom"
+                                                      {:type :llx/streaming-error})))
+                   :decode-event    (fn [_env state _payload] {:state state :events []})
+                   :finalize        (fn [_env _state]
+                                      {:assistant-message (valid-assistant 1730000000000)
+                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
+      (sut/run-stream! {:adapter      adapter
+                        :env          (assoc (stub-env) :call/id "call_2")
+                        :model        base-model
+                        :request      {:method :post :url "https://example.invalid"}
+                        :out          out
+                        :state*       state*
+                        :request-opts {}})
+      (event-stream/drain! out)
+      (let [event (util/first-event logs* :llx.obs/stream-event-error)]
+        (is (util/submap?
+             {:id   :llx.obs/stream-event-error                                                                                                  :level :error
+              :data {:call-id                 "call_2"             :provider      :openai       :api :openai-completions :model-id "gpt-4o-mini"
+                     :error-type              :llx/streaming-error :error-message "stream boom"
+                     :normalize-error-failed? false}}
+             (util/strip-generated event)))))))

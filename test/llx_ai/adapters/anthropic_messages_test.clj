@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
+   [llx-ai.test-util :as util]
    [llx-ai.adapters.anthropic-messages :as sut]
    [llx-ai.utils.unicode :as unicode]))
 
@@ -76,6 +77,23 @@
     (is (= 2 (count (get-in messages [2 :content]))))
     (is (= "continue"
            (get-in messages [3 :content])))))
+
+(deftest build-request-emits-provider-payload-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+          request (sut/build-request (stub-env) anthropic-model context {:api-key "k"} false)
+          payload (json/read-str (:body request) {:key-fn keyword})
+          event   (util/first-event logs* :llx.obs/provider-payload)]
+      (is (util/submap?
+           {:id    :llx.obs/provider-payload
+            :level :trace
+            :data  {:provider :anthropic
+                    :api      :anthropic-messages
+                    :model-id "claude-sonnet-4-5"
+                    :stream?  false
+                    :url      "https://api.anthropic.com/v1/messages"
+                    :payload  payload}}
+           (util/strip-generated event [:call-id]))))))
 
 (deftest normalize-tool-call-id-sanitizes-and-truncates
   (let [source-id (str "call|bad/id?chars+=" (apply str (repeat 120 "z")))

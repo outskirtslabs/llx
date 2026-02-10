@@ -1,7 +1,8 @@
 (ns llx-ai.errors-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx-ai.errors :as sut]))
+   [llx-ai.errors :as sut]
+   [llx-ai.test-util :as util]))
 
 (deftest rate-limit-error-has-correct-type-and-recoverable
   (let [ex (sut/rate-limit "openai" "Rate limit exceeded" :http-status 429 :retry-after 30)]
@@ -276,6 +277,32 @@
     (is (= :success (sut/retry-loop f 2 (fn [ms] (swap! sleep-ms conj ms)))))
     (is (= 2 @call-count))
     (is (= 1 (count @sleep-ms)))))
+
+(deftest retry-loop-emits-retry-scheduled-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [call-count (atom 0)
+          f          (fn []
+                       (swap! call-count inc)
+                       (if (= 1 @call-count)
+                         (throw (sut/rate-limit "openai" "rate limit"
+                                                :retry-after 2
+                                                :request-id "req_1"))
+                         :success))
+          _          (sut/retry-loop f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"})
+          event      (util/first-event logs* :llx.obs/retry-scheduled)]
+      (is (util/submap?
+           {:id    :llx.obs/retry-scheduled
+            :level :info
+            :data  {:call-id      "call_1"
+                    :attempt      0
+                    :next-attempt 1
+                    :max-retries  2
+                    :delay-ms     2000
+                    :error-type   :llx/rate-limit
+                    :provider     "openai"
+                    :request-id   "req_1"
+                    :retry-after  2}}
+           (util/strip-generated event))))))
 
 (deftest retry-loop-exhausts-retries-and-throws
   (let [call-count (atom 0)

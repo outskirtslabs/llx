@@ -164,6 +164,9 @@
     (testing "rejects unknown request option keys"
       (is (not (sut/valid? :llx/request-options (assoc opts :unknown 1)))))))
 
+(deftest options-schema-rejects-callback-style-option-keys
+  (is (not (sut/valid? :llx/request-options {:payload-callback (fn [_] nil)}))))
+
 (deftest schema-registry-rebuilds-when-component-schemas-change
   (with-redefs [schema-options/schemas
                 (assoc schema-options/schemas

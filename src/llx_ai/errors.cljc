@@ -1,6 +1,7 @@
 (ns llx-ai.errors
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [taoensso.trove :as trove]))
 
 (def client-errors
   #{:llx/authentication-error
@@ -309,17 +310,31 @@
       (long (* 1000 (inc retry-count))))))
 
 (defn retry-loop
-  [f max-retries sleep-fn]
-  (loop [attempt 0]
-    (let [result (try
-                   {:ok (f)}
-                   (catch #?(:clj clojure.lang.ExceptionInfo :cljs ExceptionInfo) e
-                     (if (should-retry? e :max-retries max-retries
-                                        :current-retry attempt)
-                       {:retry e}
-                       (throw e))))]
-      (if-let [ex (:retry result)]
-        (do
-          (sleep-fn (retry-delay-ms ex attempt))
-          (recur (inc attempt)))
-        (:ok result)))))
+  ([f max-retries sleep-fn]
+   (retry-loop f max-retries sleep-fn {}))
+  ([f max-retries sleep-fn {:keys [call-id provider]}]
+   (loop [attempt 0]
+     (let [result (try
+                    {:ok (f)}
+                    (catch #?(:clj clojure.lang.ExceptionInfo :cljs ExceptionInfo) e
+                      (if (should-retry? e :max-retries max-retries
+                                         :current-retry attempt)
+                        {:retry e}
+                        (throw e))))]
+       (if-let [ex (:retry result)]
+         (let [delay-ms (retry-delay-ms ex attempt)
+               exd      (ex-data ex)]
+           (trove/log! {:level :info
+                        :id    :llx.obs/retry-scheduled
+                        :data  {:call-id      call-id
+                                :attempt      attempt
+                                :next-attempt (inc attempt)
+                                :max-retries  max-retries
+                                :delay-ms     delay-ms
+                                :error-type   (:type exd)
+                                :provider     (or provider (:provider exd))
+                                :request-id   (:request-id exd)
+                                :retry-after  (:retry-after exd)}})
+           (sleep-fn delay-ms)
+           (recur (inc attempt)))
+         (:ok result))))))

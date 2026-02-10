@@ -3,8 +3,8 @@
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
    [llx-ai.errors :as errors]
-   [llx-ai.schema :as schema]))
-(schema/registry)
+   [llx-ai.schema :as schema]
+   [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
   [s]
@@ -311,6 +311,15 @@
                                        "Authorization" (str "Bearer " api-key)}
                                 (:headers model) (merge (:headers model))
                                 (:headers opts) (merge (:headers opts)))]
+          (trove/log! {:level :trace
+                       :id    :llx.obs/provider-payload
+                       :data  {:call-id  (:call/id env)
+                               :provider (:provider model)
+                               :api      (:api model)
+                               :model-id (:id model)
+                               :stream?  stream?
+                               :url      (str (trim-trailing-slash (:base-url model)) "/responses")
+                               :payload  sanitized}})
           {:method  :post
            :url     (str (trim-trailing-slash (:base-url model)) "/responses")
            :headers headers

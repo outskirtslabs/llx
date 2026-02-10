@@ -40,10 +40,10 @@
 
 (defn- test-context-overflow!
   [model opts]
-  (let [started-at      (System/currentTimeMillis)
-        timeout-ms      (call-timeout-ms)
-        oversized-text  (generate-overflow-content (:context-window model))
-        opts            (assoc opts :max-retries 0)
+  (let [started-at     (System/currentTimeMillis)
+        timeout-ms     (call-timeout-ms)
+        oversized-text (generate-overflow-content (:context-window model))
+        opts           (assoc opts :max-retries 0)
         context        {:messages [{:role      :user
                                     :content   oversized-text
                                     :timestamp (System/currentTimeMillis)}]}
@@ -87,17 +87,16 @@
                " due to client call timeout"
                " timeout-ms=" timeout-ms))
       (if (non-overflow-environment-error? result)
-      (is true
-          (str "Skipping overflow assertion for " (:id model)
-               " due to provider transient/quota limitation"
-               " type=" (:error-type result)
-               (when-let [retry-after (:retry-after result)]
-                 (str " retry-after=" retry-after "s"))))
-      (is (overflow/context-overflow? result (:context-window model))
-          (str "Expected context-overflow? to be true for " (:id model)
-               " stop-reason=" (:stop-reason result)
-               " error=" (:error-message result))))
-      )
+        (is true
+            (str "Skipping overflow assertion for " (:id model)
+                 " due to provider transient/quota limitation"
+                 " type=" (:error-type result)
+                 (when-let [retry-after (:retry-after result)]
+                   (str " retry-after=" retry-after "s"))))
+        (is (overflow/context-overflow? result (:context-window model))
+            (str "Expected context-overflow? to be true for " (:id model)
+                 " stop-reason=" (:stop-reason result)
+                 " error=" (:error-message result)))))
     (log! (str "DONE model=" (:id model)
                " elapsed-ms=" (- (System/currentTimeMillis) started-at)))))
 

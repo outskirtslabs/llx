@@ -4,8 +4,8 @@
    [clojure.string :as str]
    [llx-ai.errors :as errors]
    [llx-ai.models :as models]
-   [llx-ai.schema :as schema]))
-(schema/registry)
+   [llx-ai.schema :as schema]
+   [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
   [s]
@@ -329,6 +329,15 @@
                                  (seq api-key) (assoc "Authorization" (str "Bearer " api-key))
                                  (:headers model) (merge (:headers model))
                                  (:headers opts) (merge (:headers opts)))]
+          (trove/log! {:level :trace
+                       :id    :llx.obs/provider-payload
+                       :data  {:call-id  (:call/id env)
+                               :provider (:provider model)
+                               :api      (:api model)
+                               :model-id (:id model)
+                               :stream?  stream?
+                               :url      (str base-url "/chat/completions")
+                               :payload  sanitized}})
           {:method  :post
            :url     (str base-url "/chat/completions")
            :headers headers

@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.test-util :as util]
    [llx-ai.adapters.openai-responses :as sut]
    [llx-ai.transform-messages :as transform-messages]
    [llx-ai.utils.unicode :as unicode]))
@@ -82,6 +83,23 @@
            (:reasoning payload)))
     (is (= ["reasoning.encrypted_content"]
            (:include payload)))))
+
+(deftest build-request-emits-provider-payload-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+          request (sut/build-request (stub-env) openai-responses-model context {:api-key "k"} false)
+          payload (json/read-str (:body request) {:key-fn keyword})
+          event   (util/first-event logs* :llx.obs/provider-payload)]
+      (is (util/submap?
+           {:id    :llx.obs/provider-payload
+            :level :trace
+            :data  {:provider :openai
+                    :api      :openai-responses
+                    :model-id "gpt-5-mini"
+                    :stream?  false
+                    :url      "https://api.openai.com/v1/responses"
+                    :payload  payload}}
+           (util/strip-generated event [:call-id]))))))
 
 (deftest normalize-tool-call-id-normalizes-pipe-ids-and-preserves-pairing
   (let [messages  (fixture "pipe_id_prefilled")

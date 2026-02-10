@@ -329,7 +329,7 @@
       (handle-image! models/mistral-pixtral opts))))
 
 (deftest live-parity-ollama
-  (let [opts {:max-output-tokens 256}]
+  (let [opts {}]
     (testing "basic-text-generation"
       (basic-text-generation! models/ollama opts))
     (testing "handle-tool-call"
@@ -338,9 +338,7 @@
       (handle-streaming! models/ollama opts))
     (testing "handle-thinking"
       (handle-thinking! models/ollama (assoc opts
-                                             :max-output-tokens 2048
                                              :reasoning {:level :medium})))
     (testing "multi-turn"
       (multi-turn! models/ollama (assoc opts
-                                        :max-output-tokens 2048
                                         :reasoning {:level :medium})))))

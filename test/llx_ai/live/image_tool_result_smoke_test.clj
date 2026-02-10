@@ -100,27 +100,27 @@
 (deftest live-image-tool-result-openai-completions
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
     (testing "tool-result image only"
-      (test-tool-result-image-only! models/openai-completions {:api-key api-key :max-output-tokens 256}))
+      (test-tool-result-image-only! models/openai-completions {:api-key api-key}))
     (testing "tool-result text and image"
-      (test-tool-result-text-and-image! models/openai-completions {:api-key api-key :max-output-tokens 256}))))
+      (test-tool-result-text-and-image! models/openai-completions {:api-key api-key}))))
 
 (deftest live-image-tool-result-openai-responses
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
     (testing "tool-result image only"
-      (test-tool-result-image-only! models/openai-responses {:api-key api-key :max-output-tokens 256}))
+      (test-tool-result-image-only! models/openai-responses {:api-key api-key}))
     (testing "tool-result text and image"
-      (test-tool-result-text-and-image! models/openai-responses {:api-key api-key :max-output-tokens 256}))))
+      (test-tool-result-text-and-image! models/openai-responses {:api-key api-key}))))
 
 (deftest live-image-tool-result-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]
     (testing "tool-result image only"
-      (test-tool-result-image-only! models/anthropic {:api-key api-key :max-output-tokens 256}))
+      (test-tool-result-image-only! models/anthropic {:api-key api-key}))
     (testing "tool-result text and image"
-      (test-tool-result-text-and-image! models/anthropic {:api-key api-key :max-output-tokens 256}))))
+      (test-tool-result-text-and-image! models/anthropic {:api-key api-key}))))
 
 (deftest live-image-tool-result-google
   (let [api-key (live-env/get-env "GEMINI_API_KEY")]
     (testing "tool-result image only"
-      (test-tool-result-image-only! models/google {:api-key api-key :max-output-tokens 256}))
+      (test-tool-result-image-only! models/google {:api-key api-key}))
     (testing "tool-result text and image"
-      (test-tool-result-text-and-image! models/google {:api-key api-key :max-output-tokens 256}))))
+      (test-tool-result-text-and-image! models/google {:api-key api-key}))))

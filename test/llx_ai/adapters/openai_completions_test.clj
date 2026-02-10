@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.test-util :as util]
    [llx-ai.adapters.openai-completions :as sut]
    [llx-ai.utils.unicode :as unicode]))
 
@@ -96,6 +97,23 @@
     (is (= "auto" (:tool_choice (mk-payload "auto"))))
     (is (= "none" (:tool_choice (mk-payload "none"))))
     (is (= "required" (:tool_choice (mk-payload "required"))))))
+
+(deftest build-request-emits-provider-payload-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+          request (sut/build-request (stub-env) openai-model context {:api-key "k"} false)
+          payload (json/read-str (:body request) {:key-fn keyword})
+          event   (util/first-event logs* :llx.obs/provider-payload)]
+      (is (util/submap?
+           {:id    :llx.obs/provider-payload
+            :level :trace
+            :data  {:provider :openai
+                    :api      :openai-completions
+                    :model-id "gpt-4o-mini"
+                    :stream?  false
+                    :url      "https://api.openai.com/v1/chat/completions"
+                    :payload  payload}}
+           (util/strip-generated event [:call-id]))))))
 
 (deftest build-request-batches-tool-result-images-for-openai-completions
   (let [context   (fixture "mistral_request_context")

@@ -4,8 +4,8 @@
    [clojure.string :as str]
    [llx-ai.errors :as errors]
    [llx-ai.models :as models]
-   [llx-ai.schema :as schema]))
-(schema/registry)
+   [llx-ai.schema :as schema]
+   [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
   [s]
@@ -360,6 +360,15 @@
               suffix          (if stream?
                                 (str "/models/" (:id model) ":streamGenerateContent?alt=sse")
                                 (str "/models/" (:id model) ":generateContent"))]
+          (trove/log! {:level :trace
+                       :id    :llx.obs/provider-payload
+                       :data  {:call-id  (:call/id env)
+                               :provider (:provider model)
+                               :api      (:api model)
+                               :model-id (:id model)
+                               :stream?  stream?
+                               :url      (str base suffix)
+                               :payload  ((:unicode/sanitize-payload env) payload)}})
           {:method  :post
            :url     (str base suffix)
            :headers (cond-> {"Content-Type"   "application/json"

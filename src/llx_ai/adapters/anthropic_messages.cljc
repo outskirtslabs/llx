@@ -4,8 +4,8 @@
    [clojure.string :as str]
    [llx-ai.errors :as errors]
    [llx-ai.models :as models]
-   [llx-ai.schema :as schema]))
-(schema/registry)
+   [llx-ai.schema :as schema]
+   [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
   [s]
@@ -277,11 +277,21 @@
                                         "anthropic-version" "2023-06-01"
                                         "x-api-key"         api-key}
                                  (:headers model) (merge (:headers model))
-                                 (:headers opts) (merge (:headers opts)))]
+                                 (:headers opts) (merge (:headers opts)))
+              sanitized        ((:unicode/sanitize-payload env) payload)]
+          (trove/log! {:level :trace
+                       :id    :llx.obs/provider-payload
+                       :data  {:call-id  (:call/id env)
+                               :provider (:provider model)
+                               :api      (:api model)
+                               :model-id (:id model)
+                               :stream?  stream?
+                               :url      (str base-url "/v1/messages")
+                               :payload  sanitized}})
           {:method  :post
            :url     (str base-url "/v1/messages")
            :headers headers
-           :body    ((:json/encode env) ((:unicode/sanitize-payload env) payload))
+           :body    ((:json/encode env) sanitized)
            :as      (if stream? :stream :string)
            :throw   false})))
 

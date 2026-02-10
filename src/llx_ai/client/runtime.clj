@@ -5,7 +5,8 @@
    [clojure.string :as str]
    [llx-ai.errors :as errors]
    [llx-ai.event-stream :as event-stream]
-   [llx-ai.schema :as schema]))
+   [llx-ai.schema :as schema]
+   [taoensso.trove :as trove]))
 
 (set! *warn-on-reflection* true)
 
@@ -42,12 +43,23 @@
 
 (defn- emit-terminal-error!
   [adapter env model out state* stream-ex]
-  (let [assistant-message (try
-                            (schema/assert-valid!
-                             :llx/message-assistant
-                             ((:normalize-error adapter) env stream-ex @state*))
-                            (catch Exception normalize-ex
-                              (fallback-assistant-message env model stream-ex normalize-ex)))]
+  (let [[assistant-message normalize-failed?] (try
+                                                [(schema/assert-valid!
+                                                  :llx/message-assistant
+                                                  ((:normalize-error adapter) env stream-ex @state*))
+                                                 false]
+                                                (catch Exception normalize-ex
+                                                  [(fallback-assistant-message env model stream-ex normalize-ex)
+                                                   true]))]
+    (trove/log! {:level :error
+                 :id    :llx.obs/stream-event-error
+                 :data  {:call-id                 (:call/id env)
+                         :provider                (:provider model)
+                         :api                     (:api model)
+                         :model-id                (:id model)
+                         :error-type              (:type (ex-data stream-ex))
+                         :error-message           (ex-message stream-ex)
+                         :normalize-error-failed? normalize-failed?}})
     (try
       (event-stream/push! out {:type :error :assistant-message assistant-message})
       (finally
@@ -72,18 +84,48 @@
                  response    (errors/retry-loop
                               #((:open-stream adapter) env model request)
                               max-retries
-                              sleep-fn)]
+                              sleep-fn
+                              {:call-id  (:call/id env)
+                               :provider (:provider model)})]
+             (trove/log! {:level :info
+                          :id    :llx.obs/stream-start
+                          :data  {:call-id  (:call/id env)
+                                  :provider (:provider model)
+                                  :api      (:api model)
+                                  :model-id (:id model)}})
              (event-stream/push! out {:type :start})
-             (with-open [reader (io/reader (:body response))]
-               (doseq [line (line-seq reader)]
-                 (when-let [payload (data-line->payload line)]
-                   (let [{:keys [state events]} (schema/assert-valid!
-                                                 :llx/runtime-decode-event-result
-                                                 ((:decode-event adapter) env @state* payload))]
-                     (reset! state* state)
-                     (doseq [event events]
-                       (schema/assert-valid! :llx/event event)
-                       (event-stream/push! out event))))))
+             (let [item-index* (atom 0)]
+               (with-open [reader (io/reader (:body response))]
+                 (doseq [line (line-seq reader)]
+                   (when-let [payload (data-line->payload line)]
+                     (let [decoded                (or (when-let [decode-safe (:json/decode-safe env)]
+                                                        (decode-safe payload {:key-fn keyword}))
+                                                      {})
+                           provider-item-type     (or (:type decoded)
+                                                      (when (contains? decoded :candidates) "candidates")
+                                                      (when (contains? decoded :choices) "choices"))
+                           {:keys [state events]} (schema/assert-valid!
+                                                   :llx/runtime-decode-event-result
+                                                   ((:decode-event adapter) env @state* payload))
+                           event-type             (:type (first events))
+                           payload-bytes          (count payload)
+                           idx                    @item-index*]
+                       (swap! item-index* inc)
+                       (trove/log! {:level :trace
+                                    :id    :llx.obs/stream-item-received
+                                    :data  {:call-id            (:call/id env)
+                                            :provider           (:provider model)
+                                            :api                (:api model)
+                                            :model-id           (:id model)
+                                            :item-index         idx
+                                            :provider-item-type provider-item-type
+                                            :llx-event-type     event-type
+                                            :done?              false
+                                            :payload-bytes      payload-bytes}})
+                       (reset! state* state)
+                       (doseq [event events]
+                         (schema/assert-valid! :llx/event event)
+                         (event-stream/push! out event)))))))
              (let [{:keys [assistant-message events]} (schema/assert-valid!
                                                        :llx/runtime-finalize-result
                                                        ((:finalize adapter) env @state*))]
@@ -91,6 +133,15 @@
                  (schema/assert-valid! :llx/event event)
                  (event-stream/push! out event))
                (schema/assert-valid! :llx/message-assistant assistant-message)
+               (trove/log! {:level :info
+                            :id    :llx.obs/stream-done
+                            :data  {:call-id             (:call/id env)
+                                    :provider            (:provider model)
+                                    :api                 (:api model)
+                                    :model-id            (:id model)
+                                    :stop-reason         (:stop-reason assistant-message)
+                                    :usage               (:usage assistant-message)
+                                    :content-block-count (count (:content assistant-message))}})
                (event-stream/push! out {:type :done :assistant-message assistant-message}))
              (event-stream/end! out))
            (catch Exception stream-ex

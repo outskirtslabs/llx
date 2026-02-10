@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.test-util :as util]
    [llx-ai.adapters.google-generative-ai :as sut]
    [llx-ai.utils.unicode :as unicode]))
 
@@ -94,6 +95,23 @@
                                        :properties {:value {:type "integer"}}
                                        :required   ["value"]}}]}]}
            payload))))
+
+(deftest build-request-emits-provider-payload-trove-signal
+  (util/with-captured-logs [logs*]
+    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+          request (sut/build-request (stub-env) google-model context {} false)
+          payload (json/read-str (:body request) {:key-fn keyword})
+          event   (util/first-event logs* :llx.obs/provider-payload)]
+      (is (util/submap?
+           {:id    :llx.obs/provider-payload
+            :level :trace
+            :data  {:provider :google
+                    :api      :google-generative-ai
+                    :model-id "gemini-2.5-flash"
+                    :stream?  false
+                    :url      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                    :payload  payload}}
+           (util/strip-generated event [:call-id]))))))
 
 (deftest build-request-tool-result-image-forwarding-by-model-capability
   (let [context            {:messages [{:role      :user
