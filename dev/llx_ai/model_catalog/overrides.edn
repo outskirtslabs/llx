@@ -1,0 +1,25 @@
+{
+ ;; Provenance: extra/pi-mono/packages/ai/scripts/generate-models.ts@fdcd9ab7 lines 637-643
+ ;; models.dev cache pricing for claude-opus-4-5 is corrected to 0.5 / 6.25.
+ "claude-opus-4-5"
+ {:cost {:cache-read 0.5
+         :cache-write 6.25}}
+
+ ;; Provenance: extra/pi-mono/packages/ai/scripts/generate-models.ts@fdcd9ab7 lines 703-721
+ ;; add missing OpenAI responses model gpt-5-chat-latest.
+ "gpt-5-chat-latest"
+ {:name "GPT-5 Chat Latest"
+  :provider :openai
+  :api :openai-responses
+  :base-url "https://api.openai.com/v1"
+  :context-window 128000
+  :max-tokens 16384
+  :cost {:input 1.25 :output 10.0 :cache-read 0.125 :cache-write 0.0}
+  :capabilities {:reasoning? false :input #{:text :image}}}
+
+ ;; Provenance: extra/pi-mono/packages/ai/scripts/generate-models.ts@fdcd9ab7 lines 724-742
+ ;; adjust pricing for gpt-5.1-codex to match Pi override values.
+ "gpt-5.1-codex"
+ {:cost {:output 5.0
+         :cache-write 1.25}}
+}

@@ -16,6 +16,11 @@
          {:doc  "Run all tests or specific test suites"
           :task (apply clojure "-M:dev:kaocha" *command-line-args*)}
 
+         generate-models
+         {:doc  "Generate built-in model catalog artifact"
+          :task (do (clojure "-M:dev" "-m" "llx-ai.model-catalog.generate")
+                    (shell "cljfmt --quiet fix src/llx_ai/models_generated.cljc"))}
+
          fmt
          {:doc  "Format code with cljfmt"
           :task (apply shell "cljfmt --quiet -v fix" (if (seq *command-line-args*) *command-line-args* paths))}

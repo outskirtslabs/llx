@@ -1,0 +1,45 @@
+[{:api :anthropic-messages
+  :base-url "https://api.anthropic.com"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 200000
+  :cost {:cache-read 0.3 :cache-write 3.75 :input 3.0 :output 15.0}
+  :id "claude-sonnet-4-5"
+  :max-tokens 8192
+  :name "Claude Sonnet 4.5 Source"
+  :provider :anthropic}
+ {:api :google-generative-ai
+  :base-url "https://generativelanguage.googleapis.com/v1beta"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 1048576
+  :cost {:cache-read 0.03 :cache-write 0.3 :input 0.3 :output 2.5}
+  :id "gemini-2.5-flash"
+  :max-tokens 65536
+  :name "Gemini 2.5 Flash Source"
+  :provider :google}
+ {:api :openai-completions
+  :base-url "https://api.mistral.ai/v1"
+  :capabilities {:input #{:text} :reasoning? false}
+  :context-window 128000
+  :cost {:cache-read 0.0 :cache-write 0.0 :input 0.0 :output 0.0}
+  :id "devstral-medium-latest"
+  :max-tokens 8192
+  :name "Devstral Medium Source"
+  :provider :mistral}
+ {:api :openai-completions
+  :base-url "https://api.openai.com/v1"
+  :capabilities {:input #{:image :text} :reasoning? false}
+  :context-window 128000
+  :cost {:cache-read 0.0 :cache-write 0.0 :input 0.0 :output 0.0}
+  :id "gpt-4o-mini"
+  :max-tokens 16384
+  :name "GPT-4o Mini Override"
+  :provider :openai}
+ {:api :openai-responses
+  :base-url "https://api.openai.com/v1"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 272000
+  :cost {:cache-read 0.05 :cache-write 0.8 :input 0.25 :output 2.0}
+  :id "gpt-5-mini"
+  :max-tokens 60000
+  :name "GPT-5 Mini Override"
+  :provider :openai}]

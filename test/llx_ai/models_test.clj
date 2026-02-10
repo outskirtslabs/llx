@@ -31,7 +31,8 @@
               (is (= provider (:provider model)))
               (is (schema/valid? :llx/model model))
               (is (= model (get-model provider (:id model)))))))
-        (is (nil? (get-model :openai "__definitely_missing__")))))))
+        (is (nil? (get-model :openai "__definitely_missing__")))
+        (is (nil? (get-model :openai-compatible "llama3.2")))))))
 
 (deftest model-utility-functions
   (testing "calculate-cost"

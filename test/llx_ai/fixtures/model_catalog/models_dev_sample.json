@@ -1,0 +1,86 @@
+{
+  "openai": {
+    "models": {
+      "gpt-5-mini": {
+        "name": "GPT-5 Mini Source",
+        "tool_call": true,
+        "reasoning": true,
+        "limit": {"context": 272000, "output": 65536},
+        "cost": {"input": 0.25, "output": 2.0, "cache_read": 0.05, "cache_write": 0.8},
+        "modalities": {"input": ["text", "image"]}
+      },
+      "gpt-4o-mini": {
+        "name": "GPT-4o Mini Source",
+        "tool_call": false,
+        "reasoning": false,
+        "limit": {"context": 128000, "output": 16384},
+        "cost": {"input": 0.15, "output": 0.6, "cache_read": 0.0, "cache_write": 0.0},
+        "modalities": {"input": ["text", "image"]}
+      }
+    }
+  },
+  "anthropic": {
+    "models": {
+      "claude-sonnet-4-5": {
+        "name": "Claude Sonnet 4.5 Source",
+        "tool_call": true,
+        "reasoning": true,
+        "limit": {"context": 200000, "output": 8192},
+        "cost": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
+        "modalities": {"input": ["text", "image"]}
+      }
+    }
+  },
+  "google": {
+    "models": {
+      "gemini-2.5-flash": {
+        "name": "Gemini 2.5 Flash Source",
+        "tool_call": true,
+        "reasoning": true,
+        "limit": {"context": 1048576, "output": 65536},
+        "cost": {"input": 0.3, "output": 2.5, "cache_read": 0.03, "cache_write": 0.3},
+        "modalities": {"input": ["text", "image"]}
+      }
+    }
+  },
+  "mistral": {
+    "models": {
+      "devstral-medium-latest": {
+        "name": "Devstral Medium Source",
+        "tool_call": true,
+        "reasoning": false,
+        "limit": {"context": 128000, "output": 8192},
+        "modalities": {"input": ["text"]}
+      },
+      "mistral-no-tools": {
+        "name": "No Tools",
+        "tool_call": false,
+        "reasoning": false,
+        "limit": {"context": 32000, "output": 4096},
+        "modalities": {"input": ["text"]}
+      }
+    }
+  },
+  "openai-compatible": {
+    "models": {
+      "llama3.2": {
+        "name": "Llama 3.2 Source",
+        "tool_call": true,
+        "reasoning": false,
+        "limit": {"context": 8192, "output": 8192},
+        "modalities": {"input": ["text"]}
+      }
+    }
+  },
+  "unknown-provider": {
+    "models": {
+      "mystery-1": {
+        "name": "Mystery One",
+        "tool_call": true,
+        "reasoning": false,
+        "limit": {"context": 1024, "output": 512},
+        "modalities": {"input": ["text"]}
+      }
+    }
+  }
+}
