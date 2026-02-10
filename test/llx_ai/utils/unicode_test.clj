@@ -104,3 +104,10 @@
   (testing "passes through non-string leaves unchanged"
     (is (= {:a 1 :b [2 3] :c true :d nil}
            (sut/sanitize-payload {:a 1 :b [2 3] :c true :d nil})))))
+
+(deftest truncate-limits-string-length
+  (testing "truncates only when input exceeds max-len"
+    (is (= "abc" (sut/truncate "abc" 10)))
+    (is (= "abcd" (sut/truncate "abcdef" 4))))
+  (testing "coerces nil to empty string"
+    (is (= "" (sut/truncate nil 5)))))

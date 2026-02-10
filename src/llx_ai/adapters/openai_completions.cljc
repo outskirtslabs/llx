@@ -5,6 +5,7 @@
    [llx-ai.errors :as errors]
    [llx-ai.models :as models]
    [llx-ai.schema :as schema]
+   [llx-ai.utils.unicode :as unicode]
    [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
@@ -762,14 +763,24 @@
 
 (defn normalize-tool-call-id
   [tool-call-id target-model source-assistant-message]
-  (let [id (strip-openai-responses-pipe-id tool-call-id)]
-    (if (mistral-target? target-model)
+  (if (mistral-target? target-model)
+    (let [id (strip-openai-responses-pipe-id tool-call-id)]
       (or (get (mistral-id-map source-assistant-message) tool-call-id)
-          (normalize-mistral-tool-id id))
-      (let [sanitized (str/replace id #"[^a-zA-Z0-9_-]" "_")]
-        (if (> (count sanitized) 40)
-          (subs sanitized 0 40)
-          sanitized)))))
+          (normalize-mistral-tool-id id)))
+    (let [provider (keyword (or (:provider target-model) :unknown))
+          id       (or tool-call-id "")]
+      (cond
+        (str/includes? id "|")
+        (-> id
+            strip-openai-responses-pipe-id
+            (str/replace #"[^a-zA-Z0-9_-]" "_")
+            (unicode/truncate 40))
+
+        (= provider :openai)
+        (unicode/truncate id 40)
+
+        :else
+        id))))
 
 (defn adapter
   []

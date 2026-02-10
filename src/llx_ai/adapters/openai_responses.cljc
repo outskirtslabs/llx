@@ -4,6 +4,7 @@
    [clojure.string :as str]
    [llx-ai.errors :as errors]
    [llx-ai.schema :as schema]
+   [llx-ai.utils.unicode :as unicode]
    [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
@@ -88,40 +89,29 @@
     "queued" :stop
     (throw (ex-info "Unknown OpenAI responses stop reason" {:status status}))))
 
-(defn- short-hash
-  [s]
-  (str (reduce (fn [acc ch]
-                 (mod (+ (* acc 33) (int ch)) 4294967291))
-               5381
-               (or s ""))))
-
-(defn- truncate-with-hash
-  [s max-len]
-  (let [s (or s "")]
-    (if (<= (count s) max-len)
-      s
-      (let [suffix   (short-hash s)
-            keep-len (max 1 (- max-len 1 (count suffix)))
-            prefix   (subs s 0 keep-len)]
-        (str prefix "_" suffix)))))
+(def ^:private allowed-tool-call-id-providers
+  #{:openai})
 
 (defn- sanitize-and-limit-id
   [s]
   (-> (or s "")
       (str/replace #"[^A-Za-z0-9_-]" "_")
-      (truncate-with-hash 64)
+      (unicode/truncate 64)
       (str/replace #"_+$" "")))
 
 (defn normalize-tool-call-id
-  [tool-call-id _target-model _source-assistant-message]
-  (if (and (string? tool-call-id) (str/includes? tool-call-id "|"))
-    (let [[call-id item-id] (str/split tool-call-id #"\|" 2)
-          call-id           (sanitize-and-limit-id call-id)
-          item-id           (sanitize-and-limit-id item-id)
-          item-id           (if (str/starts-with? item-id "fc") item-id (str "fc_" item-id))
-          item-id           (sanitize-and-limit-id item-id)]
-      (str call-id "|" item-id))
-    tool-call-id))
+  [tool-call-id target-model _source-assistant-message]
+  (let [provider (keyword (or (:provider target-model) :unknown))]
+    (if (and (allowed-tool-call-id-providers provider)
+             (string? tool-call-id)
+             (str/includes? tool-call-id "|"))
+      (let [[call-id item-id] (str/split tool-call-id #"\|" 2)
+            call-id           (sanitize-and-limit-id call-id)
+            item-id           (sanitize-and-limit-id item-id)
+            item-id           (if (str/starts-with? item-id "fc") item-id (str "fc_" item-id))
+            item-id           (sanitize-and-limit-id item-id)]
+        (str call-id "|" item-id))
+      tool-call-id)))
 
 (defn- normalize-cache-control
   [env cache-control]
@@ -395,27 +385,48 @@
                {:state state :events []}))
 
            "response.reasoning_summary_text.delta"
-           (if (= :thinking (get-in state [:current-block :kind]))
-             (let [idx        (get-in state [:current-block :index])
-                   delta      (:delta chunk "")
-                   next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
-               {:state  next-state
-                :events [{:type :thinking-delta :thinking delta}]})
+           (if (and (= "reasoning" (get-in state [:current-item :type]))
+                    (= :thinking (get-in state [:current-block :kind])))
+             (let [summary (vec (or (get-in state [:current-item :summary]) []))]
+               (if-let [last-part (peek summary)]
+                 (let [idx          (get-in state [:current-block :index])
+                       delta        (:delta chunk "")
+                       next-summary (assoc summary
+                                           (dec (count summary))
+                                           (update last-part :text (fnil str "") delta))
+                       next-state   (-> state
+                                        (assoc-in [:current-item :summary] next-summary)
+                                        (update-in [:assistant-message :content idx :thinking] str delta))]
+                   {:state  next-state
+                    :events [{:type :thinking-delta :thinking delta}]})
+                 {:state state :events []}))
              {:state state :events []})
 
            ;; No-op: intermediate event for when a new summary part is added to the
-           ;; reasoning item. We accumulate text via the text.delta events and
-           ;; reconstruct from the output_item.done event, so this is unused.
+           ;; reasoning item.
            "response.reasoning_summary_part.added"
-           {:state state :events []}
+           (if (= "reasoning" (get-in state [:current-item :type]))
+             (let [part       (:part chunk)
+                   next-state (update-in state [:current-item :summary] (fnil conj []) part)]
+               {:state next-state :events []})
+             {:state state :events []})
 
            "response.reasoning_summary_part.done"
-           (if (= :thinking (get-in state [:current-block :kind]))
-             (let [idx        (get-in state [:current-block :index])
-                   delta      "\n\n"
-                   next-state (update-in state [:assistant-message :content idx :thinking] str delta)]
-               {:state  next-state
-                :events [{:type :thinking-delta :thinking delta}]})
+           (if (and (= "reasoning" (get-in state [:current-item :type]))
+                    (= :thinking (get-in state [:current-block :kind])))
+             (let [summary (vec (or (get-in state [:current-item :summary]) []))]
+               (if-let [last-part (peek summary)]
+                 (let [idx          (get-in state [:current-block :index])
+                       delta        "\n\n"
+                       next-summary (assoc summary
+                                           (dec (count summary))
+                                           (update last-part :text (fnil str "") delta))
+                       next-state   (-> state
+                                        (assoc-in [:current-item :summary] next-summary)
+                                        (update-in [:assistant-message :content idx :thinking] str delta))]
+                   {:state  next-state
+                    :events [{:type :thinking-delta :thinking delta}]})
+                 {:state state :events []}))
              {:state state :events []})
 
            "response.output_text.delta"

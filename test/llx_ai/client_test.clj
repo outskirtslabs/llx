@@ -7,6 +7,7 @@
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.adapters.openai-responses :as openai-responses]
    [llx-ai.event-stream :as event-stream]
+   [llx-ai.live.models :as live-models]
    [llx-ai.test-util :as util]
    [llx-ai.client :as sut]
    [llx-ai.client.runtime :as runtime]
@@ -363,7 +364,7 @@
     (is (= 4242 (get-in @captured-context [:messages 2 :timestamp])))))
 
 (deftest complete-openai-completions-mistral-normalizes-pipe-tool-id
-  (let [pipe-id      "call_pAYbIr76hXIjncD9UE4eGfnS|t5nnb2qYMFWGSsr13fhCd1CaCu3t3qONEPuOudu4HSVEtA8YJSL6FAZUxvoOoD792VIJWl91g87EdqsCWp9krVsdBysQoDaf9lMCLb8BS4EYi4gQd5kBQBYLlgD71PYwvf+TbMD9J9/5OMD42oxSRj8H+vRf78/l2Xla33LWz4nOgsddBlbvabICRs8GHt5C9PK5keFtzyi3lsyVKNlfduK3iphsZqs4MLv4zyGJnvZo/+QzShyk5xnMSQX/f98+aEoNflEApCdEOXipipgeiNWnpFSHbcwmMkZoJhURNu+JEz3xCh1mrXeYoN5o+trLL3IXJacSsLYXDrYTipZZbJFRPAucgbnjYBC+/ZzJOfkwCs+Gkw7EoZR7ZQgJ8ma+9586n4tT4cI8DEhBSZsWMjrCt8dxKg=="
+  (let [pipe-id      live-models/upstream-failing-tool-call-id
         seen-request (atom nil)
         model        {:id             "devstral-medium-latest"
                       :name           "Devstral Medium"

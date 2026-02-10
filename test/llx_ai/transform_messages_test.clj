@@ -2,15 +2,11 @@
   (:require
    [clojure.edn :as edn]
    [clojure.test :refer [deftest is testing]]
+   [llx-ai.adapters.google-generative-ai :as google-generative-ai]
    [llx-ai.adapters.openai-completions :as openai-completions]
    [llx-ai.transform-messages :as sut]))
 
 (set! *warn-on-reflection* true)
-
-(def source-openai-model
-  {:provider :openai
-   :api      :openai-responses
-   :id       "gpt-5-mini"})
 
 (def same-openai-model
   {:provider :openai
@@ -242,3 +238,28 @@
         after-ms  (System/currentTimeMillis)]
     (is (= :tool-result (:role inserted)))
     (is (<= before-ms (:timestamp inserted) after-ms))))
+
+(deftest google-gated-normalization-rewrites-assistant-and-tool-result-ids
+  (let [source-id "call/with+symbols=="
+        messages  [{:role :user :content "use a tool" :timestamp 1}
+                   {:role        :assistant
+                    :content     [{:type :tool-call :id source-id :name "echo" :arguments {:x 1}}]
+                    :api         :openai-responses
+                    :provider    :openai
+                    :model       "gpt-5-mini"
+                    :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                                  :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+                    :stop-reason :tool-use
+                    :timestamp   2}
+                   {:role         :tool-result
+                    :tool-call-id source-id
+                    :tool-name    "echo"
+                    :content      [{:type :text :text "ok"}]
+                    :is-error?    false
+                    :timestamp    3}]
+        target    {:provider :google :api :google-generative-ai :id "claude-sonnet-4-5"}
+        normalize (:normalize-tool-call-id (google-generative-ai/adapter))
+        out       (sut/for-target-model messages target {:clock/now-ms           (constantly 9999)
+                                                         :normalize-tool-call-id normalize})]
+    (is (= "call_with_symbols__" (get-in out [1 :content 0 :id])))
+    (is (= "call_with_symbols__" (get-in out [2 :tool-call-id])))))

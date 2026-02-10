@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.test-util :as util]
    [llx-ai.adapters.openai-responses :as sut]
+   [llx-ai.live.models :as live-models]
    [llx-ai.transform-messages :as transform-messages]
    [llx-ai.utils.unicode :as unicode]))
 
@@ -116,19 +117,38 @@
     (is (<= (count (second (str/split call-id #"\|" 2))) 64))
     (is (= call-id result-id))))
 
-(deftest normalize-tool-call-id-avoids-collisions-for-long-prefix-matches
+(deftest normalize-tool-call-id-uses-plain-slice-without-hash-suffix
   (let [prefix   (apply str (repeat 90 "a"))
         long-id1 (str "call_" prefix "111|item_" prefix "111")
-        long-id2 (str "call_" prefix "222|item_" prefix "222")
         out-1    (sut/normalize-tool-call-id long-id1 openai-responses-model nil)
-        out-2    (sut/normalize-tool-call-id long-id2 openai-responses-model nil)
         [c1 i1]  (str/split out-1 #"\|" 2)
-        [c2 i2]  (str/split out-2 #"\|" 2)]
-    (is (not= out-1 out-2))
+        expect-c (subs (str "call_" prefix "111") 0 64)
+        expect-i (str "fc_" (subs (str "item_" prefix "111") 0 61))]
     (is (<= (count c1) 64))
     (is (<= (count i1) 64))
-    (is (<= (count c2) 64))
-    (is (<= (count i2) 64))))
+    (is (= expect-c c1))
+    (is (= expect-i i1))))
+
+(deftest normalize-tool-call-id-trims-trailing-underscores-and-enforces-fc-prefix
+  (let [source "call/abc___|item/xyz___"
+        out-id (sut/normalize-tool-call-id source openai-responses-model nil)
+        [c i]  (str/split out-id #"\|" 2)]
+    (is (= "call_abc" c))
+    (is (= "fc_item_xyz" i))))
+
+(deftest normalize-tool-call-id-gates-by-provider-allowlist
+  (let [non-openai-model (assoc openai-responses-model :provider :openai-compatible)
+        source           "call/abc|item/xyz"]
+    (is (= source
+           (sut/normalize-tool-call-id source non-openai-model nil)))))
+
+(deftest normalize-tool-call-id-matches-upstream-issue-1022-test-id
+  (let [normalized        (sut/normalize-tool-call-id live-models/upstream-failing-tool-call-id openai-responses-model nil)
+        [call-id item-id] (str/split normalized #"\|" 2)]
+    (is (= "call_pAYbIr76hXIjncD9UE4eGfnS" call-id))
+    (is (= 64 (count item-id)))
+    (is (str/starts-with? item-id "fc_"))
+    (is (not (str/ends-with? item-id "_")))))
 
 (deftest cache-retention-mapping
   (testing "cache-control none omits both prompt cache fields"
@@ -290,6 +310,20 @@
     (is (= {:input 16 :output 5 :cache-read 4 :cache-write 0 :total-tokens 25}
            (select-keys (get-in finalize-result [:assistant-message :usage])
                         [:input :output :cache-read :cache-write :total-tokens])))))
+
+(deftest decode-event-reasoning-summary-part-done-requires-summary-part
+  (let [env        (stub-env)
+        init-state {:model openai-responses-model}
+        start-out  (sut/decode-event env init-state
+                                     (json/write-str {:type "response.output_item.added"
+                                                      :item {:type    "reasoning"
+                                                             :id      "rs_1"
+                                                             :summary []}}))
+        done-out   (sut/decode-event env (:state start-out)
+                                     (json/write-str {:type "response.reasoning_summary_part.done"}))]
+    (is (= [:thinking-start] (mapv :type (:events start-out))))
+    (is (= [] (:events done-out)))
+    (is (= "" (get-in done-out [:state :assistant-message :content 0 :thinking])))))
 
 (deftest stream-error-normalization-contract
   (let [partial-state {:model             openai-responses-model

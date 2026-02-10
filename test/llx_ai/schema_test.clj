@@ -107,8 +107,8 @@
   (testing "accepts usage where total-tokens equals component sum"
     (is (sut/valid? :llx/usage valid-usage)))
 
-  (testing "rejects usage where total-tokens does not match components"
-    (is (not (sut/valid? :llx/usage (assoc valid-usage :total-tokens 999))))))
+  (testing "accepts usage where provider total-tokens does not match component sum (Google!)"
+    (is (sut/valid? :llx/usage (assoc valid-usage :total-tokens 999)))))
 
 (deftest message-schemas
   (testing "accepts all three canonical message roles"

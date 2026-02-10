@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.test-util :as util]
    [llx-ai.adapters.google-generative-ai :as sut]
+   [llx-ai.live.models :as live-models]
    [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
@@ -95,6 +96,26 @@
                                        :properties {:value {:type "integer"}}
                                        :required   ["value"]}}]}]}
            payload))))
+
+(deftest adapter-registers-tool-call-id-normalizer-with-model-id-gate
+  (let [normalize-id (:normalize-tool-call-id (sut/adapter))
+        gated-model  (assoc google-model :id "claude-sonnet-4-5")
+        raw-id       "call/with+symbols=="
+        long-id      (apply str (repeat 80 "a"))]
+    (is (fn? normalize-id))
+    (is (= "call_with_symbols__"
+           (normalize-id raw-id gated-model nil)))
+    (is (= 64
+           (count (normalize-id long-id gated-model nil))))
+    (is (= raw-id
+           (normalize-id raw-id google-model nil)))))
+
+(deftest google-normalizer-matches-upstream-issue-1022-test-id-under-gate
+  (let [normalize-id (:normalize-tool-call-id (sut/adapter))
+        gated-model  (assoc google-model :id "claude-sonnet-4-5")
+        out-id       (normalize-id live-models/upstream-failing-tool-call-id gated-model nil)]
+    (is (= 64 (count out-id)))
+    (is (re-matches #"[A-Za-z0-9_-]{64}" out-id))))
 
 (deftest build-request-emits-provider-payload-trove-signal
   (util/with-captured-logs [logs*]

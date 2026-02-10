@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.test-util :as util]
    [llx-ai.adapters.openai-completions :as sut]
+   [llx-ai.live.models :as live-models]
    [llx-ai.utils.unicode :as unicode]))
 
 (set! *warn-on-reflection* true)
@@ -168,6 +169,34 @@
       (is (= first-id next-id))
       (is (= 9 (count first-id)))
       (is (re-matches #"[A-Za-z0-9]{9}" first-id)))))
+
+(deftest normalize-tool-call-id-openai-non-pipe-ids-are-truncated-only
+  (let [source   "call/with+symbols==?and-more"
+        out-id   (sut/normalize-tool-call-id source openai-model nil)
+        long-id  (apply str (repeat 60 "x"))
+        long-out (sut/normalize-tool-call-id long-id openai-model nil)]
+    (is (= source out-id))
+    (is (= 40 (count long-out)))
+    (is (= (apply str (repeat 40 "x")) long-out))))
+
+(deftest normalize-tool-call-id-openai-compatible-non-pipe-ids-are-unchanged
+  (let [source "call/with+symbols==?and-even-more-than-forty-characters-1234567890"]
+    (is (= source
+           (sut/normalize-tool-call-id source openai-compatible-model nil)))))
+
+(deftest normalize-tool-call-id-pipe-ids-use-call-segment-sanitize-and-truncate
+  (let [source "call/with+symbols==?and-even-more-than-forty-characters-1234567890|fc_item_1"
+        out-id (sut/normalize-tool-call-id source openai-compatible-model nil)]
+    (is (= 40 (count out-id)))
+    (is (re-matches #"[A-Za-z0-9_-]{40}" out-id))
+    (is (not (str/includes? out-id "|")))))
+
+(deftest normalize-tool-call-id-matches-upstream-issue-1022-test-id
+  (let [expected-call-id "call_pAYbIr76hXIjncD9UE4eGfnS"]
+    (is (= expected-call-id
+           (sut/normalize-tool-call-id live-models/upstream-failing-tool-call-id openai-model nil)))
+    (is (= expected-call-id
+           (sut/normalize-tool-call-id live-models/upstream-failing-tool-call-id openai-compatible-model nil)))))
 
 (deftest normalize-tool-call-id-mistral-avoids-collision-for-distinct-source-ids
   (let [assistant-message {:role        :assistant

@@ -1,9 +1,5 @@
 (ns llx-ai.schema.message)
 
-(defn usage-total-valid?
-  [{:keys [input output cache-read cache-write total-tokens]}]
-  (= total-tokens (+ input output cache-read cache-write)))
-
 (def schemas
   {:llx/content-text
    [:map {:closed true}
@@ -48,15 +44,13 @@
     [:total :llx/non-neg-number]]
 
    :llx/usage
-   [:and
-    [:map {:closed true}
-     [:input :llx/non-neg-int]
-     [:output :llx/non-neg-int]
-     [:cache-read :llx/non-neg-int]
-     [:cache-write :llx/non-neg-int]
-     [:total-tokens :llx/non-neg-int]
-     [:cost :llx/usage-cost]]
-    [:fn usage-total-valid?]]
+   [:map {:closed true}
+    [:input :llx/non-neg-int]
+    [:output :llx/non-neg-int]
+    [:cache-read :llx/non-neg-int]
+    [:cache-write :llx/non-neg-int]
+    [:total-tokens :llx/non-neg-int]
+    [:cost :llx/usage-cost]]
 
    :llx/message-user
    [:map {:closed true}

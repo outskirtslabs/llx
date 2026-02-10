@@ -39,3 +39,11 @@
   "Recursively walks a data structure, applying `sanitize-surrogates` to all strings."
   [data]
   (walk/postwalk #(if (string? %) (sanitize-surrogates %) %) data))
+
+(defn truncate
+  "Returns `s` truncated to at most `max-len` characters."
+  [s max-len]
+  (let [s (or s "")]
+    (if (> (count s) max-len)
+      (subs s 0 max-len)
+      s)))

@@ -33,20 +33,24 @@
   [[logs*] & body]
   `(let [~logs* (atom [])]
      (binding [trove/*log-fn* (fn [& args#]
-                                (let [force#                       (fn [x#]
-                                                                     (if (instance? clojure.lang.IDeref x#) @x# x#))
-                                      [ns# loc# level# id# opts#] args#
-                                      event#                       (cond
-                                                                     (and (= 1 (count args#))
-                                                                          (map? (force# (first args#))))
-                                                                     (force# (first args#))
+                                (let [force#
+                                      (fn [x#]
+                                        (if (instance? clojure.lang.IDeref x#) @x# x#))
+                                      [ns# loc# level# id# opts#]
+                                      args#
 
-                                                                     :else
-                                                                     (merge {:ns    (force# ns#)
-                                                                             :loc   (force# loc#)
-                                                                             :level (force# level#)
-                                                                             :id    (force# id#)}
-                                                                            (or (force# opts#) {})))]
+                                      event#
+                                      (cond
+                                        (and (= 1 (count args#))
+                                             (map? (force# (first args#))))
+                                        (force# (first args#))
+
+                                        :else
+                                        (merge {:ns    (force# ns#)
+                                                :loc   (force# loc#)
+                                                :level (force# level#)
+                                                :id    (force# id#)}
+                                               (or (force# opts#) {})))]
                                   (swap! ~logs* conj event#))
                                 nil)]
        ~@body)))

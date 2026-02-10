@@ -103,6 +103,15 @@
   (or (str/starts-with? (or model-id "") "claude-")
       (str/starts-with? (or model-id "") "gpt-oss-")))
 
+(defn normalize-tool-call-id
+  [tool-call-id target-model _source-assistant-message]
+  (if (and (string? tool-call-id)
+           (requires-tool-call-id? (:id target-model)))
+    (-> tool-call-id
+        (str/replace #"[^A-Za-z0-9_-]" "_")
+        (#(if (> (count %) 64) (subs % 0 64) %)))
+    tool-call-id))
+
 (defn- convert-user-content
   [model content]
   (if (string? content)
@@ -643,11 +652,12 @@
 
 (defn adapter
   []
-  {:api               :google-generative-ai
-   :build-request     build-request
-   :open-stream       open-stream
-   :decode-event      decode-event
-   :finalize          finalize
-   :normalize-error   normalize-error
-   :supports-model?   (fn [model] (= :google-generative-ai (:api model)))
-   :transform-context (fn [_model context] context)})
+  {:api                    :google-generative-ai
+   :build-request          build-request
+   :open-stream            open-stream
+   :decode-event           decode-event
+   :finalize               finalize
+   :normalize-error        normalize-error
+   :supports-model?        (fn [model] (= :google-generative-ai (:api model)))
+   :normalize-tool-call-id normalize-tool-call-id
+   :transform-context      (fn [_model context] context)})
