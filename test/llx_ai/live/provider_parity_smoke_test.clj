@@ -4,7 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [llx-ai.client.jvm :as client]
    [llx-ai.event-stream :as event-stream]
-   [llx-ai.live.env :as live-env])
+   [llx-ai.live.env :as live-env]
+   [llx-ai.live.models :as models])
   (:import
    [java.util Base64]
    [java.io File]))
@@ -254,187 +255,110 @@
     (is (str/includes? @all-text "887")
         "accumulated text should contain 887 (453 + 434)")))
 
-(def openai-responses-model
-  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_MODEL") "gpt-5-mini")
-   :name           "OpenAI Responses parity model"
-   :provider       :openai
-   :api            :openai-responses
-   :base-url       (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_BASE_URL") "https://api.openai.com/v1")
-   :context-window 400000
-   :max-tokens     128000
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? true :input #{:text :image}}})
-
-(def openai-completions-model
-  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_MODEL") "gpt-4o-mini")
-   :name           "OpenAI Completions parity model"
-   :provider       :openai
-   :api            :openai-completions
-   :base-url       "https://api.openai.com/v1"
-   :context-window 128000
-   :max-tokens     16384
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? false :input #{:text :image}}})
-
-(def anthropic-model
-  {:id             (or (live-env/get-env "LLX_LIVE_ANTHROPIC_MODEL") "claude-3-5-haiku-20241022")
-   :name           "Anthropic parity model"
-   :provider       :anthropic
-   :api            :anthropic-messages
-   :base-url       (or (live-env/get-env "LLX_LIVE_ANTHROPIC_BASE_URL") "https://api.anthropic.com")
-   :context-window 200000
-   :max-tokens     8192
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? false :input #{:text :image}}})
-
-(def google-model
-  {:id             (or (live-env/get-env "LLX_LIVE_GOOGLE_MODEL") "gemini-2.5-flash")
-   :name           "Google parity model"
-   :provider       :google
-   :api            :google-generative-ai
-   :base-url       (or (live-env/get-env "LLX_LIVE_GOOGLE_BASE_URL") "https://generativelanguage.googleapis.com/v1beta")
-   :context-window 1048576
-   :max-tokens     8192
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? true :input #{:text :image}}})
-
-(def mistral-model
-  {:id             (or (live-env/get-env "LLX_LIVE_MISTRAL_MODEL") "devstral-medium-latest")
-   :name           "Mistral parity model"
-   :provider       :mistral
-   :api            :openai-completions
-   :base-url       (or (live-env/get-env "LLX_LIVE_MISTRAL_BASE_URL") "https://api.mistral.ai/v1")
-   :context-window 128000
-   :max-tokens     8192
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? false :input #{:text}}})
-
-(def mistral-pixtral-model
-  {:id             (or (live-env/get-env "LLX_LIVE_MISTRAL_PIXTRAL_MODEL") "pixtral-12b")
-   :name           "Mistral Pixtral parity model"
-   :provider       :mistral
-   :api            :openai-completions
-   :base-url       (or (live-env/get-env "LLX_LIVE_MISTRAL_BASE_URL") "https://api.mistral.ai/v1")
-   :context-window 128000
-   :max-tokens     8192
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? false :input #{:text :image}}})
-
-(def ollama-model
-  {:id             (or (live-env/get-env "LLX_LIVE_OLLAMA_MODEL") "gpt-oss:20b")
-   :name           "Ollama GPT-OSS 20B"
-   :provider       :openai-compatible
-   :api            :openai-completions
-   :base-url       (or (live-env/get-env "LLX_LIVE_OLLAMA_BASE_URL") "http://localhost:11434/v1")
-   :context-window 128000
-   :max-tokens     16000
-   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
-   :capabilities   {:reasoning? true :input #{:text}}})
-
 (deftest live-parity-google
   (let [api-key (live-env/get-env "GEMINI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! google-model opts))
+      (basic-text-generation! models/google opts))
     (testing "handle-tool-call"
-      (handle-tool-call! google-model opts))
+      (handle-tool-call! models/google opts))
     (testing "handle-streaming"
-      (handle-streaming! google-model opts))
+      (handle-streaming! models/google opts))
     (testing "handle-thinking"
-      (handle-thinking! google-model (assoc opts
-                                            :max-output-tokens 2048
-                                            :reasoning {:level :high})))
+      (handle-thinking! models/google (assoc opts
+                                             :max-output-tokens 2048
+                                             :reasoning {:level :high})))
     (testing "handle-image"
-      (handle-image! google-model opts))
+      (handle-image! models/google opts))
     (testing "multi-turn"
-      (multi-turn! google-model (assoc opts
-                                       :max-output-tokens 2048
-                                       :reasoning {:level :high})))))
+      (multi-turn! models/google (assoc opts
+                                        :max-output-tokens 2048
+                                        :reasoning {:level :high})))))
 
 (deftest live-parity-openai-completions
   (let [api-key (live-env/get-env "OPENAI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! openai-completions-model opts))
+      (basic-text-generation! models/openai-completions opts))
     (testing "handle-tool-call"
-      (handle-tool-call! openai-completions-model opts))
+      (handle-tool-call! models/openai-completions opts))
     (testing "handle-streaming"
-      (handle-streaming! openai-completions-model opts))
+      (handle-streaming! models/openai-completions opts))
     (testing "handle-image"
-      (handle-image! openai-completions-model opts))))
+      (handle-image! models/openai-completions opts))))
 
 (deftest live-parity-openai-responses
   (let [api-key (live-env/get-env "OPENAI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! openai-responses-model opts))
+      (basic-text-generation! models/openai-responses opts))
     (testing "handle-tool-call"
-      (handle-tool-call! openai-responses-model opts))
+      (handle-tool-call! models/openai-responses opts))
     (testing "handle-streaming"
-      (handle-streaming! openai-responses-model opts))
+      (handle-streaming! models/openai-responses opts))
     (testing "handle-thinking"
-      (handle-thinking! openai-responses-model (assoc opts
-                                                      :max-output-tokens 2048
-                                                      :reasoning {:level :high :effort :high})))
+      (handle-thinking! models/openai-responses (assoc opts
+                                                       :max-output-tokens 2048
+                                                       :reasoning {:level :high :effort :high})))
     (testing "handle-image"
-      (handle-image! openai-responses-model opts))
+      (handle-image! models/openai-responses opts))
     (testing "multi-turn"
-      (multi-turn! openai-responses-model (assoc opts
-                                                 :max-output-tokens 2048
-                                                 :reasoning {:level :high :effort :high})))))
+      (multi-turn! models/openai-responses (assoc opts
+                                                  :max-output-tokens 2048
+                                                  :reasoning {:level :high :effort :high})))))
 
 (deftest live-parity-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! anthropic-model (assoc opts :reasoning {:level :high})))
+      (basic-text-generation! models/anthropic (assoc opts :reasoning {:level :high})))
     (testing "handle-tool-call"
-      (handle-tool-call! anthropic-model opts))
+      (handle-tool-call! models/anthropic opts))
     (testing "handle-streaming"
-      (handle-streaming! anthropic-model opts))
+      (handle-streaming! models/anthropic opts))
     (testing "handle-image"
-      (handle-image! anthropic-model opts))))
+      (handle-image! models/anthropic opts))))
 
 (deftest live-parity-mistral-devstral
   (let [api-key (live-env/get-env "MISTRAL_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! mistral-model opts))
+      (basic-text-generation! models/mistral opts))
     (testing "handle-tool-call"
-      (handle-tool-call! mistral-model opts))
+      (handle-tool-call! models/mistral opts))
     (testing "handle-streaming"
-      (handle-streaming! mistral-model opts))
+      (handle-streaming! models/mistral opts))
     ;; FIXME: thinking skipped -- TS test has empty body due to 422 error
     (testing "multi-turn"
-      (multi-turn! mistral-model (assoc opts
-                                        :max-output-tokens 2048
-                                        :reasoning {:level :medium})))))
+      (multi-turn! models/mistral (assoc opts
+                                         :max-output-tokens 2048
+                                         :reasoning {:level :medium})))))
 
 (deftest live-parity-mistral-pixtral
   (let [api-key (live-env/get-env "MISTRAL_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! mistral-pixtral-model opts))
+      (basic-text-generation! models/mistral-pixtral opts))
     (testing "handle-tool-call"
-      (handle-tool-call! mistral-pixtral-model opts))
+      (handle-tool-call! models/mistral-pixtral opts))
     (testing "handle-streaming"
-      (handle-streaming! mistral-pixtral-model opts))
+      (handle-streaming! models/mistral-pixtral opts))
     (testing "handle-image"
-      (handle-image! mistral-pixtral-model opts))))
+      (handle-image! models/mistral-pixtral opts))))
 
 (deftest live-parity-ollama
   (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
-      (basic-text-generation! ollama-model opts))
+      (basic-text-generation! models/ollama opts))
     (testing "handle-tool-call"
-      (handle-tool-call! ollama-model opts))
+      (handle-tool-call! models/ollama opts))
     (testing "handle-streaming"
-      (handle-streaming! ollama-model opts))
+      (handle-streaming! models/ollama opts))
     (testing "handle-thinking"
-      (handle-thinking! ollama-model (assoc opts
-                                            :max-output-tokens 2048
-                                            :reasoning {:level :medium})))
+      (handle-thinking! models/ollama (assoc opts
+                                             :max-output-tokens 2048
+                                             :reasoning {:level :medium})))
     (testing "multi-turn"
-      (multi-turn! ollama-model (assoc opts
-                                       :max-output-tokens 2048
-                                       :reasoning {:level :medium})))))
+      (multi-turn! models/ollama (assoc opts
+                                        :max-output-tokens 2048
+                                        :reasoning {:level :medium})))))
