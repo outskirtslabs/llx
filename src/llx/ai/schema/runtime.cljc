@@ -63,7 +63,7 @@
 
    :llx/stream-map
    [:map
-    [:llx.ai.stream/type :keyword]
+    [:llx.ai.event-stream/type :keyword]
     [:state* :any]
     [:cancel-fn {:optional true} :llx/fn]
     [:clock/now-ms :llx/fn]

@@ -1,7 +1,7 @@
-(ns llx.ai.stream-test
+(ns llx.ai.event-stream-test
   (:require
    [clojure.test :refer [deftest is]]
-   [llx.ai.stream :as sut]))
+   [llx.ai.event-stream :as sut]))
 
 (set! *warn-on-reflection* true)
 

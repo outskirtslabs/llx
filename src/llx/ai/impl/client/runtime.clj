@@ -5,7 +5,7 @@
    [clojure.string :as str]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [taoensso.trove :as trove]))
 
 (set! *warn-on-reflection* true)

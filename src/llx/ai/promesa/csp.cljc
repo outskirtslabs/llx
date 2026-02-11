@@ -1,5 +1,5 @@
 (ns llx.ai.promesa.csp
-  "Optional Promesa CSP adapter for [[llx.ai.stream]].
+  "Optional Promesa CSP adapter for [[llx.ai.event-stream]].
 
   This namespace provides channel/promise-oriented helpers on top of the
   callback-first stream contract:
@@ -19,7 +19,7 @@
   must include Promesa on the classpath."
   (:require
    [llx.ai :as ai]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -32,7 +32,7 @@
 (defn stream->chan
   "Attaches to `st` and returns a Promesa CSP channel of ordered stream events.
 
-  This function consumes `st` via [[llx.ai.stream/consume!]], so it must be the
+  This function consumes `st` via [[llx.ai.event-stream/consume!]], so it must be the
   first and only consumer attachment for that stream handle.
 
   Options:
@@ -103,7 +103,7 @@
   - `:stream` underlying LLX stream handle
   - `:chan` CSP channel of ordered events
   - `:result` deferred terminal assistant message
-  - `:cancel!` idempotent cancel function delegating to [[llx.ai.stream/cancel!]]"
+  - `:cancel!` idempotent cancel function delegating to [[llx.ai.event-stream/cancel!]]"
   [env model context opts]
   (let [st      (ai/stream* env model context opts)
         ch      (sp/chan :buf (sp/sliding-buffer 64))

@@ -1,4 +1,4 @@
-(ns llx.ai.stream
+(ns llx.ai.event-stream
   (:require
    [taoensso.trove :as trove]))
 
@@ -33,7 +33,7 @@
 (defn stream?
   "Returns true when `x` is an LLX stream handle."
   [x]
-  (= stream-type (:llx.ai.stream/type x)))
+  (= stream-type (:llx.ai.event-stream/type x)))
 
 (defn create
   "Creates a stream handle.
@@ -43,7 +43,7 @@
    (create {}))
   ([{:keys [cancel-fn start-fn] :as opts}]
    (let [now-ms (or (:clock/now-ms opts) (constantly 0))]
-     (cond-> {:llx.ai.stream/type stream-type
+     (cond-> {:llx.ai.event-stream/type stream-type
               :state*             (atom {:consumer        nil
                                          :consumed?       false
                                          :started?        false

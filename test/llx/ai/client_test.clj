@@ -6,7 +6,7 @@
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [llx.ai.live.models :as live-models]
    [llx.ai.test-util :as util]
    [llx.ai.impl.client :as sut]

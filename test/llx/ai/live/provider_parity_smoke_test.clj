@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx.ai :as client]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models])
   (:import

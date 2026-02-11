@@ -232,7 +232,7 @@
                                 :env     valid-env
                                 :model   valid-model
                                 :request {:method :post :url "https://example.invalid"}
-                                :out     {:llx.ai.stream/type :llx.ai.stream/stream
+                                :out     {:llx.ai.event-stream/type :llx.ai.event-stream/stream
                                           :state*             (atom {})
                                           :clock/now-ms       (fn [] 0)
                                           :lock               (atom nil)}
@@ -241,7 +241,7 @@
                                 :env     valid-env
                                 :model   valid-model
                                 :request {:method :post :url "https://example.invalid"}
-                                :out     {:llx.ai.stream/type :llx.ai.stream/stream
+                                :out     {:llx.ai.event-stream/type :llx.ai.event-stream/stream
                                           :state*             (atom {})
                                           :clock/now-ms       (fn [] 0)
                                           :lock               (atom nil)}
@@ -259,7 +259,7 @@
       (is (sut/valid? :llx/raw-stream-chunk "{\"type\":\"delta\"}"))
       (is (sut/valid? :llx/raw-stream-chunk {:type :delta}))
       (is (sut/valid? :llx/stream-map
-                      {:llx.ai.stream/type :llx.ai.stream/stream
+                      {:llx.ai.event-stream/type :llx.ai.event-stream/stream
                        :state*             (atom {})
                        :clock/now-ms       (fn [] 0)
                        :lock               (atom nil)}))

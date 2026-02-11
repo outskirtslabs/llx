@@ -73,7 +73,7 @@
   | `:registry`          | Per-call adapter registry override.                        |
   | `:max-retries`       | Retry count for transient failures (default `2`).          |
 
-  Consume events via [[llx.ai.stream/consume!]]. Stream production starts after
+  Consume events via [[llx.ai.event-stream/consume!]]. Stream production starts after
   consume attachment. Use [[stream]] for the unified API."
   [env model context opts]
   (impl.client/stream* env model context opts))
@@ -132,7 +132,7 @@
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 
-  Consume events via [[llx.ai.stream/consume!]]. Stream production starts after
+  Consume events via [[llx.ai.event-stream/consume!]]. Stream production starts after
   consume attachment.
 
   Use [[stream*]] for provider-specific option control.

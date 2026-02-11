@@ -3,7 +3,7 @@
    [babashka.json :as json]
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.client.runtime :as sut]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [llx.ai.test-util :as util]
    [llx.ai.impl.utils.unicode :as unicode]))
 

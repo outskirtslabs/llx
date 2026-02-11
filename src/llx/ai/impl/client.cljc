@@ -10,7 +10,7 @@
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.transform-messages :as transform-messages]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [taoensso.trove :as trove]))
 
 (def ^:private builtins-source-id "llx.ai.impl.client/builtins")

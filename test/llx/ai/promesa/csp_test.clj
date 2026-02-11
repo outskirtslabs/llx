@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is]]
    [llx.ai :as ai]
    [llx.ai.promesa.csp :as sut]
-   [llx.ai.stream :as stream]
+   [llx.ai.event-stream :as stream]
    [promesa.exec.csp :as sp]))
 
 (set! *warn-on-reflection* true)
