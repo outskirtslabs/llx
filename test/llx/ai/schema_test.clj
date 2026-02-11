@@ -229,18 +229,16 @@
         valid-http-response    {:status  200
                                 :headers {"content-type" "application/json"}
                                 :body    {:ok true}}
-        valid-run-stream-input {:adapter valid-adapter
-                                :env     valid-env
-                                :model   valid-model
-                                :request {:method :post :url "https://example.invalid"}
-                                :out     (sp/chan)
-                                :state*  (atom {:model valid-model})}
-        valid-run-stream-args  {:adapter valid-adapter
-                                :env     valid-env
-                                :model   valid-model
-                                :request {:method :post :url "https://example.invalid"}
-                                :out     (sp/chan)
-                                :state*  (atom {:model valid-model})}]
+        valid-run-stream-base-input {:adapter valid-adapter
+                                     :env     valid-env
+                                     :model   valid-model
+                                     :request {:method :post :url "https://example.invalid"}
+                                     :out     (sp/chan)
+                                     :state*  (atom {:model valid-model})}
+        valid-run-stream-input      (assoc valid-run-stream-base-input
+                                           :open-stream! (fn [] {:status 200})
+                                           :start-source! (fn [_args] {:stop-fn (fn [])}))
+        valid-run-stream-args       valid-run-stream-base-input]
     (testing "accepts runtime adapter boundary maps"
       (is (sut/valid? :llx/http-response-map valid-http-response))
       (is (sut/valid? :llx/runtime-stream-state valid-stream-state))
@@ -258,6 +256,7 @@
       (is (sut/valid? :llx/registry-map {:llx.registry/adapters {:openai-completions {:adapter valid-adapter}}}))
       (is (sut/valid? :llx/runtime-decode-event-result valid-event-transition))
       (is (sut/valid? :llx/runtime-finalize-result valid-finalize-result))
+      (is (sut/valid? :llx/runtime-run-stream-base-input valid-run-stream-base-input))
       (is (sut/valid? :llx/runtime-run-stream-input valid-run-stream-input)))
 
     (testing "rejects malformed runtime boundary maps"
@@ -270,7 +269,8 @@
       (is (not (sut/valid? :llx/registry-entry {:adapter valid-adapter :source-id :x :extra true})))
       (is (not (sut/valid? :llx/runtime-decode-event-result {:state {} :events [{:type :toolcall-delta :id "c1" :name "tool"}]})))
       (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []})))
-      (is (not (sut/valid? :llx/runtime-run-stream-input (assoc valid-run-stream-input :out :not-a-chan)))))
+      (is (not (sut/valid? :llx/runtime-run-stream-base-input (assoc valid-run-stream-base-input :out :not-a-chan))))
+      (is (not (sut/valid? :llx/runtime-run-stream-input valid-run-stream-base-input))))
 
     (testing "accepts run-stream argument map contract"
       (is (sut/valid? :llx/runtime-run-stream-args valid-run-stream-args)))))

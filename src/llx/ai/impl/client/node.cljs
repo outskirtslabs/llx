@@ -163,7 +163,7 @@
 
 (>defn run-stream!
        [{:keys [adapter env model request request-opts] :as input}]
-       [:llx/runtime-run-stream-input => any?]
+       [:llx/runtime-run-stream-base-input => any?]
        (let [abort-controller    (js/AbortController.)
              request             (assoc request :signal (or (:signal request)
                                                             (.-signal abort-controller)))

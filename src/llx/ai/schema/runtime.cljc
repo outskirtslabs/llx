@@ -99,7 +99,7 @@
     [:assistant-message :llx/message-assistant]
     [:events [:vector :llx/event]]]
 
-   :llx/runtime-run-stream-input
+   :llx/runtime-run-stream-base-input
    [:map
     [:adapter :llx/adapter]
     [:env :llx/env]
@@ -109,5 +109,18 @@
     [:state* :any]
     [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
 
+   :llx/runtime-run-stream-input
+   [:map
+    [:adapter :llx/adapter]
+    [:env :llx/env]
+    [:model :llx/model]
+    [:request :llx/adapter-request-map]
+    [:out :llx/stream-channel]
+    [:state* :any]
+    [:request-opts {:optional true} [:maybe :llx/provider-request-options]]
+    [:cancel! {:optional true} :llx/fn]
+    [:start-source! :llx/fn]
+    [:open-stream! :llx/fn]]
+
    :llx/runtime-run-stream-args
-   :llx/runtime-run-stream-input})
+   :llx/runtime-run-stream-base-input})
