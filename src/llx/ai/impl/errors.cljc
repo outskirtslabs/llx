@@ -1,6 +1,7 @@
 (ns llx.ai.impl.errors
   (:require
    [clojure.string :as str]
+   [promesa.core :as p]
    [taoensso.trove :as trove]))
 
 (def client-errors
@@ -229,8 +230,9 @@
                               (when-let [v (get headers "x-ratelimit-reset-after")]
                                 ["x-ratelimit-reset-after" v]))]
     (when-let [seconds (parse-retry-after-value raw header-name)]
-      (when (pos? seconds)
-        (min seconds (double max-seconds))))))
+      (let [seconds (double (or seconds 0.0))]
+        (when (> seconds 0.0)
+          (min seconds (double max-seconds)))))))
 
 (defn extract-retry-after-from-message
   [message & {:keys [max-seconds] :or {max-seconds 60}}]
@@ -238,8 +240,9 @@
     (when-let [[_ raw] (and (seq (or text ""))
                             (re-find #"(?i)please\s+retry\s+in\s+([0-9]+(?:\.[0-9]+)?)s" text))]
       (when-let [seconds (parse-retry-after-value raw "retry-after")]
-        (when (pos? seconds)
-          (min seconds (double max-seconds)))))))
+        (let [seconds (double (or seconds 0.0))]
+          (when (> seconds 0.0)
+            (min seconds (double max-seconds))))))))
 
 (defn extract-retry-after-hint
   [headers message & {:keys [max-seconds] :or {max-seconds 60}}]
@@ -309,32 +312,36 @@
       :else
       (long (* 1000 (inc retry-count))))))
 
-(defn retry-loop
+(defn retry-loop-async
   ([f max-retries sleep-fn]
-   (retry-loop f max-retries sleep-fn {}))
+   (retry-loop-async f max-retries sleep-fn {}))
   ([f max-retries sleep-fn {:keys [call-id provider]}]
-   (loop [attempt 0]
-     (let [result (try
-                    {:ok (f)}
-                    (catch #?(:clj clojure.lang.ExceptionInfo :cljs ExceptionInfo) e
-                      (if (should-retry? e :max-retries max-retries
-                                         :current-retry attempt)
-                        {:retry e}
-                        (throw e))))]
-       (if-let [ex (:retry result)]
-         (let [delay-ms (retry-delay-ms ex attempt)
-               exd      (ex-data ex)]
-           (trove/log! {:level :info
-                        :id    :llx.obs/retry-scheduled
-                        :data  {:call-id      call-id
-                                :attempt      attempt
-                                :next-attempt (inc attempt)
-                                :max-retries  max-retries
-                                :delay-ms     delay-ms
-                                :error-type   (:type exd)
-                                :provider     (or provider (:provider exd))
-                                :request-id   (:request-id exd)
-                                :retry-after  (:retry-after exd)}})
-           (sleep-fn delay-ms)
-           (recur (inc attempt)))
-         (:ok result))))))
+   (letfn [(sleep! [delay-ms]
+             (let [v (sleep-fn delay-ms)]
+               (if (p/deferred? v)
+                 v
+                 (p/resolved v))))
+           (step [attempt]
+             (-> (p/resolved nil)
+                 (p/then (fn [_] (f)))
+                 (p/catch (fn [ex]
+                            (if (should-retry? ex :max-retries max-retries
+                                               :current-retry attempt)
+                              (let [delay-ms (retry-delay-ms ex attempt)
+                                    exd      (ex-data ex)]
+                                (trove/log! {:level :info
+                                             :id    :llx.obs/retry-scheduled
+                                             :data  {:call-id      call-id
+                                                     :attempt      attempt
+                                                     :next-attempt (inc attempt)
+                                                     :max-retries  max-retries
+                                                     :delay-ms     delay-ms
+                                                     :error-type   (:type exd)
+                                                     :provider     (or provider (:provider exd))
+                                                     :request-id   (:request-id exd)
+                                                     :retry-after  (:retry-after exd)}})
+                                (-> (sleep! delay-ms)
+                                    (p/then (fn [_]
+                                              (step (inc attempt))))))
+                              (p/rejected ex))))))]
+     (step 0))))

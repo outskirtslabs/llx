@@ -7,7 +7,9 @@
    [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.google-generative-ai :as sut]
    [llx.ai.live.models :as live-models]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.utils.await :as await]
+   [llx.ai.impl.utils.unicode :as unicode]
+   ))
 
 (set! *warn-on-reflection* true)
 
@@ -271,12 +273,13 @@
 
 (deftest open-stream-non-2xx-throws-structured-error
   (let [ex (try
-             (sut/open-stream
-              (stub-env {:http/request (fn [_]
-                                         {:status 401
-                                          :body   (json/write-str {:error {:message "bad key"}})})})
-              google-model
-              {:method :post :url "https://example.invalid"})
+             (await/await!
+              (sut/open-stream
+               (stub-env {:http/request (fn [_]
+                                          {:status 401
+                                           :body   (json/write-str {:error {:message "bad key"}})})})
+               google-model
+               {:method :post :url "https://example.invalid"}))
              (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/authentication-error
             :message      "bad key"

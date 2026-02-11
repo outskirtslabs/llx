@@ -6,7 +6,7 @@
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.test-util :as util]
-   [promesa.core :as p])
+   [llx.ai.impl.utils.await :as await])
   (:import
    [java.util Base64]
    [java.io File]))
@@ -15,10 +15,6 @@
 
 (def ^:private env
   (client/default-env))
-
-(defn- await!
-  [x]
-  (if (p/deferred? x) @x x))
 
 (defn- collect-stream!
   [ch]
@@ -73,7 +69,7 @@
                  :messages      [{:role      :user
                                   :content   "Reply with exactly: 'Hello test successful'"
                                   :timestamp (System/currentTimeMillis)}]}
-        first-r (await! (client/complete* env model context opts))]
+        first-r (await/await! (client/complete* env model context opts))]
     (is (= :assistant (:role first-r)))
     (is (seq (:content first-r)))
     (is (> (+ (get-in first-r [:usage :input] 0)
@@ -89,7 +85,7 @@
                                     {:role      :user
                                      :content   "Now say 'Goodbye test successful'"
                                      :timestamp (System/currentTimeMillis)}]}
-          second-r (await! (client/complete* env model context2 opts))]
+          second-r (await/await! (client/complete* env model context2 opts))]
       (is (= :assistant (:role second-r)))
       (is (seq (:content second-r)))
       (is (> (+ (get-in second-r [:usage :input] 0)
@@ -187,7 +183,7 @@
   [model opts]
   (if-not (contains? (get-in model [:capabilities :input]) :image)
     (is true (str "Skipping image test - model " (:id model) " doesn't support images"))
-    (let [result (await! (client/complete* env model
+    (let [result (await/await! (client/complete* env model
                                            {:system-prompt "You are a helpful assistant."
                                             :messages      [{:role      :user
                                                              :content   [{:type :text
@@ -217,7 +213,7 @@
     (loop [messages [initial-msg]
            turn     0]
       (when (< turn max-turns)
-        (let [response     (await! (client/complete* env model
+        (let [response     (await/await! (client/complete* env model
                                                      {:system-prompt "You are a helpful assistant that can use tools to answer questions."
                                                       :messages      messages
                                                       :tools         [tool-spec]}

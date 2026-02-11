@@ -2,6 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.errors :as sut]
+   [llx.ai.impl.utils.await :as await]
+   [promesa.core :as p]
    [llx.ai.test-util :as util]))
 
 (deftest rate-limit-error-has-correct-type-and-recoverable
@@ -262,11 +264,12 @@
     (is (= 2000 (sut/retry-delay-ms ex 1)))
     (is (= 3000 (sut/retry-delay-ms ex 2)))))
 
-(deftest retry-loop-succeeds-on-first-attempt
-  (let [result (sut/retry-loop (fn [] :ok) 2 (fn [_ms]))]
-    (is (= :ok result))))
+(deftest retry-loop-async-succeeds-on-first-attempt
+  (let [result (sut/retry-loop-async (fn [] :ok) 2 (fn [_ms]))]
+    (is (p/deferred? result))
+    (is (= :ok (await/await! result)))))
 
-(deftest retry-loop-retries-transient-and-succeeds
+(deftest retry-loop-async-retries-transient-and-succeeds
   (let [call-count (atom 0)
         sleep-ms   (atom [])
         f          (fn []
@@ -274,11 +277,11 @@
                      (if (= 1 @call-count)
                        (throw (sut/rate-limit "openai" "rate limit"))
                        :success))]
-    (is (= :success (sut/retry-loop f 2 (fn [ms] (swap! sleep-ms conj ms)))))
+    (is (= :success (await/await! (sut/retry-loop-async f 2 (fn [ms] (swap! sleep-ms conj ms))))))
     (is (= 2 @call-count))
     (is (= 1 (count @sleep-ms)))))
 
-(deftest retry-loop-emits-retry-scheduled-trove-signal
+(deftest retry-loop-async-emits-retry-scheduled-trove-signal
   (util/with-captured-logs [logs*]
     (let [call-count (atom 0)
           f          (fn []
@@ -288,7 +291,7 @@
                                                 :retry-after 2
                                                 :request-id "req_1"))
                          :success))
-          _          (sut/retry-loop f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"})
+          _          (await/await! (sut/retry-loop-async f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"}))
           event      (util/first-event logs* :llx.obs/retry-scheduled)]
       (is (util/submap?
            {:id    :llx.obs/retry-scheduled
@@ -304,13 +307,13 @@
                     :retry-after  2}}
            (util/strip-generated event))))))
 
-(deftest retry-loop-exhausts-retries-and-throws
+(deftest retry-loop-async-exhausts-retries-and-throws
   (let [call-count (atom 0)
         f          (fn []
                      (swap! call-count inc)
                      (throw (sut/rate-limit "openai" "rate limit")))
         ex         (try
-                     (sut/retry-loop f 2 (fn [_ms]))
+                     (await/await! (sut/retry-loop-async f 2 (fn [_ms])))
                      (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/rate-limit
             :message      "rate limit"
@@ -321,13 +324,13 @@
     ;; 1 initial + 2 retries = 3 total
     (is (= 3 @call-count))))
 
-(deftest retry-loop-does-not-retry-client-errors
+(deftest retry-loop-async-does-not-retry-client-errors
   (let [call-count (atom 0)
         f          (fn []
                      (swap! call-count inc)
                      (throw (sut/authentication-error "openai" "bad key")))
         ex         (try
-                     (sut/retry-loop f 2 (fn [_ms]))
+                     (await/await! (sut/retry-loop-async f 2 (fn [_ms])))
                      (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/authentication-error
             :message      "bad key"

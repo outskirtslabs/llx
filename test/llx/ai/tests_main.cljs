@@ -7,8 +7,7 @@
 
 (set! *main-cli-fn*
       #(t/run-tests
-        'llx.ai.client-runtime-test
-        'llx.ai.default-env-test))
+        'llx.ai.client.node-test))
 
 (defmethod t/report [:cljs.test/default :end-run-tests]
   [m]

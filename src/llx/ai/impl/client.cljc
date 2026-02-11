@@ -1,6 +1,7 @@
 (ns llx.ai.impl.client
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
+   [clojure.string :as str]
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
@@ -114,6 +115,17 @@
       (transform-context-fn model transformed)
       transformed)))
 
+(defn provider-from-host
+  [host]
+  (let [host (str/lower-case (str (or host "")))]
+    (cond
+      (str/blank? host) "unknown"
+      (str/includes? host "openai.com") "openai"
+      (str/includes? host "anthropic.com") "anthropic"
+      (str/includes? host "googleapis.com") "google"
+      (str/includes? host "mistral.ai") "mistral"
+      :else host)))
+
 (defn- check-response-status!
   [env model response operation]
   (let [status (long (or (:status response) 0))]
@@ -156,20 +168,89 @@
 
 (defn- start-channel-close-watcher!
   [out runtime-cancel* runtime-done?*]
-  (p/future
-    (loop []
-      (when-not (sp/closed? out)
-        @(p/delay 10 nil)
-        (recur)))
-    (when (and (fn? @runtime-cancel*)
-               (not ((or @runtime-done?* (constantly false)))))
-      (@runtime-cancel*))))
+  (letfn [(poll []
+            (if (sp/closed? out)
+              (when (and (fn? @runtime-cancel*)
+                         (not ((or @runtime-done?* (constantly false)))))
+                (@runtime-cancel*))
+              (-> (p/delay 10 nil)
+                  (p/then (fn [_]
+                            (poll))))))]
+    (poll)))
+
+(defn runtime-data-line->payload
+  [line]
+  (when (str/starts-with? line "data:")
+    (let [payload (str/trim (subs line (count "data:")))]
+      (when (and (seq payload) (not= payload "[DONE]"))
+        payload))))
+
+(defn runtime-fallback-error-message
+  [stream-ex normalize-ex]
+  (str "Stream error: " (or (ex-message stream-ex) (pr-str stream-ex))
+       (when normalize-ex
+         (str " | normalize-error failure: " (or (ex-message normalize-ex)
+                                                 (pr-str normalize-ex))))))
+
+(defn runtime-fallback-assistant-message
+  [env model stream-ex normalize-ex]
+  {:role          :assistant
+   :content       []
+   :api           (:api model)
+   :provider      (:provider model)
+   :model         (:id model)
+   :usage         {:input        0
+                   :output       0
+                   :cache-read   0
+                   :cache-write  0
+                   :total-tokens 0
+                   :cost         {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
+   :stop-reason   :error
+   :error-message (runtime-fallback-error-message stream-ex normalize-ex)
+   :timestamp     ((:clock/now-ms env))})
+
+(defn runtime-payload->provider-item-type
+  [env payload]
+  (let [decoded (or (when-let [decode-safe (:json/decode-safe env)]
+                      (decode-safe payload {:key-fn keyword}))
+                    {})]
+    (or (:type decoded)
+        (when (contains? decoded :candidates) "candidates")
+        (when (contains? decoded :choices) "choices"))))
+
+(defn runtime-split-lines
+  [buffer]
+  (let [parts (str/split buffer #"\n" -1)]
+    {:lines     (butlast parts)
+     :remainder (last parts)}))
+
+(defn runtime-terminal-error-event
+  [adapter env model state* stream-ex]
+  (let [[assistant-message normalize-failed?] (try
+                                                [(schema/assert-valid!
+                                                  :llx/message-assistant
+                                                  ((:normalize-error adapter) env stream-ex @state*))
+                                                 false]
+                                                (catch #?(:clj Exception :cljs :default) normalize-ex
+                                                  [(runtime-fallback-assistant-message
+                                                    env model stream-ex normalize-ex)
+                                                   true]))]
+    (trove/log! {:level :error
+                 :id    :llx.obs/stream-event-error
+                 :data  {:call-id                 (:call/id env)
+                         :provider                (:provider model)
+                         :api                     (:api model)
+                         :model-id                (:id model)
+                         :error-type              (:type (ex-data stream-ex))
+                         :error-message           (ex-message stream-ex)
+                         :normalize-error-failed? normalize-failed?}})
+    {:type :error :assistant-message assistant-message}))
 
 (>defn complete*
        "See [[llx.ai/complete*]]"
        [env model context opts]
        [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/deferred]
-       (p/future
+       (try
          (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
                opts                      (or opts {})
                {:keys [registry-override
@@ -193,9 +274,13 @@
                                                                {:type        :llx/config-error
                                                                 :max-retries max-retries}))))
                do-request                (fn []
-                                           (let [response ((:http/request env) request)]
-                                             (check-response-status! call-env model response :complete)
-                                             response))]
+                                           (let [response ((:http/request env) request)
+                                                 handle   (fn [response]
+                                                            (check-response-status! call-env model response :complete)
+                                                            response)]
+                                             (if (p/deferred? response)
+                                               (p/then response handle)
+                                               (p/resolved (handle response)))))]
            (trove/log! {:level :info
                         :id    :llx.obs/call-start
                         :data  {:call-id            (:call/id call-env)
@@ -206,38 +291,40 @@
                                 :message-count      (count (:messages context))
                                 :has-tools?         (boolean (seq (:tools context)))
                                 :has-system-prompt? (boolean (seq (:system-prompt context)))}})
-           (try
-             (let [response                    (errors/retry-loop do-request max-retries sleep-fn
-                                                                  {:call-id  (:call/id call-env)
-                                                                   :provider (:provider model)})
-                   {:keys [assistant-message]} (schema/assert-valid!
-                                                :llx/runtime-finalize-result
-                                                ((:finalize adapter) call-env {:model model :response response}))]
-               (trove/log! {:level :info
-                            :id    :llx.obs/call-finished
-                            :data  {:call-id             (:call/id call-env)
-                                    :operation           :complete
-                                    :provider            (:provider model)
-                                    :api                 (:api model)
-                                    :model-id            (:id model)
-                                    :stop-reason         (:stop-reason assistant-message)
-                                    :usage               (:usage assistant-message)
-                                    :content-block-count (count (:content assistant-message))}})
-               assistant-message)
-             (catch #?(:clj Exception :cljs :default) ex
-               (trove/log! {:level :error
-                            :id    :llx.obs/call-error
-                            :data  {:call-id       (:call/id call-env)
-                                    :operation     :complete
-                                    :provider      (:provider model)
-                                    :api           (:api model)
-                                    :model-id      (:id model)
-                                    :error-type    (:type (ex-data ex))
-                                    :error-message (ex-message ex)
-                                    :recoverable?  (get (ex-data ex) :recoverable?)
-                                    :request-id    (get (ex-data ex) :request-id)
-                                    :provider-code (get (ex-data ex) :provider-code)}})
-               (throw ex))))))
+           (-> (errors/retry-loop-async do-request max-retries sleep-fn
+                                        {:call-id  (:call/id call-env)
+                                         :provider (:provider model)})
+               (p/then (fn [response]
+                         (let [{:keys [assistant-message]} (schema/assert-valid!
+                                                            :llx/runtime-finalize-result
+                                                            ((:finalize adapter) call-env {:model model :response response}))]
+                           (trove/log! {:level :info
+                                        :id    :llx.obs/call-finished
+                                        :data  {:call-id             (:call/id call-env)
+                                                :operation           :complete
+                                                :provider            (:provider model)
+                                                :api                 (:api model)
+                                                :model-id            (:id model)
+                                                :stop-reason         (:stop-reason assistant-message)
+                                                :usage               (:usage assistant-message)
+                                                :content-block-count (count (:content assistant-message))}})
+                           assistant-message)))
+               (p/catch (fn [ex]
+                          (trove/log! {:level :error
+                                       :id    :llx.obs/call-error
+                                       :data  {:call-id       (:call/id call-env)
+                                               :operation     :complete
+                                               :provider      (:provider model)
+                                               :api           (:api model)
+                                               :model-id      (:id model)
+                                               :error-type    (:type (ex-data ex))
+                                               :error-message (ex-message ex)
+                                               :recoverable?  (get (ex-data ex) :recoverable?)
+                                               :request-id    (get (ex-data ex) :request-id)
+                                               :provider-code (get (ex-data ex) :provider-code)}})
+                          (p/rejected ex)))))
+         (catch #?(:clj Exception :cljs :default) ex
+           (p/rejected ex))))
 
 (>defn stream*
        "See [[llx.ai/stream*]]"

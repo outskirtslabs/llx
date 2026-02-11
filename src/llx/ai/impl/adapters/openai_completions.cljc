@@ -6,6 +6,7 @@
    [llx.ai.impl.models :as models]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
+   [promesa.core :as p]
    [taoensso.trove :as trove]))
 
 (defn- trim-trailing-slash
@@ -674,11 +675,12 @@
              (assoc :stop-reason (if aborted? :aborted :error))
              (assoc :error-message error-message))))
 
-(>defn open-stream
-       [env _model request-map]
-       [:llx/env :llx/model :llx/adapter-request-map => :llx/http-response-map]
-       (let [response ((:http/request env) request-map)
-             status   (long (or (:status response) 0))]
+(>defn handle-open-stream-response
+       [env model response]
+       [:llx/env :llx/model :llx/http-response-map => :llx/http-response-map]
+       (let [response      (schema/assert-valid! :llx/http-response-map response)
+             status        (long (or (:status response) 0))
+             provider      (name (or (:provider model) "unknown"))]
          (when (or (< status 200) (>= status 300))
            (let [body-string   (cond
                                  (string? (:body response)) (:body response)
@@ -691,8 +693,7 @@
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :type])
                  request-id    (get headers "x-request-id")
-                 retry-after   (errors/extract-retry-after-hint headers message)
-                 provider      (name (or (:provider _model) "unknown"))]
+                 retry-after   (errors/extract-retry-after-hint headers message)]
              (throw (errors/http-status->error
                      status provider message
                      :provider-code provider-code
@@ -700,6 +701,13 @@
                      :request-id request-id
                      :body body))))
          response))
+
+(>defn open-stream
+       [env _model request-map]
+       [:llx/env :llx/model :llx/adapter-request-map => :llx/deferred]
+       (-> ((:http/request env) request-map)
+           (p/then (fn [response]
+                     (handle-open-stream-response env _model response)))))
 
 (defn- mistral-target?
   [target-model]

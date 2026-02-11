@@ -5,16 +5,12 @@
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.test-util :as util]
-   [promesa.core :as p]))
+   [llx.ai.impl.utils.await :as await]))
 
 (set! *warn-on-reflection* true)
 
 (def ^:private env
   (client/default-env))
-
-(defn- await!
-  [x]
-  (if (p/deferred? x) @x x))
 
 (defn- collect-stream!
   [ch]
@@ -41,7 +37,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (await! (client/complete* env models/anthropic
+           (await/await! (client/complete* env models/anthropic
                                      {:messages [{:role      :user
                                                   :content   "reply with exactly: llx anthropic smoke ok"
                                                   :timestamp 1}]}
@@ -63,7 +59,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (await! (client/complete* env models/google
+           (await/await! (client/complete* env models/google
                                      {:messages [{:role      :user
                                                   :content   "reply with exactly: llx google smoke ok"
                                                   :timestamp 1}]}
@@ -87,7 +83,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (await! (client/complete* env models/mistral
+           (await/await! (client/complete* env models/mistral
                                      {:messages [{:role      :user
                                                   :content   "reply with exactly: llx mistral smoke ok"
                                                   :timestamp 1}]}
@@ -105,7 +101,7 @@
 (deftest live-ollama-smoke
   (testing "complete"
     (assert-complete-ok
-     (await! (client/complete* env models/ollama
+     (await/await! (client/complete* env models/ollama
                                {:messages [{:role      :user
                                             :content   "reply with exactly: llx ollama smoke ok"
                                             :timestamp 1}]}
@@ -124,7 +120,7 @@
       (is true "Skipping live OpenAI smoke test: OPENAI_API_KEY not set")
       (testing "complete"
         (assert-complete-ok
-         (await! (client/complete* env models/openai-completions
+         (await/await! (client/complete* env models/openai-completions
                                    {:messages [{:role      :user
                                                 :content   "reply with exactly: llx smoke ok"
                                                 :timestamp 1}]}
@@ -138,7 +134,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (await! (client/complete* env models/openai-responses
+           (await/await! (client/complete* env models/openai-responses
                                      {:messages [{:role      :user
                                                   :content   "reply with exactly: llx openai responses smoke ok"
                                                   :timestamp 1}]}

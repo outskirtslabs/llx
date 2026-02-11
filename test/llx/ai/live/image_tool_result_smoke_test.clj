@@ -5,7 +5,7 @@
    [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
-   [promesa.core :as p])
+   [llx.ai.impl.utils.await :as await])
   (:import
    [java.io File]
    [java.util Base64]))
@@ -14,10 +14,6 @@
 
 (def ^:private env
   (client/default-env))
-
-(defn- await!
-  [x]
-  (if (p/deferred? x) @x x))
 
 (def ^:private test-image-base64
   (let [f (File. "test/llx/ai/fixtures/test-image.png")]
@@ -65,7 +61,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (await! (client/complete* env model context opts))]
+        result  (await/await! (client/complete* env model context opts))]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))
@@ -99,7 +95,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (await! (client/complete* env model context opts))]
+        result  (await/await! (client/complete* env model context opts))]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))

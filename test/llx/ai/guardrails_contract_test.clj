@@ -5,7 +5,7 @@
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.client :as client]
-   [llx.ai.impl.client.runtime :as runtime]
+   [llx.ai.impl.client.jvm :as runtime]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
