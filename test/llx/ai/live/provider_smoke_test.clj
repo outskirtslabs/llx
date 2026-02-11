@@ -1,12 +1,15 @@
 (ns ^{:kaocha/parallelize? true} llx.ai.live.provider-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.jvm :as client]
+   [llx.ai :as client]
    [llx.ai.stream :as stream]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private env
+  (client/default-env))
 
 (defn- collect-stream!
   [st]
@@ -44,7 +47,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* models/anthropic
+           (client/complete* env models/anthropic
                              {:messages [{:role      :user
                                           :content   "reply with exactly: llx anthropic smoke ok"
                                           :timestamp 1}]}
@@ -52,7 +55,7 @@
                               :max-output-tokens 128})))
         (testing "stream"
           (assert-stream-ok
-           (client/stream* models/anthropic
+           (client/stream* env models/anthropic
                            {:messages [{:role      :user
                                         :content   "reply with exactly: llx anthropic stream ok"
                                         :timestamp 1}]}
@@ -66,7 +69,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* models/google
+           (client/complete* env models/google
                              {:messages [{:role      :user
                                           :content   "reply with exactly: llx google smoke ok"
                                           :timestamp 1}]}
@@ -75,7 +78,7 @@
                               :reasoning         {:level :high :effort :high}})))
         (testing "stream"
           (assert-stream-ok
-           (client/stream* models/google
+           (client/stream* env models/google
                            {:messages [{:role      :user
                                         :content   "reply with exactly: llx google stream ok"
                                         :timestamp 1}]}
@@ -90,7 +93,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* models/mistral
+           (client/complete* env models/mistral
                              {:messages [{:role      :user
                                           :content   "reply with exactly: llx mistral smoke ok"
                                           :timestamp 1}]}
@@ -98,7 +101,7 @@
                               :max-output-tokens 96})))
         (testing "stream"
           (assert-stream-ok
-           (client/stream* models/mistral
+           (client/stream* env models/mistral
                            {:messages [{:role      :user
                                         :content   "reply with exactly: llx mistral stream ok"
                                         :timestamp 1}]}
@@ -108,14 +111,14 @@
 (deftest live-ollama-smoke
   (testing "complete"
     (assert-complete-ok
-     (client/complete* models/ollama
+     (client/complete* env models/ollama
                        {:messages [{:role      :user
                                     :content   "reply with exactly: llx ollama smoke ok"
                                     :timestamp 1}]}
                        {:max-output-tokens 64})))
   (testing "stream"
     (assert-stream-ok
-     (client/stream* models/ollama
+     (client/stream* env models/ollama
                      {:messages [{:role      :user
                                   :content   "reply with exactly: llx ollama stream ok"
                                   :timestamp 1}]}
@@ -127,7 +130,7 @@
       (is true "Skipping live OpenAI smoke test: OPENAI_API_KEY not set")
       (testing "complete"
         (assert-complete-ok
-         (client/complete* models/openai-completions
+         (client/complete* env models/openai-completions
                            {:messages [{:role      :user
                                         :content   "reply with exactly: llx smoke ok"
                                         :timestamp 1}]}
@@ -141,7 +144,7 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* models/openai-responses
+           (client/complete* env models/openai-responses
                              {:messages [{:role      :user
                                           :content   "reply with exactly: llx openai responses smoke ok"
                                           :timestamp 1}]}
@@ -150,7 +153,7 @@
                               :reasoning         {:effort :high :summary :detailed}})))
         (testing "stream"
           (assert-stream-ok
-           (client/stream* models/openai-responses
+           (client/stream* env models/openai-responses
                            {:messages [{:role      :user
                                         :content   "reply with exactly: llx openai responses stream ok"
                                         :timestamp 1}]}

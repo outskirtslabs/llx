@@ -1,13 +1,16 @@
 (ns llx.ai.live.context-overflow-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.jvm :as client]
+   [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.impl.utils.overflow :as overflow]
    [llx.ai.impl.utils.rate-limit :as rate-limit]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private env
+  (client/default-env))
 
 (def ^:private lorem-ipsum
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ")
@@ -55,7 +58,7 @@
                                   " max-retries=" (:max-retries opts)))
         call*          (future
                          (try
-                           (client/complete* model context opts)
+                           (client/complete* env model context opts)
                            (catch clojure.lang.ExceptionInfo e
                              (let [error-data (ex-data e)]
                                (log! (str "ERROR model=" (:id model)

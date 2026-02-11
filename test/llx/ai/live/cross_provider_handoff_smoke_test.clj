@@ -1,22 +1,25 @@
 (ns llx.ai.live.cross-provider-handoff-smoke-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.jvm :as client]
+   [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private env
+  (client/default-env))
 
 (defn- handoff-check!
   [model-a opts-a prompt-a model-b opts-b]
   (let [user1  {:role      :user
                 :content   prompt-a
                 :timestamp 1}
-        step-1 (client/complete* model-a {:messages [user1]} opts-a)
+        step-1 (client/complete* env model-a {:messages [user1]} opts-a)
         user2  {:role      :user
                 :content   "Now say hi and mention the previous sentence briefly."
                 :timestamp 2}
-        step-2 (client/complete* model-b {:messages [user1 step-1 user2]} opts-b)]
+        step-2 (client/complete* env model-b {:messages [user1 step-1 user2]} opts-b)]
     (is (not= :error (:stop-reason step-1)))
     (is (not= :error (:stop-reason step-2)))
     (is (seq (:content step-2)))

@@ -2,7 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.jvm :as client]
+   [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models])
   (:import
@@ -10,6 +10,9 @@
    [java.util Base64]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private env
+  (client/default-env))
 
 (def ^:private test-image-base64
   (let [f (File. "test/llx/ai/fixtures/test-image.png")]
@@ -57,7 +60,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (client/complete* model context opts)]
+        result  (client/complete* env model context opts)]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))
@@ -91,7 +94,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (client/complete* model context opts)]
+        result  (client/complete* env model context opts)]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))

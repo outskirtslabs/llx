@@ -2,7 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.jvm :as client]
+   [llx.ai :as client]
    [llx.ai.stream :as stream]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models])
@@ -11,6 +11,9 @@
    [java.io File]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private env
+  (client/default-env))
 
 (defn- collect-stream!
   [st]
@@ -68,7 +71,7 @@
                  :messages      [{:role      :user
                                   :content   "Reply with exactly: 'Hello test successful'"
                                   :timestamp (System/currentTimeMillis)}]}
-        first-r (client/complete* model context opts)]
+        first-r (client/complete* env model context opts)]
     (is (= :assistant (:role first-r)))
     (is (seq (:content first-r)))
     (is (> (+ (get-in first-r [:usage :input] 0)
@@ -84,7 +87,7 @@
                                     {:role      :user
                                      :content   "Now say 'Goodbye test successful'"
                                      :timestamp (System/currentTimeMillis)}]}
-          second-r (client/complete* model context2 opts)]
+          second-r (client/complete* env model context2 opts)]
       (is (= :assistant (:role second-r)))
       (is (seq (:content second-r)))
       (is (> (+ (get-in second-r [:usage :input] 0)
@@ -98,7 +101,7 @@
   "Stream with calculator tool. Verify the library emits the expected event
    sequence and produces a well-shaped tool-call result."
   [model opts]
-  (let [stream    (client/stream* model
+  (let [stream    (client/stream* env model
                                   {:system-prompt "You are a helpful assistant that uses tools when asked."
                                    :messages      [{:role      :user
                                                     :content   "Calculate 15 + 27 using the math_operation tool."
@@ -127,7 +130,7 @@
   "Stream 'count from 1 to 3'. Assert text-start/-delta/-end all seen,
    accumulated text length > 0, and result has :text content block."
   [model opts]
-  (let [stream     (client/stream* model
+  (let [stream     (client/stream* env model
                                    {:system-prompt "You are a helpful assistant."
                                     :messages      [{:role      :user
                                                      :content   "Count from 1 to 3"
@@ -151,7 +154,7 @@
    :thinking content block."
   [model opts]
   (let [rand-num       (rand-int 256)
-        stream         (client/stream* model
+        stream         (client/stream* env model
                                        {:system-prompt "You are a helpful assistant."
                                         :messages      [{:role      :user
                                                          :content   (str "Think long and hard about " rand-num " + 27. Think step by step. Then output the result.")
@@ -177,7 +180,7 @@
   [model opts]
   (if-not (contains? (get-in model [:capabilities :input]) :image)
     (is true (str "Skipping image test - model " (:id model) " doesn't support images"))
-    (let [result (client/complete* model
+    (let [result (client/complete* env model
                                    {:system-prompt "You are a helpful assistant."
                                     :messages      [{:role      :user
                                                      :content   [{:type :text
@@ -207,7 +210,7 @@
     (loop [messages [initial-msg]
            turn     0]
       (when (< turn max-turns)
-        (let [response     (client/complete* model
+        (let [response     (client/complete* env model
                                              {:system-prompt "You are a helpful assistant that can use tools to answer questions."
                                               :messages      messages
                                               :tools         [tool-spec]}

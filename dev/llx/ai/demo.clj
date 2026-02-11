@@ -1,8 +1,7 @@
 (ns llx.ai.demo
   (:require
-   [llx.ai.impl.client.jvm :as jvm]
-   [llx.ai.stream :as stream]
-   [llx.ai.impl.schema :as schema]))
+   [llx.ai :as ai]
+   [llx.ai.stream :as stream]))
 
 (set! *warn-on-reflection* true)
 
@@ -37,9 +36,9 @@
 
 (def google-model
   {:id             "gemini-2.5-flash"
-  :name           "Gemini 2.5 Flash"
-  :provider       :google
-  :api            :google-generative-ai
+   :name           "Gemini 2.5 Flash"
+   :provider       :google
+   :api            :google-generative-ai
    :base-url       "https://generativelanguage.googleapis.com/v1beta"
    :context-window 1048576
    :max-tokens     8192
@@ -60,101 +59,101 @@
 (def demo-context
   {:messages [{:role :user :content "say hello from llx" :timestamp 1}]})
 
+(def demo-env
+  (ai/default-env))
+
 (defn- collect-stream!
   [st]
   (let [events* (atom [])
         result* (promise)
         close*  (promise)]
     (stream/consume! st
-                       {:on-event  (fn [event]
-                                     (swap! events* conj event))
-                        :on-result (fn [assistant-message]
-                                     (deliver result* assistant-message))
-                        :on-close  (fn [_close-meta]
-                                     (deliver close* true))})
+                     {:on-event  (fn [event]
+                                   (swap! events* conj event))
+                      :on-result (fn [assistant-message]
+                                   (deliver result* assistant-message))
+                      :on-close  (fn [_close-meta]
+                                   (deliver close* true))})
     (deref close* 60000 false)
     (let [result (deref result* 1000 nil)]
       {:events @events*
        :result result})))
 
 (comment
-  (schema/valid? :llx/model openai-model)
-  (schema/valid? :llx/message (first (:messages demo-context)))
-  (schema/valid? :llx/unified-request-options {:max-tokens 64 :temperature 0.2})
-  (jvm/complete openai-model
-                {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-tokens 64 :temperature 0.0})
-  (jvm/complete ollama-model
-                {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-tokens 64 :temperature 0.0})
-  (jvm/complete anthropic-model
-                {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-tokens 128})
-  (let [stream (jvm/stream ollama-model
-                           {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
-                           {:max-tokens 64 :temperature 0.0})]
+  (ai/complete demo-env openai-model
+               {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
+               {:max-tokens 64 :temperature 0.0})
+  (ai/complete demo-env ollama-model
+               {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
+               {:max-tokens 64 :temperature 0.0})
+  (ai/complete demo-env anthropic-model
+               {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
+               {:max-tokens 128})
+  (let [stream (ai/stream demo-env ollama-model
+                          {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
+                          {:max-tokens 64 :temperature 0.0})]
     (collect-stream! stream))
-  (let [stream (jvm/stream anthropic-model
-                           {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
-                           {:max-tokens 128})]
+  (let [stream (ai/stream demo-env anthropic-model
+                          {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
+                          {:max-tokens 128})]
     (collect-stream! stream))
-  (jvm/complete google-model
-                {:messages [{:role :user :content "reply with exactly: llx google demo ok" :timestamp 1}]}
-                {:max-tokens 96
-                 :reasoning  :high})
-  (jvm/complete mistral-model
-                {:messages [{:role :user :content "reply with exactly: llx mistral demo ok" :timestamp 1}]}
-                {:max-tokens 96})
-  (let [stream (jvm/stream google-model
-                           {:messages [{:role :user :content "reply with exactly: llx google stream demo ok" :timestamp 1}]}
-                           {:max-tokens 96
-                            :reasoning  :high})]
+  (ai/complete demo-env google-model
+               {:messages [{:role :user :content "reply with exactly: llx google demo ok" :timestamp 1}]}
+               {:max-tokens 96
+                :reasoning  :high})
+  (ai/complete demo-env mistral-model
+               {:messages [{:role :user :content "reply with exactly: llx mistral demo ok" :timestamp 1}]}
+               {:max-tokens 96})
+  (let [stream (ai/stream demo-env google-model
+                          {:messages [{:role :user :content "reply with exactly: llx google stream demo ok" :timestamp 1}]}
+                          {:max-tokens 96
+                           :reasoning  :high})]
     (collect-stream! stream))
-  (let [stream (jvm/stream mistral-model
-                           {:messages [{:role :user :content "reply with exactly: llx mistral stream demo ok" :timestamp 1}]}
-                           {:max-tokens 96})]
+  (let [stream (ai/stream demo-env mistral-model
+                          {:messages [{:role :user :content "reply with exactly: llx mistral stream demo ok" :timestamp 1}]}
+                          {:max-tokens 96})]
     (collect-stream! stream))
   ;; Handoff: Anthropic -> Google
   (let [user1  {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
-        step-1 (jvm/complete anthropic-model
-                             {:messages [user1]}
-                             {:max-tokens 96})
+        step-1 (ai/complete demo-env anthropic-model
+                            {:messages [user1]}
+                            {:max-tokens 96})
         user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-    (jvm/complete google-model
-                  {:messages [user1 step-1 user2]}
-                  {:max-tokens 128
-                   :reasoning  :high}))
+    (ai/complete demo-env google-model
+                 {:messages [user1 step-1 user2]}
+                 {:max-tokens 128
+                  :reasoning  :high}))
   ;; Handoff: Google -> OpenAI Completions
   (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
-        step-1 (jvm/complete google-model
-                             {:messages [user1]}
-                             {:max-tokens 96
-                              :reasoning  :high})
+        step-1 (ai/complete demo-env google-model
+                            {:messages [user1]}
+                            {:max-tokens 96
+                             :reasoning  :high})
         user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-    (jvm/complete openai-model
-                  {:messages [user1 step-1 user2]}
-                  {:max-tokens 96
-                   :temperature       0.0}))
+    (ai/complete demo-env openai-model
+                 {:messages [user1 step-1 user2]}
+                 {:max-tokens  96
+                  :temperature 0.0}))
   ;; Handoff: Google -> Mistral
-  (let [user1       {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
-        step-1      (jvm/complete google-model
-                                  {:messages [user1]}
-                                  {:max-tokens 96
-                                   :reasoning  :high})
-        user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-    (jvm/complete mistral-model
-                  {:messages [user1 step-1 user2]}
-                  {:max-tokens 128}))
+  (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
+        step-1 (ai/complete demo-env google-model
+                            {:messages [user1]}
+                            {:max-tokens 96
+                             :reasoning  :high})
+        user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (ai/complete demo-env mistral-model
+                 {:messages [user1 step-1 user2]}
+                 {:max-tokens 128}))
   ;; Handoff: Mistral -> OpenAI-compatible
-  (let [user1       {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
-        step-1      (jvm/complete mistral-model
-                                  {:messages [user1]}
-                                  {:max-tokens 96})
-        user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-    (jvm/complete ollama-model
-                  {:messages [user1 step-1 user2]}
-                  {:max-tokens 128
-                   :temperature       0.0}))
+  (let [user1  {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
+        step-1 (ai/complete demo-env mistral-model
+                            {:messages [user1]}
+                            {:max-tokens 96})
+        user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
+    (ai/complete demo-env ollama-model
+                 {:messages [user1 step-1 user2]}
+                 {:max-tokens  128
+                  :temperature 0.0}))
   ;;
 
   (comment
@@ -171,36 +170,36 @@
        :capabilities   {:reasoning? true :input #{:text}}})
 
     ;; Responses complete
-    (jvm/complete openai-responses-model
-                  {:messages [{:role :user :content "reply with exactly: llx openai responses demo ok" :timestamp 1}]}
-                  {:max-tokens 96
-                   :reasoning  :high})
+    (ai/complete demo-env openai-responses-model
+                 {:messages [{:role :user :content "reply with exactly: llx openai responses demo ok" :timestamp 1}]}
+                 {:max-tokens 96
+                  :reasoning  :high})
 
     ;; Responses stream
-    (let [stream (jvm/stream openai-responses-model
-                             {:messages [{:role :user :content "reply with exactly: llx openai responses stream demo ok" :timestamp 1}]}
-                             {:max-tokens 96
-                              :reasoning  :high})]
+    (let [stream (ai/stream demo-env openai-responses-model
+                            {:messages [{:role :user :content "reply with exactly: llx openai responses stream demo ok" :timestamp 1}]}
+                            {:max-tokens 96
+                             :reasoning  :high})]
       (collect-stream! stream))
 
     ;; Handoff: OpenAI Responses -> Anthropic
     (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
-          step-1 (jvm/complete openai-responses-model
-                               {:messages [user1]}
-                               {:max-tokens 128
-                                :reasoning  :high})
+          step-1 (ai/complete demo-env openai-responses-model
+                              {:messages [user1]}
+                              {:max-tokens 128
+                               :reasoning  :high})
           user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-      (jvm/complete anthropic-model
-                    {:messages [user1 step-1 user2]}
-                    {:max-tokens 128}))
+      (ai/complete demo-env anthropic-model
+                   {:messages [user1 step-1 user2]}
+                   {:max-tokens 128}))
 
     ;; Handoff: Anthropic -> OpenAI Responses
     (let [user1  {:role :user :content "Give one short sentence about Lisp history." :timestamp 1}
-          step-1 (jvm/complete anthropic-model
-                               {:messages [user1]}
-                               {:max-tokens 96})
+          step-1 (ai/complete demo-env anthropic-model
+                              {:messages [user1]}
+                              {:max-tokens 96})
           user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
-      (jvm/complete openai-responses-model
-                    {:messages [user1 step-1 user2]}
-                    {:max-tokens 128
-                     :reasoning  :high}))))
+      (ai/complete demo-env openai-responses-model
+                   {:messages [user1 step-1 user2]}
+                   {:max-tokens 128
+                    :reasoning  :high}))))
