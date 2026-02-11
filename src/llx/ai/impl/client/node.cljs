@@ -3,12 +3,12 @@
    [clojure.string :as str]
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.client :as client]
+   [llx.ai.impl.client.stream :as stream]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.core :as p]
-   [promesa.exec.csp :as sp]
-   [taoensso.trove :as trove]))
+   [promesa.exec.csp :as sp]))
 
 (defn- parse-json
   [s]
@@ -79,185 +79,139 @@
                            (provider-from-url (:url request))
                            (or (ex-message ex) (str ex)))))))))
 
-(defn- cancelled?
-  [out cancelled*]
-  (or @cancelled* (sp/closed? out)))
-
-(defn- emit-events!
-  [out cancel-fn events]
-  (letfn [(step [remaining]
-            (if-not remaining
-              (p/resolved true)
-              (let [event (first remaining)]
-                (schema/assert-valid! :llx/event event)
-                (-> (sp/put out event)
-                    (p/then (fn [accepted?]
-                              (if accepted?
-                                (step (next remaining))
-                                (do
-                                  (cancel-fn)
-                                  false))))))))]
-    (step (seq events))))
-
-(defn- emit-terminal-error!
-  [adapter env model out state* stream-ex]
-  (sp/put out (client/runtime-terminal-error-event adapter env model state* stream-ex)))
-
-(defn- process-line!
-  [adapter env model out state* cancel-fn item-index* line]
-  (if-let [payload (client/runtime-data-line->payload line)]
-    (try
-      (let [provider-item-type     (client/runtime-payload->provider-item-type env payload)
-            {:keys [state events]} (schema/assert-valid!
-                                    :llx/runtime-decode-event-result
-                                    ((:decode-event adapter) env @state* payload))
-            event-type             (:type (first events))
-            payload-bytes          (count payload)
-            idx                    @item-index*]
-        (swap! item-index* inc)
-        (trove/log! {:level :trace
-                     :id    :llx.obs/stream-item-received
-                     :data  {:call-id            (:call/id env)
-                             :provider           (:provider model)
-                             :api                (:api model)
-                             :model-id           (:id model)
-                             :item-index         idx
-                             :provider-item-type provider-item-type
-                             :llx-event-type     event-type
-                             :done?              false
-                             :payload-bytes      payload-bytes}})
-        (reset! state* state)
-        (emit-events! out cancel-fn events))
-      (catch :default ex
-        (p/rejected ex)))
-    (p/resolved true)))
+(defn- payload->channel!
+  [payload-ch payload]
+  (-> (sp/put payload-ch (stream/payload-msg payload))
+      (p/then (fn [accepted?]
+                (if accepted?
+                  true
+                  (throw (ex-info "Payload channel closed while streaming" {})))))))
 
 (defn- process-lines!
-  [adapter env model out state* cancel-fn item-index* cancelled* lines]
-  (letfn [(step [remaining]
-            (if-not (seq remaining)
-              (p/resolved true)
-              (if (cancelled? out cancelled*)
-                (p/resolved false)
-                (-> (process-line! adapter env model out state* cancel-fn item-index* (first remaining))
-                    (p/then (fn [ok?]
-                              (if ok?
-                                (step (next remaining))
-                                false)))))))]
-    (step lines)))
+  [{:keys [payload-ch cancelled?]} lines]
+  (p/loop [remaining (seq lines)]
+    (cond
+      (not remaining)
+      true
 
-(defn- stream-events!
-  [adapter env model out state* cancel-fn cancelled* stream-body]
-  (let [reader       (.getReader stream-body)
-        decoder      (js/TextDecoder.)
-        line-buffer* (atom "")
-        item-index*  (atom 0)]
-    (letfn [(step []
-              (if (cancelled? out cancelled*)
-                (p/resolved false)
-                (-> (.read reader)
-                    (p/then (fn [chunk]
-                              (if (.-done chunk)
-                                (if (seq @line-buffer*)
-                                  (-> (process-lines! adapter env model out state* cancel-fn item-index* cancelled* [@line-buffer*])
-                                      (p/then (fn [ok?]
-                                                (when ok?
-                                                  (reset! line-buffer* ""))
-                                                ok?)))
-                                  (p/resolved true))
-                                (let [chunk-text          (.decode decoder (.-value chunk) #js {:stream true})
-                                      combined            (str @line-buffer* chunk-text)
-                                      {:keys [lines
-                                              remainder]} (client/runtime-split-lines combined)]
-                                  (reset! line-buffer* remainder)
-                                  (-> (process-lines! adapter env model out state* cancel-fn item-index* cancelled* lines)
-                                      (p/then (fn [ok?]
-                                                (if ok?
-                                                  (step)
-                                                  false)))))))))))]
-      (step))))
+      (cancelled?)
+      false
+
+      :else
+      (let [line (first remaining)]
+        (if-let [payload (client/runtime-data-line->payload line)]
+          (p/let [_ (payload->channel! payload-ch payload)]
+            (p/recur (next remaining)))
+          (p/recur (next remaining)))))))
+
+(defn- start-node-source!
+  [{:keys [response payload-ch cancelled?]}]
+  (let [reader*          (atom nil)
+        local-cancelled* (atom false)
+        cancelled-now?   (fn []
+                           (or @local-cancelled*
+                               (cancelled?)))]
+    (letfn [(cancel-reader! []
+              (when-let [reader @reader*]
+                (.cancel reader)
+                (reset! reader* nil)))
+            (read-loop! [decoder line-buffer]
+              (if (cancelled-now?)
+                (p/resolved nil)
+                (p/let [chunk (.read @reader*)]
+                  (if (.-done chunk)
+                    (if (seq line-buffer)
+                      (process-lines! {:payload-ch payload-ch
+                                       :cancelled? cancelled-now?}
+                                      [line-buffer])
+                      true)
+                    (let [chunk-text          (.decode decoder (.-value chunk) #js {:stream true})
+                          combined            (str line-buffer chunk-text)
+                          {:keys [lines
+                                  remainder]} (client/runtime-split-lines combined)]
+                      (p/let [ok? (process-lines! {:payload-ch payload-ch
+                                                   :cancelled? cancelled-now?}
+                                                  lines)]
+                        (if ok?
+                          (read-loop! decoder remainder)
+                          false)))))))]
+      (-> (p/resolved nil)
+          (p/then (fn [_]
+                    (let [stream-body (:body response)]
+                      (when-not stream-body
+                        (throw (errors/invalid-response
+                                "unknown"
+                                "Stream response missing body"
+                                :context {:status (:status response)})))
+                      (let [reader  (.getReader stream-body)
+                            decoder (js/TextDecoder.)]
+                        (reset! reader* reader)
+                        (read-loop! decoder "")))))
+          (p/catch (fn [ex]
+                     (if (cancelled-now?)
+                       nil
+                       (sp/put payload-ch (stream/error-msg ex)))))
+          (p/finally (fn [_ _]
+                       (cancel-reader!)
+                       (sp/close payload-ch)))))
+    {:stop-fn (fn []
+                (when (compare-and-set! local-cancelled* false true)
+                  (when-let [reader @reader*]
+                    (.cancel reader)
+                    (reset! reader* nil))
+                  (sp/close payload-ch)))}))
 
 (>defn run-stream!
-       [{:keys [adapter env model request out state* request-opts]}]
+       [{:keys [adapter env model request request-opts] :as input}]
        [:llx/runtime-run-stream-input => any?]
-       (schema/assert-valid! :llx/runtime-run-stream-input
-                             {:adapter      adapter
-                              :env          env
-                              :model        model
-                              :request      request
-                              :out          out
-                              :state*       state*
-                              :request-opts request-opts})
-       (let [cancelled*       (atom false)
-             done*            (atom false)
-             abort-controller (js/AbortController.)
-             request          (assoc request :signal (or (:signal request)
-                                                         (.-signal abort-controller)))]
-         (letfn [(cancel-fn []
-                   (when (compare-and-set! cancelled* false true)
-                     (when-not (.-aborted (.-signal abort-controller))
-                       (.abort abort-controller))))
-                 (finalize-stream! []
-                   (let [{:keys [assistant-message events]} (schema/assert-valid!
-                                                             :llx/runtime-finalize-result
-                                                             ((:finalize adapter) env @state*))]
-                     (-> (emit-events! out cancel-fn events)
-                         (p/then (fn [events-ok?]
-                                   (if-not events-ok?
-                                     false
-                                     (do
-                                       (schema/assert-valid! :llx/message-assistant assistant-message)
-                                       (trove/log! {:level :info
-                                                    :id    :llx.obs/stream-done
-                                                    :data  {:call-id             (:call/id env)
-                                                            :provider            (:provider model)
-                                                            :api                 (:api model)
-                                                            :model-id            (:id model)
-                                                            :stop-reason         (:stop-reason assistant-message)
-                                                            :usage               (:usage assistant-message)
-                                                            :content-block-count (count (:content assistant-message))}})
-                                       (sp/put out {:type              :done
-                                                    :assistant-message assistant-message}))))))))]
-           (-> (errors/retry-loop-async
-                #((:open-stream adapter) env model request)
-                (get request-opts :max-retries 2)
-                (or (:thread/sleep env) (fn [_ms] nil))
-                {:call-id  (:call/id env)
-                 :provider (:provider model)})
-               (p/then (fn [response]
-                         (let [response (schema/assert-valid! :llx/http-response-map response)]
-                           (trove/log! {:level :info
-                                        :id    :llx.obs/stream-start
-                                        :data  {:call-id  (:call/id env)
-                                                :provider (:provider model)
-                                                :api      (:api model)
-                                                :model-id (:id model)}})
-                           (if-not (:body response)
-                             (p/rejected (errors/invalid-response
-                                          (name (or (:provider model) "unknown"))
-                                          "Stream response missing body"
-                                          :context {:status (:status response)}))
-                             (-> (sp/put out {:type :start})
-                                 (p/then (fn [accepted?]
-                                           (if-not accepted?
-                                             (do
-                                               (cancel-fn)
-                                               false)
-                                             (stream-events! adapter env model out state* cancel-fn cancelled* (:body response)))))
-                                 (p/then (fn [stream-ok?]
-                                           (if (or (not stream-ok?)
-                                                   (cancelled? out cancelled*))
-                                             false
-                                             (finalize-stream!)))))))))
-               (p/catch (fn [stream-ex]
-                          (if (cancelled? out cancelled*)
-                            nil
-                            (emit-terminal-error! adapter env model out state* stream-ex))))
-               (p/finally (fn []
-                            (reset! done* true)
-                            (sp/close out))))
-           {:cancel-fn cancel-fn
-            :done?     (fn [] (boolean @done*))})))
+       (let [abort-controller    (js/AbortController.)
+             request             (assoc request :signal (or (:signal request)
+                                                            (.-signal abort-controller)))
+             cancel-requested?*  (atom false)
+             request-started?*   (atom false)
+             abort-request!      (fn []
+                                   (when-not (.-aborted (.-signal abort-controller))
+                                     (.abort abort-controller)))
+             cancel-request!     (fn []
+                                   (reset! cancel-requested?* true)
+                                   (when @request-started?*
+                                     (abort-request!)))
+             open-stream!        (fn []
+                                   (let [max-retries (get request-opts :max-retries 2)
+                                         sleep-fn    (or (:thread/sleep env)
+                                                         (fn [ms]
+                                                           (p/delay (long (max 0 (or ms 0))) nil)))]
+                                     (-> (errors/retry-loop-async
+                                          (fn []
+                                            (reset! request-started?* true)
+                                            (let [response-d ((:open-stream adapter) env model request)]
+                                              (when @cancel-requested?*
+                                                (abort-request!))
+                                              response-d))
+                                          max-retries
+                                          sleep-fn
+                                          {:call-id  (:call/id env)
+                                           :provider (:provider model)})
+                                         (p/then (fn [response]
+                                                   (schema/assert-valid! :llx/http-response-map response)))
+                                         (p/then (fn [response]
+                                                   (if (:body response)
+                                                     response
+                                                     (throw (errors/invalid-response
+                                                             (name (or (:provider model) "unknown"))
+                                                             "Stream response missing body"
+                                                             :context {:status (:status response)}))))))))]
+         (stream/run-stream!
+          (assoc input
+                 :request request
+                 :cancel! cancel-request!
+                 :open-stream! open-stream!
+                 :start-source! (fn [args]
+                                  (let [base-stop-fn (:stop-fn (start-node-source! args))]
+                                    {:stop-fn (fn []
+                                                (cancel-request!)
+                                                (when base-stop-fn
+                                                  (base-stop-fn)))}))))))
 
 (defn default-env
   []

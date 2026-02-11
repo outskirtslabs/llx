@@ -8,26 +8,36 @@
    [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
 
-(defn- root-cause
-  [t]
-  #?(:clj (main/root-cause t)
-     :cljs t))
+#?(:clj
+   (defn- root-cause
+     [t]
+     (main/root-cause t)))
 
-(defn await!
-  ([x]
-   (if (p/deferred? x)
-     (let [result (p/await x)]
-       (if (instance? #?(:clj Throwable :cljs js/Error) result)
-         (throw (root-cause result))
-         result))
-     x))
-  ([x duration default-on-timeout]
-   (if (p/deferred? x)
-     (let [result (p/await x duration default-on-timeout)]
-       (if (instance? #?(:clj Throwable :cljs js/Error) result)
-         (throw (root-cause result))
-         result))
-     x)))
+#?(:clj
+   (defn await!
+     ([x]
+      (if (p/deferred? x)
+        (let [result (p/await x)]
+          (if (instance? Throwable result)
+            (throw (root-cause result))
+            result))
+        x))
+     ([x duration default-on-timeout]
+      (if (p/deferred? x)
+        (let [result (p/await x duration default-on-timeout)]
+          (if (instance? Throwable result)
+            (throw (root-cause result))
+            result))
+        x))))
+
+#?(:cljs
+   (defn await!
+     ([x]
+      x)
+     ([x _duration default-on-timeout]
+      (if (p/deferred? x)
+        default-on-timeout
+        x))))
 
 (defn validate-run-stream-input!
   [{:keys [adapter env model request out state* request-opts] :as input}]
@@ -180,6 +190,7 @@
 
 (def ^:private runtime-stream-hooks-schema
   [:map {:closed true}
+   [:cancel! {:optional true} :llx/fn]
    [:start-source! :llx/fn]
    [:open-stream! :llx/fn]])
 
@@ -195,12 +206,13 @@
     (stop-fn)))
 
 (defn run-stream!
-  [{:keys [adapter env model request out state* start-source! open-stream!]
+  [{:keys [adapter env model request out state* cancel! start-source! open-stream!]
     :as   args}]
   (schema/assert-valid! :llx/runtime-run-stream-input args)
   (schema/assert-valid! runtime-stream-hooks-schema
-                        {:start-source! start-source!
-                         :open-stream!  open-stream!})
+                        (cond-> {:start-source! start-source!
+                                 :open-stream!  open-stream!}
+                          (fn? cancel!) (assoc :cancel! cancel!)))
   (let [cancelled*      (atom false)
         done*           (atom false)
         source-stop-fn* (atom nil)
@@ -210,6 +222,8 @@
               (or @cancelled* (sp/closed? out)))
             (cancel-fn []
               (when (compare-and-set! cancelled* false true)
+                (when cancel!
+                  (cancel!))
                 (stop-source! source-stop-fn*)
                 (sp/close control-ch)
                 true))
@@ -266,45 +280,48 @@
                       :else
                       (p/recur item-index))))))
             (run-worker! []
-              (if (cancelled-now?)
-                (p/resolved nil)
-                (p/let [response    (open-stream!)
-                        response    (schema/assert-valid! :llx/http-response-map response)
-                        start-ok?   (if (cancelled-now?)
-                                      false
-                                      (emit-start* {:emit!     emit-event!
-                                                    :cancel-fn cancel-fn
-                                                    :env       env
-                                                    :model     model}))
-                        source-stop (if (or (not start-ok?) (cancelled-now?))
-                                      nil
-                                      (start-source! {:adapter    adapter
-                                                      :env        env
-                                                      :model      model
-                                                      :request    request
-                                                      :response   response
-                                                      :payload-ch payload-ch
-                                                      :control-ch control-ch
-                                                      :cancelled? cancelled-now?}))]
-                  (when-let [stop-fn (:stop-fn source-stop)]
-                    (if (cancelled-now?)
-                      (stop-fn)
-                      (reset! source-stop-fn* stop-fn)))
-                  (if (or (not start-ok?) (cancelled-now?))
-                    nil
-                    (consume-stream!)))))]
-      (p/future
-        (-> (run-worker!)
-            (p/catch (fn [stream-ex]
-                       (if (cancelled-now?)
-                         nil
-                         (emit-terminal-error! stream-ex))))
-            (p/finally (fn []
-                         (stop-source! source-stop-fn*)
-                         (reset! done* true)
-                         (sp/close payload-ch)
-                         (sp/close control-ch)
-                         (sp/close out)))))
+              (p/let [response              (open-stream!)
+                      response              (schema/assert-valid! :llx/http-response-map response)
+                      cancelled-after-open? (cancelled-now?)
+                      _                     (when cancelled-after-open?
+                                              (cancel-fn))
+                      start-ok?             (if cancelled-after-open?
+                                             false
+                                             (emit-start* {:emit!     emit-event!
+                                                           :cancel-fn cancel-fn
+                                                           :env       env
+                                                           :model     model}))
+                      cancelled-before-source? (cancelled-now?)
+                      _                        (when cancelled-before-source?
+                                                 (cancel-fn))
+                      source-stop           (if (or (not start-ok?) cancelled-before-source?)
+                                              nil
+                                              (start-source! {:adapter    adapter
+                                                              :env        env
+                                                              :model      model
+                                                              :request    request
+                                                              :response   response
+                                                              :payload-ch payload-ch
+                                                              :control-ch control-ch
+                                                              :cancelled? cancelled-now?}))]
+                (when-let [stop-fn (:stop-fn source-stop)]
+                  (if (cancelled-now?)
+                    (stop-fn)
+                    (reset! source-stop-fn* stop-fn)))
+                (if (or (not start-ok?) (cancelled-now?))
+                  nil
+                  (consume-stream!))))]
+      (-> (run-worker!)
+          (p/catch (fn [stream-ex]
+                     (if (cancelled-now?)
+                       nil
+                       (emit-terminal-error! stream-ex))))
+          (p/finally (fn [_ _]
+                       (stop-source! source-stop-fn*)
+                       (reset! done* true)
+                       (sp/close payload-ch)
+                       (sp/close control-ch)
+                       (sp/close out))))
       {:cancel-fn  cancel-fn
        :done?      (fn [] (boolean @done*))
        :payload-ch payload-ch
