@@ -16,6 +16,10 @@
          {:doc  "Run all tests or specific test suites"
           :task (apply clojure "-M:dev:kaocha" *command-line-args*)}
 
+         test:cljs
+         {:doc  "Compile and run ClojureScript tests on Node"
+          :task (clojure "-M:cljs-test" "-m" "llx.ai.cljs-test-runner")}
+
          generate-models
          {:doc  "Generate built-in model catalog artifact"
           :task (do (clojure "-M:dev" "-m" "llx.ai.impl.model-catalog.generate")

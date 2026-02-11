@@ -18,6 +18,10 @@
                                   com.cnuernber/charred                    {:mvn/version "1.037"}
                                   djblue/portal                            {:mvn/version "0.62.1"}
                                   com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}}
+           :cljs-test
+           {:extra-paths ["test"]
+            :extra-deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}
+                          funcool/promesa           {:mvn/version "12.0.0-RC2"}}}
            :build  {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.11"
                                                                 :git/sha "c6c670a"}
                                  slipset/deps-deploy           {:mvn/version "0.2.2"}}

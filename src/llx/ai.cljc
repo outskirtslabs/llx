@@ -2,6 +2,7 @@
   (:require
    [llx.ai.impl.client :as impl.client]
    #?(:clj [llx.ai.impl.client.jvm :as impl.jvm])
+   #?(:cljs [llx.ai.impl.client.node :as impl.node])
    [llx.ai.impl.models :as impl.models]
    [llx.ai.impl.utils.overflow :as impl.overflow]
    [llx.ai.impl.utils.tool-validation :as impl.tool-validation]
@@ -11,7 +12,7 @@
   "Returns the default environment for your platform."
   []
   #?(:cljd (throw (ex-info "CLJS support not yet implemented" {:type :llx/env-required}))
-     :cljs (throw (ex-info "CLJS support not yet implemented" {:type :llx/env-required}))
+     :cljs (impl.node/default-env)
      :clj (impl.jvm/default-env)))
 
 (defn complete*
