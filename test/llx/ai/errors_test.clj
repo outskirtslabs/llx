@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.errors :as sut]
-   [llx.ai.impl.utils.await :as await]
+   [llx.ai.impl.client.stream :as await]
    [promesa.core :as p]
    [llx.ai.test-util :as util]))
 

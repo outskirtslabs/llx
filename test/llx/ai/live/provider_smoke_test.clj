@@ -5,7 +5,7 @@
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.test-util :as util]
-   [llx.ai.impl.utils.await :as await]))
+   [llx.ai.impl.client.stream :as await]))
 
 (set! *warn-on-reflection* true)
 

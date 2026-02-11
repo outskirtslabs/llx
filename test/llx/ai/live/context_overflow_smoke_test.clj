@@ -4,7 +4,7 @@
    [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
-   [llx.ai.impl.utils.await :as await]
+   [llx.ai.impl.client.stream :as await]
    [llx.ai.impl.utils.overflow :as overflow]
    [llx.ai.impl.utils.rate-limit :as rate-limit]))
 

@@ -11,7 +11,7 @@
    [llx.ai.impl.client :as sut]
    [llx.ai.impl.client.jvm :as runtime]
    [llx.ai.impl.registry :as registry]
-   [llx.ai.impl.utils.await :as await]
+   [llx.ai.impl.client.stream :as await]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))

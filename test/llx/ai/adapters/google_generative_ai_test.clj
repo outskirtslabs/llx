@@ -7,7 +7,7 @@
    [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.google-generative-ai :as sut]
    [llx.ai.live.models :as live-models]
-   [llx.ai.impl.utils.await :as await]
+   [llx.ai.impl.client.stream :as await]
    [llx.ai.impl.utils.unicode :as unicode]
    ))
 
