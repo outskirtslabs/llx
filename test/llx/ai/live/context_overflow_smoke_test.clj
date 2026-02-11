@@ -5,12 +5,25 @@
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.impl.utils.overflow :as overflow]
-   [llx.ai.impl.utils.rate-limit :as rate-limit]))
+   [llx.ai.impl.utils.rate-limit :as rate-limit]
+   [promesa.core :as p]))
 
 (set! *warn-on-reflection* true)
 
 (def ^:private env
   (client/default-env))
+
+(defn- await!
+  [x]
+  (if (p/deferred? x)
+    (try
+      @x
+      (catch java.util.concurrent.ExecutionException e
+        (loop [cause (.getCause e)]
+          (if (and cause (instance? java.util.concurrent.ExecutionException cause))
+            (recur (.getCause ^java.util.concurrent.ExecutionException cause))
+            (throw (or cause e))))))
+    x))
 
 (def ^:private lorem-ipsum
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ")
@@ -58,7 +71,7 @@
                                   " max-retries=" (:max-retries opts)))
         call*          (future
                          (try
-                           (client/complete* env model context opts)
+                           (await! (client/complete* env model context opts))
                            (catch clojure.lang.ExceptionInfo e
                              (let [error-data (ex-data e)]
                                (log! (str "ERROR model=" (:id model)

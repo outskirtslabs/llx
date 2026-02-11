@@ -1,6 +1,7 @@
 (ns llx.ai.impl.schema.core
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [promesa.core :as p]))
 
 (defn non-blank-string?
   [s]
@@ -14,6 +15,10 @@
   [n]
   (and (number? n) (<= 0 n)))
 
+(defn deferred?
+  [x]
+  (p/deferred? x))
+
 (def schemas
   {:llx/id-string       [:and :string [:fn non-blank-string?]]
    :llx/non-neg-int     [:fn non-negative-int?]
@@ -26,5 +31,6 @@
    :llx/cache-control   [:enum :none :short :long]
    :llx/timestamp-ms    :llx/non-neg-int
    :llx/fn              [:fn ifn?]
+   :llx/deferred        [:fn deferred?]
    :llx/metadata-key    [:or :keyword :string]
    :llx/metadata-map    [:map-of :llx/metadata-key :any]})

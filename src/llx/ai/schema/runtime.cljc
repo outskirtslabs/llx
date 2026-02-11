@@ -1,4 +1,10 @@
-(ns llx.ai.schema.runtime)
+(ns llx.ai.schema.runtime
+  (:require
+   [promesa.exec.csp :as sp]))
+
+(defn stream-channel?
+  [x]
+  (sp/chan? x))
 
 (def schemas
   {:llx/adapter
@@ -61,13 +67,8 @@
    :llx/raw-stream-chunk
    [:or :string :map]
 
-   :llx/stream-map
-   [:map
-    [:llx.ai.event-stream/type :keyword]
-    [:state* :any]
-    [:cancel-fn {:optional true} :llx/fn]
-    [:clock/now-ms :llx/fn]
-    [:lock :any]]
+   :llx/stream-channel
+   [:fn stream-channel?]
 
    :llx/registry-entry
    [:map {:closed true}
@@ -104,7 +105,7 @@
     [:env :llx/env]
     [:model :llx/model]
     [:request :llx/adapter-request-map]
-    [:out :llx/stream-map]
+    [:out :llx/stream-channel]
     [:state* :any]
     [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
 

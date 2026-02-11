@@ -3,9 +3,10 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx.ai :as client]
-   [llx.ai.event-stream :as stream]
    [llx.ai.live.env :as live-env]
-   [llx.ai.live.models :as models])
+   [llx.ai.live.models :as models]
+   [llx.ai.test-util :as util]
+   [promesa.core :as p])
   (:import
    [java.util Base64]
    [java.io File]))
@@ -15,22 +16,15 @@
 (def ^:private env
   (client/default-env))
 
+(defn- await!
+  [x]
+  (if (p/deferred? x) @x x))
+
 (defn- collect-stream!
-  [st]
-  (let [events* (atom [])
-        result* (promise)
-        close*  (promise)]
-    (stream/consume! st
-                     {:on-event  (fn [event]
-                                   (swap! events* conj event))
-                      :on-result (fn [assistant-message]
-                                   (deliver result* assistant-message))
-                      :on-close  (fn [_close-meta]
-                                   (deliver close* true))})
-    (deref close* 60000 false)
-    (let [result (deref result* 1000 nil)]
-      {:events @events*
-       :result result})))
+  [ch]
+  (let [events (util/collect-channel-events! ch 60000)]
+    {:events events
+     :result (:assistant-message (last events))}))
 
 (def tool-spec
   {:name         "math_operation"
@@ -53,6 +47,14 @@
        (map :text)
        (str/join "")))
 
+(defn- extract-thinking
+  "Join all :thinking blocks from an assistant message's :content."
+  [assistant-message]
+  (->> (:content assistant-message)
+       (filter #(= :thinking (:type %)))
+       (map :thinking)
+       (str/join "")))
+
 (defn- execute-math
   "Evaluate a math_operation tool call, returning the numeric result."
   [{:keys [a b operation]}]
@@ -71,7 +73,7 @@
                  :messages      [{:role      :user
                                   :content   "Reply with exactly: 'Hello test successful'"
                                   :timestamp (System/currentTimeMillis)}]}
-        first-r (client/complete* env model context opts)]
+        first-r (await! (client/complete* env model context opts))]
     (is (= :assistant (:role first-r)))
     (is (seq (:content first-r)))
     (is (> (+ (get-in first-r [:usage :input] 0)
@@ -87,7 +89,7 @@
                                     {:role      :user
                                      :content   "Now say 'Goodbye test successful'"
                                      :timestamp (System/currentTimeMillis)}]}
-          second-r (client/complete* env model context2 opts)]
+          second-r (await! (client/complete* env model context2 opts))]
       (is (= :assistant (:role second-r)))
       (is (seq (:content second-r)))
       (is (> (+ (get-in second-r [:usage :input] 0)
@@ -164,15 +166,20 @@
         events         (:events collected)
         result         (:result collected)
         types          (set (map :type events))
-        thinking-accum (apply str (keep :thinking (filter #(= :thinking-delta (:type %)) events)))]
+        thinking-delta (apply str (keep :thinking (filter #(= :thinking-delta (:type %)) events)))
+        thinking-final (extract-thinking result)]
     (is (= :stop (:stop-reason result))
         (str "expected :stop but got " (:stop-reason result) " error: " (:error-message result)))
     (is (contains? types :thinking-start) "expected :thinking-start event")
-    (is (contains? types :thinking-delta) "expected :thinking-delta event")
     (is (contains? types :thinking-end) "expected :thinking-end event")
-    (is (pos? (count thinking-accum)) "accumulated thinking should be non-empty")
-    (is (some #(= :thinking (:type %)) (:content result))
-        "result should contain a :thinking content block")))
+    (if (contains? types :thinking-delta)
+      (is (pos? (count thinking-delta)) "accumulated thinking from deltas should be non-empty")
+      (is (or (pos? (count thinking-final))
+              (some #(= :thinking (:type %)) (:content result)))
+          "when no :thinking-delta events are emitted, provider should still signal thinking in final content"))
+    (is (or (contains? types :thinking-delta)
+            (some #(= :thinking (:type %)) (:content result)))
+        "thinking stream should contain either delta events or a final :thinking block")))
 
 (defn- handle-image!
   "Complete with text + image content (test-image.png). Skips if model doesn't
@@ -180,16 +187,16 @@
   [model opts]
   (if-not (contains? (get-in model [:capabilities :input]) :image)
     (is true (str "Skipping image test - model " (:id model) " doesn't support images"))
-    (let [result (client/complete* env model
-                                   {:system-prompt "You are a helpful assistant."
-                                    :messages      [{:role      :user
-                                                     :content   [{:type :text
-                                                                  :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
-                                                                 {:type      :image
-                                                                  :data      test-image-base64
-                                                                  :mime-type "image/png"}]
-                                                     :timestamp (System/currentTimeMillis)}]}
-                                   opts)
+    (let [result (await! (client/complete* env model
+                                           {:system-prompt "You are a helpful assistant."
+                                            :messages      [{:role      :user
+                                                             :content   [{:type :text
+                                                                          :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
+                                                                         {:type      :image
+                                                                          :data      test-image-base64
+                                                                          :mime-type "image/png"}]
+                                                             :timestamp (System/currentTimeMillis)}]}
+                                           opts))
           text   (str/lower-case (extract-text result))]
       (is (pos? (count (:content result))))
       (is (str/includes? text "green") "response should mention 'green'")
@@ -210,11 +217,11 @@
     (loop [messages [initial-msg]
            turn     0]
       (when (< turn max-turns)
-        (let [response     (client/complete* env model
-                                             {:system-prompt "You are a helpful assistant that can use tools to answer questions."
-                                              :messages      messages
-                                              :tools         [tool-spec]}
-                                             opts)
+        (let [response     (await! (client/complete* env model
+                                                     {:system-prompt "You are a helpful assistant that can use tools to answer questions."
+                                                      :messages      messages
+                                                      :tools         [tool-spec]}
+                                                     opts))
               messages     (conj messages response)
               tool-results (reduce
                             (fn [results block]

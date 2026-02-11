@@ -45,6 +45,9 @@
   | `:registry`          | Per-call adapter registry override.                         |
   | `:max-retries`       | Retry count for transient failures (default `2`).           |
 
+  Returns a promise that resolves to one canonical assistant message map.
+  Errors reject the promise with structured LLX exception data.
+
   Use [[complete]] for the unified API."
   [env model context opts]
   (impl.client/complete* env model context opts))
@@ -74,8 +77,11 @@
   | `:registry`          | Per-call adapter registry override.                        |
   | `:max-retries`       | Retry count for transient failures (default `2`).          |
 
-  Consume events via [[llx.ai.event-stream/consume!]]. Stream production starts after
-  consume attachment. Use [[stream]] for the unified API."
+  Returns a Promesa CSP channel emitting canonical LLX event maps.
+  Stream completion emits terminal `:done` or `:error` and closes the channel.
+  Consumer cancellation is channel closure.
+
+  Use [[stream]] for the unified API."
   [env model context opts]
   (impl.client/stream* env model context opts))
 
@@ -106,6 +112,9 @@
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 
+  Returns a promise that resolves to one canonical assistant message map.
+  Errors reject the promise with structured LLX exception data.
+
   Use [[complete*]] if you need provider-specific options that are outside the
   unified schema."
   [env model context unified-opts]
@@ -133,11 +142,11 @@
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 
-  Consume events via [[llx.ai.event-stream/consume!]]. Stream production starts after
-  consume attachment.
+  Returns a Promesa CSP channel emitting canonical LLX event maps.
+  Stream completion emits terminal `:done` or `:error` and closes the channel.
+  Consumer cancellation is channel closure.
 
-  Use [[stream*]] for provider-specific option control.
-  For Promesa CSP consumption, see [[llx.ai.promesa.csp/stream]]."
+  Use [[stream*]] for provider-specific option control."
   [env model context unified-opts]
   (impl.client/stream env model context unified-opts))
 

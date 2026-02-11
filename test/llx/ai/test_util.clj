@@ -1,5 +1,6 @@
 (ns llx.ai.test-util
   (:require
+   [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
 
 (defn submap?
@@ -73,3 +74,14 @@
                    :msg
                    :error)
      (seq data-keys) (update :data #(apply dissoc % data-keys)))))
+
+(defn collect-channel-events!
+  [ch timeout-ms]
+  (deref
+   (future
+     (loop [events []]
+       (if-let [event (sp/take! ch)]
+         (recur (conj events event))
+         events)))
+   timeout-ms
+   ::timeout))

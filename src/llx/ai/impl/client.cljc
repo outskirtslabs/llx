@@ -10,7 +10,8 @@
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.transform-messages :as transform-messages]
-   [llx.ai.event-stream :as stream]
+   [promesa.core :as p]
+   [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
 
 (def ^:private builtins-source-id "llx.ai.impl.client/builtins")
@@ -153,83 +154,95 @@
                 :request-id request-id
                 :body body))))))
 
+(defn- start-channel-close-watcher!
+  [out runtime-cancel* runtime-done?*]
+  (p/future
+    (loop []
+      (when-not (sp/closed? out)
+        @(p/delay 10 nil)
+        (recur)))
+    (when (and (fn? @runtime-cancel*)
+               (not ((or @runtime-done?* (constantly false)))))
+      (@runtime-cancel*))))
+
 (>defn complete*
        "See [[llx.ai/complete*]]"
        [env model context opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/message-assistant]
-       (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
-             opts                      (or opts {})
-             {:keys [registry-override
-                     request-opts]}    (split-client-opts opts)
-             _                         (schema/assert-valid! :llx/env env)
-             _                         (schema/assert-valid! :llx/model model)
-             _                         (schema/assert-valid! :llx/provider-request-options request-opts)
-             _                         (assert-reasoning-level! model request-opts)
-             context                   (assert-context! context)
-             call-env                  (assoc env :call/id ((:id/new env)))
-             resolved-registry         (resolve-call-registry env registry-override)
-             adapter                   (select-adapter resolved-registry model)
-             context                   (apply-message-transform env adapter model context)
-             request                   (schema/assert-valid!
-                                        :llx/adapter-request-map
-                                        ((:build-request adapter) call-env model context request-opts false))
-             max-retries               (get request-opts :max-retries 2)
-             sleep-fn                  (or (:thread/sleep env)
-                                           (when (pos? max-retries)
-                                             (throw (ex-info "Retry requested but env is missing :thread/sleep"
-                                                             {:type        :llx/config-error
-                                                              :max-retries max-retries}))))
-             do-request                (fn []
-                                         (let [response ((:http/request env) request)]
-                                           (check-response-status! call-env model response :complete)
-                                           response))]
-         (trove/log! {:level :info
-                      :id    :llx.obs/call-start
-                      :data  {:call-id            (:call/id call-env)
-                              :operation          :complete
-                              :provider           (:provider model)
-                              :api                (:api model)
-                              :model-id           (:id model)
-                              :message-count      (count (:messages context))
-                              :has-tools?         (boolean (seq (:tools context)))
-                              :has-system-prompt? (boolean (seq (:system-prompt context)))}})
-         (try
-           (let [response                    (errors/retry-loop do-request max-retries sleep-fn
-                                                                {:call-id  (:call/id call-env)
-                                                                 :provider (:provider model)})
-                 {:keys [assistant-message]} (schema/assert-valid!
-                                              :llx/runtime-finalize-result
-                                              ((:finalize adapter) call-env {:model model :response response}))]
-             (trove/log! {:level :info
-                          :id    :llx.obs/call-finished
-                          :data  {:call-id             (:call/id call-env)
-                                  :operation           :complete
-                                  :provider            (:provider model)
-                                  :api                 (:api model)
-                                  :model-id            (:id model)
-                                  :stop-reason         (:stop-reason assistant-message)
-                                  :usage               (:usage assistant-message)
-                                  :content-block-count (count (:content assistant-message))}})
-             assistant-message)
-           (catch #?(:clj Exception :cljs :default) ex
-             (trove/log! {:level :error
-                          :id    :llx.obs/call-error
-                          :data  {:call-id       (:call/id call-env)
-                                  :operation     :complete
-                                  :provider      (:provider model)
-                                  :api           (:api model)
-                                  :model-id      (:id model)
-                                  :error-type    (:type (ex-data ex))
-                                  :error-message (ex-message ex)
-                                  :recoverable?  (get (ex-data ex) :recoverable?)
-                                  :request-id    (get (ex-data ex) :request-id)
-                                  :provider-code (get (ex-data ex) :provider-code)}})
-             (throw ex)))))
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/deferred]
+       (p/future
+         (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
+               opts                      (or opts {})
+               {:keys [registry-override
+                       request-opts]}    (split-client-opts opts)
+               _                         (schema/assert-valid! :llx/env env)
+               _                         (schema/assert-valid! :llx/model model)
+               _                         (schema/assert-valid! :llx/provider-request-options request-opts)
+               _                         (assert-reasoning-level! model request-opts)
+               context                   (assert-context! context)
+               call-env                  (assoc env :call/id ((:id/new env)))
+               resolved-registry         (resolve-call-registry env registry-override)
+               adapter                   (select-adapter resolved-registry model)
+               context                   (apply-message-transform env adapter model context)
+               request                   (schema/assert-valid!
+                                          :llx/adapter-request-map
+                                          ((:build-request adapter) call-env model context request-opts false))
+               max-retries               (get request-opts :max-retries 2)
+               sleep-fn                  (or (:thread/sleep env)
+                                             (when (pos? max-retries)
+                                               (throw (ex-info "Retry requested but env is missing :thread/sleep"
+                                                               {:type        :llx/config-error
+                                                                :max-retries max-retries}))))
+               do-request                (fn []
+                                           (let [response ((:http/request env) request)]
+                                             (check-response-status! call-env model response :complete)
+                                             response))]
+           (trove/log! {:level :info
+                        :id    :llx.obs/call-start
+                        :data  {:call-id            (:call/id call-env)
+                                :operation          :complete
+                                :provider           (:provider model)
+                                :api                (:api model)
+                                :model-id           (:id model)
+                                :message-count      (count (:messages context))
+                                :has-tools?         (boolean (seq (:tools context)))
+                                :has-system-prompt? (boolean (seq (:system-prompt context)))}})
+           (try
+             (let [response                    (errors/retry-loop do-request max-retries sleep-fn
+                                                                  {:call-id  (:call/id call-env)
+                                                                   :provider (:provider model)})
+                   {:keys [assistant-message]} (schema/assert-valid!
+                                                :llx/runtime-finalize-result
+                                                ((:finalize adapter) call-env {:model model :response response}))]
+               (trove/log! {:level :info
+                            :id    :llx.obs/call-finished
+                            :data  {:call-id             (:call/id call-env)
+                                    :operation           :complete
+                                    :provider            (:provider model)
+                                    :api                 (:api model)
+                                    :model-id            (:id model)
+                                    :stop-reason         (:stop-reason assistant-message)
+                                    :usage               (:usage assistant-message)
+                                    :content-block-count (count (:content assistant-message))}})
+               assistant-message)
+             (catch #?(:clj Exception :cljs :default) ex
+               (trove/log! {:level :error
+                            :id    :llx.obs/call-error
+                            :data  {:call-id       (:call/id call-env)
+                                    :operation     :complete
+                                    :provider      (:provider model)
+                                    :api           (:api model)
+                                    :model-id      (:id model)
+                                    :error-type    (:type (ex-data ex))
+                                    :error-message (ex-message ex)
+                                    :recoverable?  (get (ex-data ex) :recoverable?)
+                                    :request-id    (get (ex-data ex) :request-id)
+                                    :provider-code (get (ex-data ex) :provider-code)}})
+               (throw ex))))))
 
 (>defn stream*
        "See [[llx.ai/stream*]]"
        [env model context opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/stream-map]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/stream-channel]
        (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
              opts                      (or opts {})
              {:keys [registry-override
@@ -249,30 +262,8 @@
              state*                    (atom {:model model})
              run-stream!               (:stream/run! env)
              runtime-cancel*           (atom nil)
-             out                       (let [out* (atom nil)
-                                             st   (stream/create
-                                                   {:clock/now-ms (:clock/now-ms env)
-                                                    :cancel-fn    (fn []
-                                                                    (when-let [cancel-fn @runtime-cancel*]
-                                                                      (cancel-fn)))
-                                                    :start-fn     (fn []
-                                                                    (let [runtime-result (run-stream! {:adapter      adapter
-                                                                                                       :env          call-env
-                                                                                                       :model        model
-                                                                                                       :request      request
-                                                                                                       :out          @out*
-                                                                                                       :state*       state*
-                                                                                                       :request-opts request-opts})]
-                                                                      (cond
-                                                                        (fn? runtime-result)
-                                                                        (reset! runtime-cancel* runtime-result)
-
-                                                                        (map? runtime-result)
-                                                                        (reset! runtime-cancel* (:cancel-fn runtime-result))
-
-                                                                        :else nil)))})]
-                                         (reset! out* st)
-                                         st)]
+             runtime-done?*            (atom (constantly false))
+             out                       (sp/chan :buf (sp/sliding-buffer 64))]
          (when-not run-stream!
            (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
          (trove/log! {:level :info
@@ -286,6 +277,24 @@
                               :has-tools?         (boolean (seq (:tools context)))
                               :has-system-prompt? (boolean (seq (:system-prompt context)))}})
          (try
+           (let [runtime-result (run-stream! {:adapter      adapter
+                                              :env          call-env
+                                              :model        model
+                                              :request      request
+                                              :out          out
+                                              :state*       state*
+                                              :request-opts request-opts})]
+             (cond
+               (fn? runtime-result)
+               (reset! runtime-cancel* runtime-result)
+
+               (map? runtime-result)
+               (do
+                 (reset! runtime-cancel* (:cancel-fn runtime-result))
+                 (reset! runtime-done?* (or (:done? runtime-result) (constantly false))))
+
+               :else nil))
+           (start-channel-close-watcher! out runtime-cancel* runtime-done?*)
            out
            (catch #?(:clj Exception :cljs :default) ex
              (trove/log! {:level :error
@@ -305,13 +314,13 @@
 (>defn stream
        "See [[llx.ai/stream]]"
        [env model context unified-opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/stream-map]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/stream-channel]
        (let [_ (schema/assert-valid! [:maybe :llx/unified-request-options] unified-opts)]
          (stream* env model context (unified-opts->request-opts model unified-opts))))
 
 (>defn complete
        "See [[llx.ai/complete]]"
        [env model context unified-opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/message-assistant]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/deferred]
        (let [_ (schema/assert-valid! [:maybe :llx/unified-request-options] unified-opts)]
          (complete* env model context (unified-opts->request-opts model unified-opts))))

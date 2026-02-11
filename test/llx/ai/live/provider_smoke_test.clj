@@ -2,31 +2,25 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx.ai :as client]
-   [llx.ai.event-stream :as stream]
    [llx.ai.live.env :as live-env]
-   [llx.ai.live.models :as models]))
+   [llx.ai.live.models :as models]
+   [llx.ai.test-util :as util]
+   [promesa.core :as p]))
 
 (set! *warn-on-reflection* true)
 
 (def ^:private env
   (client/default-env))
 
+(defn- await!
+  [x]
+  (if (p/deferred? x) @x x))
+
 (defn- collect-stream!
-  [st]
-  (let [events* (atom [])
-        result* (promise)
-        close*  (promise)]
-    (stream/consume! st
-                     {:on-event  (fn [event]
-                                   (swap! events* conj event))
-                      :on-result (fn [assistant-message]
-                                   (deliver result* assistant-message))
-                      :on-close  (fn [_close-meta]
-                                   (deliver close* true))})
-    (deref close* 60000 false)
-    (let [result (deref result* 1000 nil)]
-      {:events @events*
-       :result result})))
+  [ch]
+  (let [events (util/collect-channel-events! ch 60000)]
+    {:events events
+     :result (:assistant-message (last events))}))
 
 (defn- assert-complete-ok [out]
   (is (= :assistant (:role out)))
@@ -47,12 +41,12 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* env models/anthropic
-                             {:messages [{:role      :user
-                                          :content   "reply with exactly: llx anthropic smoke ok"
-                                          :timestamp 1}]}
-                             {:api-key           api-key
-                              :max-output-tokens 128})))
+           (await! (client/complete* env models/anthropic
+                                     {:messages [{:role      :user
+                                                  :content   "reply with exactly: llx anthropic smoke ok"
+                                                  :timestamp 1}]}
+                                     {:api-key           api-key
+                                      :max-output-tokens 128}))))
         (testing "stream"
           (assert-stream-ok
            (client/stream* env models/anthropic
@@ -69,13 +63,13 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* env models/google
-                             {:messages [{:role      :user
-                                          :content   "reply with exactly: llx google smoke ok"
-                                          :timestamp 1}]}
-                             {:api-key           api-key
-                              :max-output-tokens 96
-                              :reasoning         {:level :high :effort :high}})))
+           (await! (client/complete* env models/google
+                                     {:messages [{:role      :user
+                                                  :content   "reply with exactly: llx google smoke ok"
+                                                  :timestamp 1}]}
+                                     {:api-key           api-key
+                                      :max-output-tokens 96
+                                      :reasoning         {:level :high :effort :high}}))))
         (testing "stream"
           (assert-stream-ok
            (client/stream* env models/google
@@ -93,12 +87,12 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* env models/mistral
-                             {:messages [{:role      :user
-                                          :content   "reply with exactly: llx mistral smoke ok"
-                                          :timestamp 1}]}
-                             {:api-key           api-key
-                              :max-output-tokens 96})))
+           (await! (client/complete* env models/mistral
+                                     {:messages [{:role      :user
+                                                  :content   "reply with exactly: llx mistral smoke ok"
+                                                  :timestamp 1}]}
+                                     {:api-key           api-key
+                                      :max-output-tokens 96}))))
         (testing "stream"
           (assert-stream-ok
            (client/stream* env models/mistral
@@ -111,11 +105,11 @@
 (deftest live-ollama-smoke
   (testing "complete"
     (assert-complete-ok
-     (client/complete* env models/ollama
-                       {:messages [{:role      :user
-                                    :content   "reply with exactly: llx ollama smoke ok"
-                                    :timestamp 1}]}
-                       {:max-output-tokens 64})))
+     (await! (client/complete* env models/ollama
+                               {:messages [{:role      :user
+                                            :content   "reply with exactly: llx ollama smoke ok"
+                                            :timestamp 1}]}
+                               {:max-output-tokens 64}))))
   (testing "stream"
     (assert-stream-ok
      (client/stream* env models/ollama
@@ -130,12 +124,12 @@
       (is true "Skipping live OpenAI smoke test: OPENAI_API_KEY not set")
       (testing "complete"
         (assert-complete-ok
-         (client/complete* env models/openai-completions
-                           {:messages [{:role      :user
-                                        :content   "reply with exactly: llx smoke ok"
-                                        :timestamp 1}]}
-                           {:api-key           api-key
-                            :max-output-tokens 64}))))))
+         (await! (client/complete* env models/openai-completions
+                                   {:messages [{:role      :user
+                                                :content   "reply with exactly: llx smoke ok"
+                                                :timestamp 1}]}
+                                   {:api-key           api-key
+                                    :max-output-tokens 64})))))))
 
 (deftest live-openai-responses-smoke
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
@@ -144,13 +138,13 @@
       (do
         (testing "complete"
           (assert-complete-ok
-           (client/complete* env models/openai-responses
-                             {:messages [{:role      :user
-                                          :content   "reply with exactly: llx openai responses smoke ok"
-                                          :timestamp 1}]}
-                             {:api-key           api-key
-                              :max-output-tokens 96
-                              :reasoning         {:effort :high :summary :detailed}})))
+           (await! (client/complete* env models/openai-responses
+                                     {:messages [{:role      :user
+                                                  :content   "reply with exactly: llx openai responses smoke ok"
+                                                  :timestamp 1}]}
+                                     {:api-key           api-key
+                                      :max-output-tokens 96
+                                      :reasoning         {:effort :high :summary :detailed}}))))
         (testing "stream"
           (assert-stream-ok
            (client/stream* env models/openai-responses

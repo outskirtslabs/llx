@@ -2,7 +2,9 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [llx.ai :as ai]
-   [promesa.core :as p]))
+   [llx.ai.impl.client :as impl.client]
+   [promesa.core :as p]
+   [promesa.exec.csp :as sp]))
 
 (deftest default-env-returns-cljs-node-scaffold
   (let [env (ai/default-env)]
@@ -25,3 +27,18 @@
         (is (= :http/request (:feature (ex-data ex))))))
     (testing "promesa is available in cljs test runtime"
       (is (= 42 @(p/resolved 42))))))
+
+(deftest api-contract-uses-deferred-and-channel-surfaces
+  (let [env        {:env :ok}
+        model      {:id "m"}
+        context    {:messages []}
+        complete-d (p/resolved {:role :assistant})
+        stream-ch  (sp/chan)]
+    (with-redefs [impl.client/complete* (fn [_e _m _c _o] complete-d)
+                  impl.client/complete  (fn [_e _m _c _o] complete-d)
+                  impl.client/stream*   (fn [_e _m _c _o] stream-ch)
+                  impl.client/stream    (fn [_e _m _c _o] stream-ch)]
+      (is (p/deferred? (ai/complete* env model context {})))
+      (is (p/deferred? (ai/complete env model context {})))
+      (is (sp/chan? (ai/stream* env model context {})))
+      (is (sp/chan? (ai/stream env model context {}))))))

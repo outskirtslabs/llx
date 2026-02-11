@@ -3,9 +3,9 @@
    [babashka.json :as json]
    [clojure.test :refer [deftest is testing]]
    [llx.ai.impl.client.runtime :as sut]
-   [llx.ai.event-stream :as stream]
    [llx.ai.test-util :as util]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.utils.unicode :as unicode]
+   [promesa.exec.csp :as sp]))
 
 (set! *warn-on-reflection* true)
 
@@ -46,26 +46,11 @@
    :http/read-body-string    (fn [_body] "")
    :unicode/sanitize-payload unicode/sanitize-payload})
 
-(defn- attach-collector!
-  [st]
-  (let [events* (atom [])
-        result* (promise)
-        close*  (promise)]
-    (stream/consume! st
-                     {:on-event  (fn [event]
-                                   (swap! events* conj event))
-                      :on-result (fn [assistant-message]
-                                   (deliver result* assistant-message))
-                      :on-close  (fn [close-meta]
-                                   (deliver close* close-meta))})
-    {:events* events* :result* result* :close* close*}))
-
 (defn- collect-stream!
-  [{:keys [events* result* close*]} timeout-ms]
-  (let [close-meta (deref close* timeout-ms ::timeout)]
-    {:events @events*
-     :result (deref result* timeout-ms ::timeout)
-     :close  close-meta}))
+  [ch timeout-ms]
+  (let [events (util/collect-channel-events! ch timeout-ms)]
+    {:events events
+     :result (:assistant-message (last events))}))
 
 (defn- make-normalize-error-fn
   []
@@ -87,79 +72,76 @@
 
 (deftest run-stream-validation
   (testing "rejects malformed decoded events"
-    (let [line      (str "data: " (json/write-str {:chunk true}) "\n" "data: [DONE]\n")
-          body      (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
-          out       (stream/create)
-          state*    (atom {:model base-model})
-          adapter   {:api             :openai-completions
-                     :build-request   (fn [_env _model _context _opts _stream?]
-                                        {:method :post :url "https://example.invalid"})
-                     :open-stream     (fn [_env _model _request] {:body body})
-                     :decode-event    (fn [_env state _payload]
-                                        {:state  state
-                                         :events [{:type :toolcall-delta :id "call_1" :name "search"}]})
-                     :finalize        (fn [_env _state]
-                                        {:assistant-message (valid-assistant 1730000000000)
-                                         :events            []})
-                     :normalize-error (make-normalize-error-fn)}
-          collector (attach-collector! out)]
+    (let [line    (str "data: " (json/write-str {:chunk true}) "\n" "data: [DONE]\n")
+          body    (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
+          out     (sp/chan)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request] {:body body})
+                   :decode-event    (fn [_env state _payload]
+                                      {:state  state
+                                       :events [{:type :toolcall-delta :id "call_1" :name "search"}]})
+                   :finalize        (fn [_env _state]
+                                      {:assistant-message (valid-assistant 1730000000000)
+                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
       (sut/run-stream! {:adapter adapter
                         :env     (stub-env)
                         :model   base-model
                         :request {:method :post :url "https://example.invalid"}
                         :out     out
                         :state*  state*})
-      (let [{:keys [events result]} (collect-stream! collector 1000)]
+      (let [{:keys [events result]} (collect-stream! out 1000)]
         (is (= :error (:type (last events))))
         (is (= :error (:stop-reason result)))
         (is (string? (:error-message result)))
         (is (re-find #"Schema validation failed" (or (:error-message result) ""))))))
   (testing "rejects malformed finalize output"
-    (let [line      "data: [DONE]\n"
-          body      (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
-          out       (stream/create)
-          state*    (atom {:model base-model})
-          adapter   {:api             :openai-completions
-                     :build-request   (fn [_env _model _context _opts _stream?]
-                                        {:method :post :url "https://example.invalid"})
-                     :open-stream     (fn [_env _model _request] {:body body})
-                     :decode-event    (fn [_env state _payload] {:state state :events []})
-                     :finalize        (fn [_env _state] {:assistant-message {:role :assistant}
-                                                         :events            []})
-                     :normalize-error (make-normalize-error-fn)}
-          collector (attach-collector! out)]
+    (let [line    "data: [DONE]\n"
+          body    (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
+          out     (sp/chan)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request] {:body body})
+                   :decode-event    (fn [_env state _payload] {:state state :events []})
+                   :finalize        (fn [_env _state] {:assistant-message {:role :assistant}
+                                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
       (sut/run-stream! {:adapter adapter
                         :env     (stub-env)
                         :model   base-model
                         :request {:method :post :url "https://example.invalid"}
                         :out     out
                         :state*  state*})
-      (let [{:keys [events result]} (collect-stream! collector 1000)]
+      (let [{:keys [events result]} (collect-stream! out 1000)]
         (is (= :error (:type (last events))))
         (is (= :error (:stop-reason result)))
         (is (string? (:error-message result)))
         (is (re-find #"Schema validation failed" (or (:error-message result) ""))))))
   (testing "malformed normalize-error still emits terminal error"
-    (let [out       (stream/create)
-          state*    (atom {:model base-model})
-          adapter   {:api             :openai-completions
-                     :build-request   (fn [_env _model _context _opts _stream?]
-                                        {:method :post :url "https://example.invalid"})
-                     :open-stream     (fn [_env _model _request]
-                                        (throw (ex-info "stream boom" {:status 500})))
-                     :decode-event    (fn [_env state _payload] {:state state :events []})
-                     :finalize        (fn [_env _state] {:assistant-message (valid-assistant 1730000000000)
-                                                         :events            []})
-                     :normalize-error (fn [_env _ex _partial-state]
-                                        {:role :assistant})}
-          collector (attach-collector! out)]
+    (let [out     (sp/chan)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request]
+                                      (throw (ex-info "stream boom" {:status 500})))
+                   :decode-event    (fn [_env state _payload] {:state state :events []})
+                   :finalize        (fn [_env _state] {:assistant-message (valid-assistant 1730000000000)
+                                                       :events            []})
+                   :normalize-error (fn [_env _ex _partial-state]
+                                      {:role :assistant})}]
       (sut/run-stream! {:adapter adapter
                         :env     (stub-env)
                         :model   base-model
                         :request {:method :post :url "https://example.invalid"}
                         :out     out
                         :state*  state*})
-      (let [{:keys [events result]} (collect-stream! collector 1000)]
+      (let [{:keys [events result]} (collect-stream! out 1000)]
         (is (seq events))
         (is (= :error (:type (last events))))
         (is (not= ::timeout result))
@@ -169,24 +151,23 @@
 
 (deftest run-stream-emits-stream-lifecycle-trove-signals
   (util/with-captured-logs [logs*]
-    (let [line      (str "data: " (json/write-str {:type "delta" :text "ok"}) "\n" "data: [DONE]\n")
-          body      (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
-          out       (stream/create)
-          state*    (atom {:model base-model})
-          adapter   {:api             :openai-completions
-                     :build-request   (fn [_env _model _context _opts _stream?]
-                                        {:method :post :url "https://example.invalid"})
-                     :open-stream     (fn [_env _model _request] {:body body})
-                     :decode-event    (fn [_env state _payload]
-                                        {:state  state
-                                         :events [{:type :text-start}
-                                                  {:type :text-delta :text "ok"}
-                                                  {:type :text-end}]})
-                     :finalize        (fn [_env _state]
-                                        {:assistant-message (valid-assistant 1730000000000)
-                                         :events            []})
-                     :normalize-error (make-normalize-error-fn)}
-          collector (attach-collector! out)]
+    (let [line    (str "data: " (json/write-str {:type "delta" :text "ok"}) "\n" "data: [DONE]\n")
+          body    (java.io.ByteArrayInputStream. (.getBytes line "UTF-8"))
+          out     (sp/chan)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request] {:body body})
+                   :decode-event    (fn [_env state _payload]
+                                      {:state  state
+                                       :events [{:type :text-start}
+                                                {:type :text-delta :text "ok"}
+                                                {:type :text-end}]})
+                   :finalize        (fn [_env _state]
+                                      {:assistant-message (valid-assistant 1730000000000)
+                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
       (sut/run-stream! {:adapter      adapter
                         :env          (assoc (stub-env) :call/id "call_1")
                         :model        base-model
@@ -194,7 +175,7 @@
                         :out          out
                         :state*       state*
                         :request-opts {}})
-      (collect-stream! collector 1000)
+      (collect-stream! out 1000)
       (let [start (util/first-event logs* :llx.obs/stream-start)
             item  (util/first-event logs* :llx.obs/stream-item-received)
             done  (util/first-event logs* :llx.obs/stream-done)]
@@ -215,20 +196,19 @@
 
 (deftest run-stream-emits-stream-event-error-trove-signal
   (util/with-captured-logs [logs*]
-    (let [out       (stream/create)
-          state*    (atom {:model base-model})
-          adapter   {:api             :openai-completions
-                     :build-request   (fn [_env _model _context _opts _stream?]
-                                        {:method :post :url "https://example.invalid"})
-                     :open-stream     (fn [_env _model _request]
-                                        (throw (ex-info "stream boom"
-                                                        {:type :llx/streaming-error})))
-                     :decode-event    (fn [_env state _payload] {:state state :events []})
-                     :finalize        (fn [_env _state]
-                                        {:assistant-message (valid-assistant 1730000000000)
-                                         :events            []})
-                     :normalize-error (make-normalize-error-fn)}
-          collector (attach-collector! out)]
+    (let [out     (sp/chan)
+          state*  (atom {:model base-model})
+          adapter {:api             :openai-completions
+                   :build-request   (fn [_env _model _context _opts _stream?]
+                                      {:method :post :url "https://example.invalid"})
+                   :open-stream     (fn [_env _model _request]
+                                      (throw (ex-info "stream boom"
+                                                      {:type :llx/streaming-error})))
+                   :decode-event    (fn [_env state _payload] {:state state :events []})
+                   :finalize        (fn [_env _state]
+                                      {:assistant-message (valid-assistant 1730000000000)
+                                       :events            []})
+                   :normalize-error (make-normalize-error-fn)}]
       (sut/run-stream! {:adapter      adapter
                         :env          (assoc (stub-env) :call/id "call_2")
                         :model        base-model
@@ -236,7 +216,7 @@
                         :out          out
                         :state*       state*
                         :request-opts {}})
-      (collect-stream! collector 1000)
+      (collect-stream! out 1000)
       (let [event (util/first-event logs* :llx.obs/stream-event-error)]
         (is (util/submap?
              {:id   :llx.obs/stream-event-error                                                                                                  :level :error

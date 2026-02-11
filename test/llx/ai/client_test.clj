@@ -6,13 +6,14 @@
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
-   [llx.ai.event-stream :as stream]
    [llx.ai.live.models :as live-models]
    [llx.ai.test-util :as util]
    [llx.ai.impl.client :as sut]
    [llx.ai.impl.client.runtime :as runtime]
    [llx.ai.impl.registry :as registry]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.utils.unicode :as unicode]
+   [promesa.core :as p]
+   [promesa.exec.csp :as sp]))
 
 (set! *warn-on-reflection* true)
 
@@ -51,21 +52,46 @@
     (java.io.ByteArrayInputStream. (.getBytes payload "UTF-8"))))
 
 (defn- collect-stream!
-  [st]
-  (let [events* (atom [])
-        result* (promise)
-        close*  (promise)]
-    (stream/consume! st
-                     {:on-event  (fn [event]
-                                   (swap! events* conj event))
-                      :on-result (fn [assistant-message]
-                                   (deliver result* assistant-message))
-                      :on-close  (fn [close-meta]
-                                   (deliver close* close-meta))})
-    (deref close* 1000 ::timeout)
-    (let [result (deref result* 1000 nil)]
-      {:events @events*
-       :result result})))
+  [ch]
+  (let [events (util/collect-channel-events! ch 1000)
+        done   (last events)
+        result (when (map? done) (:assistant-message done))]
+    {:events events
+     :result result}))
+
+(defn- await!
+  [x]
+  (if (p/deferred? x)
+    (try
+      (deref x 1000 ::timeout)
+      (catch java.util.concurrent.ExecutionException e
+        (throw (.getCause e))))
+    x))
+
+(deftest complete-returns-deferred
+  (let [env   (stub-env (fn [_]
+                          {:status 200
+                           :body   (json/write-str
+                                    {:choices [{:finish_reason "stop"
+                                                :message       {:role "assistant" :content "ok"}}]
+                                     :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
+        out-d (sut/complete* env base-model {:messages [{:role :user :content "hi" :timestamp 1}]} {:api-key "x"})]
+    (is (p/deferred? out-d))
+    (is (= :assistant (:role (await! out-d))))))
+
+(deftest stream-returns-csp-channel
+  (let [env (stub-env (fn [_]
+                        {:status 200
+                         :body   (sse-body
+                                  [(str "data: " (json/write-str {:choices [{:delta         {:content "ok"}
+                                                                             :finish_reason "stop"}]
+                                                                  :usage   {:prompt_tokens     1
+                                                                            :completion_tokens 1
+                                                                            :total_tokens      2}}))
+                                   "data: [DONE]"])}))
+        ch  (sut/stream* env base-model {:messages [{:role :user :content "hi" :timestamp 1}]} {:api-key "x"})]
+    (is (sp/chan? ch))
+    (is (= :done (:type (last (util/collect-channel-events! ch 1000)))))))
 
 (deftest unified-opts->request-opts-normalizes-unified-shape
   (let [model                                                                      (assoc base-model :max-tokens 64000)
@@ -113,16 +139,16 @@
         simple-in {:max-tokens 99 :reasoning :xhigh :temperature 0.2}]
     (with-redefs [sut/complete* (fn [env' model' context' opts']
                                   (reset! called* {:env env' :model model' :context context' :opts opts'})
-                                  sentinel)]
-      (is (= sentinel (sut/complete env model context simple-in)))
+                                  (p/resolved sentinel))]
+      (is (= sentinel (await! (sut/complete env model context simple-in))))
       (is (= {:max-output-tokens 99
               :temperature       0.2
               :reasoning         {:level :high}}
              (:opts @called*))))
     (with-redefs [sut/complete* (fn [_env _model _context opts']
                                   (reset! called* opts')
-                                  sentinel)]
-      (sut/complete env model context {})
+                                  (p/resolved sentinel))]
+      (await! (sut/complete env model context {}))
       (is (= {:max-output-tokens 32000} @called*)))))
 
 (deftest stream-simple-wrapper-normalizes-options
@@ -130,12 +156,12 @@
         env       (stub-env (fn [_] {:status 200 :body "{}"}))
         model     (assoc base-model :max-tokens 64000)
         context   {:messages [{:role :user :content "hi" :timestamp 1}]}
-        stream-st (stream/create)
+        stream-st (sp/chan)
         simple-in {:max-tokens 77 :reasoning-effort :medium :top-p 0.9}]
     (with-redefs [sut/stream* (fn [env' model' context' opts']
                                 (reset! called* {:env env' :model model' :context context' :opts opts'})
                                 stream-st)]
-      (is (identical? stream-st (sut/stream env model context simple-in)))
+      (is (identical? stream-st (await! (sut/stream env model context simple-in))))
       (is (= {:max-output-tokens 77
               :top-p             0.9
               :reasoning         {:level :medium}}
@@ -166,8 +192,8 @@
         simple-in {:max-tokens 77 :reasoning :high :top-p 0.9}]
     (with-redefs [sut/complete* (fn [_env _model _context opts']
                                   (reset! called* opts')
-                                  sentinel)]
-      (is (= sentinel (sut/complete env model context simple-in)))
+                                  (p/resolved sentinel))]
+      (is (= sentinel (await! (sut/complete env model context simple-in))))
       (is (= {:max-output-tokens 77
               :top-p             0.9
               :reasoning         {:effort :high}}
@@ -189,7 +215,7 @@
         opts         {:api-key           "test-openai-key"
                       :max-output-tokens 128
                       :temperature       0.2}
-        out          (sut/complete* env base-model context opts)
+        out          (await! (sut/complete* env base-model context opts))
         request      @seen-request
         payload      (json/read-str (:body request) {:key-fn keyword})]
     (is
@@ -231,7 +257,7 @@
                                                     :message       {:role "assistant" :content "ok"}}]
                                          :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
           context {:messages [{:role :user :content "hi" :timestamp 1}]}
-          _       (sut/complete* env base-model context {:api-key "x"})
+          _       (await! (sut/complete* env base-model context {:api-key "x"}))
           start   (util/first-event logs* :llx.obs/call-start)
           done    (util/first-event logs* :llx.obs/call-finished)]
       (is (util/submap?
@@ -263,7 +289,7 @@
                                         :completion_tokens 3
                                         :total_tokens      43}})}))
         context {:messages [{:role :user :content "run search" :timestamp 1}]}
-        out     (sut/complete* env base-model context {:api-key "x"})]
+        out     (await! (sut/complete* env base-model context {:api-key "x"}))]
     (is
      (= {:stop-reason :tool-use
          :content     [{:type :tool-call :id "call_1" :name "search" :arguments {:q "foo"}}]
@@ -278,7 +304,7 @@
                              :body   (json/write-str {:error {:message "bad key"}})}))
         context {:messages [{:role :user :content "hi" :timestamp 1}]}
         ex      (try
-                  (sut/complete* env base-model context {:api-key "bad"})
+                  (await! (sut/complete* env base-model context {:api-key "bad"}))
                   (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/authentication-error
             :message      "bad key"
@@ -294,7 +320,7 @@
                                :body   (json/write-str {:error {:message "bad key"}})}))
           context {:messages [{:role :user :content "hi" :timestamp 1}]}
           _       (try
-                    (sut/complete* env base-model context {:api-key "bad"})
+                    (await! (sut/complete* env base-model context {:api-key "bad"}))
                     (catch clojure.lang.ExceptionInfo _ nil))
           status  (util/first-event logs* :llx.obs/http-status-error)
           failed  (util/first-event logs* :llx.obs/call-error)]
@@ -325,7 +351,7 @@
                                             :usage   {:prompt_tokens     3
                                                       :completion_tokens 2
                                                       :total_tokens      5}})}))
-        out          (sut/complete* env model {:messages [{:role :user :content "ping" :timestamp 1}]} {})
+        out          (await! (sut/complete* env model {:messages [{:role :user :content "ping" :timestamp 1}]} {}))
         request      @seen-request]
     (is
      (= {:role        :assistant
@@ -434,9 +460,9 @@
                                                       :completion_tokens 1
                                                       :total_tokens      2}})}))
         env          (assoc env :registry (registry/immutable-registry))
-        out          (sut/complete* env base-model {:messages [{:role :user :content "ping" :timestamp 1}]}
-                                    {:api-key  "x"
-                                     :registry sut/default-registry})]
+        out          (await! (sut/complete* env base-model {:messages [{:role :user :content "ping" :timestamp 1}]}
+                                            {:api-key  "x"
+                                             :registry sut/default-registry}))]
     (is (= "override ok" (get-in out [:content 0 :text])))
     (is (= "gpt-4o-mini" (get-in (json/read-str (:body @seen-request) {:key-fn keyword}) [:model])))))
 
@@ -481,7 +507,7 @@
                                       :stop-reason :tool-use
                                       :timestamp   2}
                                      {:role :user :content "continue" :timestamp 3}]}]
-    (sut/complete* env model context {})
+    (await! (sut/complete* env model context {}))
     (is (= [:user :assistant :tool-result :user]
            (mapv :role (:messages @captured-context))))
     (is (= "norm_call_1" (get-in @captured-context [:messages 1 :content 0 :id])))
@@ -528,7 +554,7 @@
                                   :is-error?    false
                                   :timestamp    3}
                                  {:role :user :content "say hi" :timestamp 4}]}
-        _            (sut/complete* env model context {:api-key "x"})
+        _            (await! (sut/complete* env model context {:api-key "x"}))
         payload      (json/read-str (:body @seen-request) {:key-fn keyword})
         call-id      (get-in payload [:messages 1 :tool_calls 0 :id])
         result-id    (get-in payload [:messages 2 :tool_call_id])]
@@ -559,8 +585,8 @@
                                            {:content     [{:type "text" :text "hello from claude"}]
                                             :stop_reason "end_turn"
                                             :usage       {:input_tokens 4 :output_tokens 3}})}))
-        out          (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                                    {:api-key "anthropic-test-key"})
+        out          (await! (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                            {:api-key "anthropic-test-key"}))
         payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
     (is (= "https://api.anthropic.com/v1/messages" (:url @seen-request)))
     (is (= "anthropic-test-key" (get-in @seen-request [:headers "x-api-key"])))
@@ -593,7 +619,7 @@
                                            (case k
                                              "GEMINI_API_KEY" "google-key"
                                              nil))))
-        out          (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {})
+        out          (await! (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]} {}))
         payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
     (is (= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
            (:url @seen-request)))
@@ -621,9 +647,9 @@
                                                              :output_tokens               50
                                                              :cache_read_input_tokens     10
                                                              :cache_creation_input_tokens 5}})}))
-        anthropic-out   (sut/complete* anthropic-env anthropic-model
-                                       {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                                       {:api-key "anthropic-test-key"})
+        anthropic-out   (await! (sut/complete* anthropic-env anthropic-model
+                                               {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                               {:api-key "anthropic-test-key"}))
         google-model    {:id             "gemini-2.5-flash"
                          :name           "Gemini 2.5 Flash"
                          :provider       :google
@@ -647,9 +673,9 @@
                                               (case k
                                                 "GEMINI_API_KEY" "google-key"
                                                 nil))))
-        google-out      (sut/complete* google-env google-model
-                                       {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                                       {})]
+        google-out      (await! (sut/complete* google-env google-model
+                                               {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                               {}))]
     (is (= 0.25 (get-in anthropic-out [:usage :cost :total])))
     (is (= 0.28 (get-in google-out [:usage :cost :total])))))
 
@@ -752,8 +778,8 @@
                                                       :content [{:type "output_text"
                                                                  :text "hello from responses"}]}]
                                             :usage  {:input_tokens 6 :output_tokens 4 :total_tokens 10}})}))
-        out          (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
-                                    {:api-key "openai-test-key"})
+        out          (await! (sut/complete* env model {:messages [{:role :user :content "say hi" :timestamp 1}]}
+                                            {:api-key "openai-test-key"}))
         payload      (json/read-str (:body @seen-request) {:key-fn keyword})]
     (is (= "https://api.openai.com/v1/responses" (:url @seen-request)))
     (is (= "Bearer openai-test-key" (get-in @seen-request [:headers "Authorization"])))
@@ -821,7 +847,7 @@
         context {:messages [{:role :user :content "hello" :timestamp 1}]
                  :unknown  true}]
     (is (thrown? Exception
-                 (sut/complete* env base-model context {:api-key "x"})))))
+                 (await! (sut/complete* env base-model context {:api-key "x"}))))))
 
 (deftest complete-rejects-non-map-opts-with-schema-error
   (let [env     (stub-env (fn [_request]
@@ -833,7 +859,7 @@
                                        :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
         context {:messages [{:role :user :content "hello" :timestamp 1}]}]
     (is (thrown? Exception
-                 (sut/complete* env base-model context [1 2])))))
+                 (await! (sut/complete* env base-model context [1 2]))))))
 
 (deftest complete-fails-fast-on-unknown-openai-completions-stop-reason
   (let [env     (stub-env (fn [_request]
@@ -847,7 +873,7 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Unknown OpenAI completions stop reason"
-         (sut/complete* env base-model context {:api-key "x"})))))
+         (await! (sut/complete* env base-model context {:api-key "x"}))))))
 
 (deftest complete-rejects-malformed-adapter-finalize-result
   (let [adapter {:api             :openai-completions
@@ -865,7 +891,7 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Schema validation failed"
-         (sut/complete* env base-model context {:api-key "x"})))))
+         (await! (sut/complete* env base-model context {:api-key "x"}))))))
 
 (deftest complete-retries-on-transient-error
   (let [call-count (atom 0)
@@ -883,7 +909,7 @@
                                                       :completion_tokens 1
                                                       :total_tokens      2}})})))
         context    {:messages [{:role :user :content "hi" :timestamp 1}]}
-        out        (sut/complete* env base-model context {:api-key "x" :max-retries 2})]
+        out        (await! (sut/complete* env base-model context {:api-key "x" :max-retries 2}))]
     (is (= 2 @call-count))
     (is (= :stop (:stop-reason out)))
     (is (= [{:type :text :text "ok"}] (:content out)))))
@@ -907,7 +933,7 @@
                                                              :total_tokens      2}})})))
                           :thread/sleep (fn [ms] (swap! sleep-ms* conj ms)))
         context    {:messages [{:role :user :content "hi" :timestamp 1}]}
-        out        (sut/complete* env base-model context {:api-key "x" :max-retries 2})]
+        out        (await! (sut/complete* env base-model context {:api-key "x" :max-retries 2}))]
     (is (= 2 @call-count))
     (is (= [14927] @sleep-ms*))
     (is (= :stop (:stop-reason out)))
@@ -921,7 +947,7 @@
                                 :body   (json/write-str {:error {:message "unauthorized"}})}))
         context    {:messages [{:role :user :content "hi" :timestamp 1}]}
         ex         (try
-                     (sut/complete* env base-model context {:api-key "bad" :max-retries 2})
+                     (await! (sut/complete* env base-model context {:api-key "bad" :max-retries 2}))
                      (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/authentication-error
             :message      "unauthorized"
@@ -939,7 +965,7 @@
                                 :body   (json/write-str {:error {:message "service unavailable"}})}))
         context    {:messages [{:role :user :content "hi" :timestamp 1}]}
         ex         (try
-                     (sut/complete* env base-model context {:api-key "x" :max-retries 0})
+                     (await! (sut/complete* env base-model context {:api-key "x" :max-retries 0}))
                      (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type         :llx/server-error
             :message      "service unavailable"
@@ -953,7 +979,7 @@
   (let [env-no-sleep (dissoc (stub-env (fn [_] {:status 200 :body "{}"})) :thread/sleep)
         context      {:messages [{:role :user :content "hi" :timestamp 1}]}
         ex           (try
-                       (sut/complete* env-no-sleep base-model context {:api-key "x" :max-retries 2})
+                       (await! (sut/complete* env-no-sleep base-model context {:api-key "x" :max-retries 2}))
                        (catch clojure.lang.ExceptionInfo e e))]
     (is (= {:type        :llx/config-error
             :max-retries 2}
@@ -971,7 +997,7 @@
                                                               :total_tokens      2}})}))
                              :thread/sleep)
         context      {:messages [{:role :user :content "hi" :timestamp 1}]}
-        out          (sut/complete* env-no-sleep base-model context {:api-key "x" :max-retries 0})]
+        out          (await! (sut/complete* env-no-sleep base-model context {:api-key "x" :max-retries 0}))]
     (is (= :stop (:stop-reason out)))))
 
 (deftest complete-rejects-unsupported-xhigh-with-structured-error
@@ -984,9 +1010,9 @@
                                        :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
         context {:messages [{:role :user :content "hi" :timestamp 1}]}
         ex      (try
-                  (sut/complete* env base-model context
-                                 {:api-key   "x"
-                                  :reasoning {:level :xhigh}})
+                  (await! (sut/complete* env base-model context
+                                         {:api-key   "x"
+                                          :reasoning {:level :xhigh}}))
                   nil
                   (catch clojure.lang.ExceptionInfo e e))]
     (is (some? ex) "should throw for unsupported :xhigh")
@@ -1022,9 +1048,9 @@
                                            :stop_reason "end_turn"
                                            :usage       {:input_tokens 1 :output_tokens 1}})}))
         context     {:messages [{:role :user :content "hi" :timestamp 1}]}
-        out         (sut/complete* env xhigh-model context
-                                   {:api-key   "x"
-                                    :reasoning {:level :xhigh}})]
+        out         (await! (sut/complete* env xhigh-model context
+                                           {:api-key   "x"
+                                            :reasoning {:level :xhigh}}))]
     (is (= :assistant (:role out)))
     (is (= :stop (:stop-reason out)))))
 
@@ -1051,7 +1077,7 @@
     (is (= :done (:type (last events))))
     (is (= :stop (:stop-reason out)))))
 
-(deftest stream-cancel-delegates-to-runtime-cancel-fn
+(deftest stream-close-delegates-to-runtime-cancel-fn
   (let [cancel-count* (atom 0)
         run-count*    (atom 0)
         runtime-hook  (fn [_input]
@@ -1063,10 +1089,8 @@
                           (assoc :stream/run! runtime-hook))
         st            (sut/stream* env base-model
                                    {:messages [{:role :user :content "hi" :timestamp 1}]}
-                                   {:api-key "x"})
-        closed*       (promise)]
-    (stream/consume! st {:on-close (fn [close-meta] (deliver closed* close-meta))})
-    (stream/cancel! st)
+                                   {:api-key "x"})]
+    (sp/close st)
+    (Thread/sleep 20)
     (is (= 1 @run-count*))
-    (is (= 1 @cancel-count*))
-    (is (= :cancelled (:reason (deref closed* 1000 ::timeout))))))
+    (is (= 1 @cancel-count*))))
