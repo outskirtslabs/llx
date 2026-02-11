@@ -1,8 +1,7 @@
 (ns llx.ai.impl.client.node
   (:require
    [llx.ai.impl.client :as client]
-   [llx.ai.impl.utils.unicode :as unicode]
-   [promesa.core :as p]))
+   [llx.ai.impl.utils.unicode :as unicode]))
 
 (defn- not-implemented
   [feature]
@@ -33,9 +32,7 @@
                                  (catch :default _
                                    nil)))
    :http/read-body-string    (fn [body] (if (string? body) body (str body)))
-   :stream/run!              (fn [_]
-                               ;; Keep runtime behavior async-compatible in CLJS scaffolding.
-                               (p/do! (not-implemented :stream/run!)))
+   :stream/run!              (fn [_] (not-implemented :stream/run!))
    :registry                 client/default-registry
    :clock/now-ms             (fn [] (.now js/Date))
    :id/new                   (fn []

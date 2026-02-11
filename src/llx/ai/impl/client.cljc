@@ -248,17 +248,29 @@
                                         ((:build-request adapter) call-env model context request-opts true))
              state*                    (atom {:model model})
              run-stream!               (:stream/run! env)
+             runtime-cancel*           (atom nil)
              out                       (let [out* (atom nil)
                                              st   (stream/create
                                                    {:clock/now-ms (:clock/now-ms env)
+                                                    :cancel-fn    (fn []
+                                                                    (when-let [cancel-fn @runtime-cancel*]
+                                                                      (cancel-fn)))
                                                     :start-fn     (fn []
-                                                                    (run-stream! {:adapter      adapter
-                                                                                  :env          call-env
-                                                                                  :model        model
-                                                                                  :request      request
-                                                                                  :out          @out*
-                                                                                  :state*       state*
-                                                                                  :request-opts request-opts}))})]
+                                                                    (let [runtime-result (run-stream! {:adapter      adapter
+                                                                                                       :env          call-env
+                                                                                                       :model        model
+                                                                                                       :request      request
+                                                                                                       :out          @out*
+                                                                                                       :state*       state*
+                                                                                                       :request-opts request-opts})]
+                                                                      (cond
+                                                                        (fn? runtime-result)
+                                                                        (reset! runtime-cancel* runtime-result)
+
+                                                                        (map? runtime-result)
+                                                                        (reset! runtime-cancel* (:cancel-fn runtime-result))
+
+                                                                        :else nil)))})]
                                          (reset! out* st)
                                          st)]
          (when-not run-stream!

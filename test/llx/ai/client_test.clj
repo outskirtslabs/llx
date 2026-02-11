@@ -1050,3 +1050,23 @@
     (is (= 2 @call-count))
     (is (= :done (:type (last events))))
     (is (= :stop (:stop-reason out)))))
+
+(deftest stream-cancel-delegates-to-runtime-cancel-fn
+  (let [cancel-count* (atom 0)
+        run-count*    (atom 0)
+        runtime-hook  (fn [_input]
+                        (swap! run-count* inc)
+                        {:cancel-fn (fn [] (swap! cancel-count* inc))})
+        env           (-> (stub-env (fn [_request]
+                                      {:status 200
+                                       :body   (sse-body ["data: [DONE]"])}))
+                          (assoc :stream/run! runtime-hook))
+        st            (sut/stream* env base-model
+                                   {:messages [{:role :user :content "hi" :timestamp 1}]}
+                                   {:api-key "x"})
+        closed*       (promise)]
+    (stream/consume! st {:on-close (fn [close-meta] (deliver closed* close-meta))})
+    (stream/cancel! st)
+    (is (= 1 @run-count*))
+    (is (= 1 @cancel-count*))
+    (is (= :cancelled (:reason (deref closed* 1000 ::timeout))))))
