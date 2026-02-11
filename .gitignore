@@ -15,3 +15,4 @@ prompts/PROMPTS.md
 result
 .env
 *.md
+.shadow-cljs

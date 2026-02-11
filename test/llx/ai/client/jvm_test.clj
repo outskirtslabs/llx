@@ -1,8 +1,8 @@
-(ns llx.ai.client-runtime-test
+(ns llx.ai.client.jvm-test
   (:require
    [babashka.json :as json]
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.client.runtime :as sut]
+   [llx.ai.impl.client.jvm :as sut]
    [llx.ai.test-util :as util]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.exec.csp :as sp]))

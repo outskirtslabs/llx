@@ -12,13 +12,33 @@
          {:doc  "Start a local development server"
           :task (apply clojure "-M:repl/dev:dev" *command-line-args*)}
 
-         test
+         test:jvm
          {:doc  "Run all tests or specific test suites"
-          :task (apply clojure "-M:dev:kaocha" *command-line-args*)}
+          :task (apply clojure "-M:dev:kaocha"
+                       (if (seq *command-line-args*) *command-line-args* [":unit"]))}
+
+         test:jvm-live
+         {:doc  "Run all tests or specific test suites"
+          :task (apply clojure "-M:dev:kaocha"
+                       (if (seq *command-line-args*) *command-line-args* [":live"]))}
+
+         test:watch-cljs
+         {:doc  "Watch CLJS tests with shadow-cljs"
+          :task (apply clojure "-M:dev:shadow-cljs" "watch" "test" *command-line-args*)}
+
+         test:build-cljs
+         {:doc  "Compile CLJS tests with shadow-cljs without autorun"
+          :task (apply clojure "-M:dev:shadow-cljs" "compile" "test"
+                       "--config-merge" "{:autorun false}" *command-line-args*)}
 
          test:cljs
-         {:doc  "Compile and run ClojureScript tests on Node"
-          :task (clojure "-M:cljs-test" "-m" "llx.ai.cljs-test-runner")}
+         {:doc     "Compile and run CLJS tests with shadow-cljs"
+          :depends [test:build-cljs]
+          :task    (shell "node" "target/tests.js")}
+
+         test
+         {:doc     "TODO this description"
+          :depends [test:jvm test:cljs]}
 
          generate-models
          {:doc  "Generate built-in model catalog artifact"
@@ -72,6 +92,10 @@
          qa
          {:doc     "Run full quality assurance: format, lint, and test"
           :depends [fmt lint guardrails:check-signatures test]}
+
+         qa-long
+         {:doc     "Run full quality assurance: format, lint, and test"
+          :depends [fmt lint guardrails:check-signatures test test:jvm-live]}
 
          ci
          {:doc     "Run CI checks: test, format check, and lint"

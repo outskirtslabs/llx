@@ -1,12 +1,13 @@
 (ns llx.ai.tests-main
   (:require
    [clojure.test :as t]
-   [llx.ai.default-env-test]))
+   [llx.ai.client.node-test]))
 
 (enable-console-print!)
 
 (set! *main-cli-fn*
       #(t/run-tests
+        'llx.ai.client-runtime-test
         'llx.ai.default-env-test))
 
 (defmethod t/report [:cljs.test/default :end-run-tests]

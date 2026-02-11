@@ -14,19 +14,21 @@
             :main-opts   ["-m" "kaocha.runner"]}
 
            :dev
-           {:extra-paths ["dev"]
+           {:extra-paths ["dev" "test"]
             :jvm-opts    ["-Dguardrails.enabled=true"]
 
             :extra-deps  {dev.weavejester/hashp                    {:mvn/version "0.5.1"}
                           io.github.tonsky/clj-reload              {:mvn/version "1.0.0"}
                           com.cnuernber/charred                    {:mvn/version "1.037"}
                           djblue/portal                            {:mvn/version "0.62.1"}
+                          criterium/criterium                      {:mvn/version "0.4.6"}
+                          thheller/shadow-cljs                     {:mvn/version "RELEASE"}
                           com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}}
 
-           :cljs-test
-           {:extra-paths ["test"]
-            :extra-deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}
-                          funcool/promesa           {:mvn/version "12.0.0-RC2"}}}
+           :shadow-cljs
+           {:main-opts ["-m" "shadow.cljs.devtools.cli"]
+            :jvm-opts  ["-XX:+UnlockExperimentalVMOptions"
+                        "-XX:CompileCommand=blackhole,criterium.blackhole.Blackhole::consume"]}
 
            :build
            {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.11"
