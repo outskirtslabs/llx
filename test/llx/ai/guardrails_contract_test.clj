@@ -50,9 +50,9 @@
                                               :message       {:role "assistant" :content "ok"}}]
                                    :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))]
     (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
-                          (client/complete env test-model {} {:api-key "x"})))
+                          (client/complete* env test-model {} {:api-key "x"})))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
-                          (client/stream env test-model {} {:api-key "x"})))
+                          (client/stream* env test-model {} {:api-key "x"})))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
                           (openai-completions/build-request env test-model {} {:api-key "x"} false)))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re

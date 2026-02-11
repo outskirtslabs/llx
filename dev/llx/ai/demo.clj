@@ -80,80 +80,80 @@
 (comment
   (schema/valid? :llx/model openai-model)
   (schema/valid? :llx/message (first (:messages demo-context)))
-  (schema/valid? :llx/request-options {:max-output-tokens 64 :temperature 0.2})
+  (schema/valid? :llx/unified-request-options {:max-tokens 64 :temperature 0.2})
   (jvm/complete openai-model
                 {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-output-tokens 64 :temperature 0.0})
+                {:max-tokens 64 :temperature 0.0})
   (jvm/complete ollama-model
                 {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-output-tokens 64 :temperature 0.0})
+                {:max-tokens 64 :temperature 0.0})
   (jvm/complete anthropic-model
                 {:messages [{:role :user :content "Who are you?" :timestamp 1}]}
-                {:max-output-tokens 128})
+                {:max-tokens 128})
   (let [stream (jvm/stream ollama-model
                            {:messages [{:role :user :content "reply with exactly: llx stream demo ok" :timestamp 1}]}
-                           {:max-output-tokens 64 :temperature 0.0})]
+                           {:max-tokens 64 :temperature 0.0})]
     (collect-stream! stream))
   (let [stream (jvm/stream anthropic-model
                            {:messages [{:role :user :content "reply with exactly: llx anthropic stream demo ok" :timestamp 1}]}
-                           {:max-output-tokens 128})]
+                           {:max-tokens 128})]
     (collect-stream! stream))
   (jvm/complete google-model
                 {:messages [{:role :user :content "reply with exactly: llx google demo ok" :timestamp 1}]}
-                {:max-output-tokens 96
-                 :reasoning         {:level :high :effort :high :summary :detailed}})
+                {:max-tokens 96
+                 :reasoning  :high})
   (jvm/complete mistral-model
                 {:messages [{:role :user :content "reply with exactly: llx mistral demo ok" :timestamp 1}]}
-                {:max-output-tokens 96})
+                {:max-tokens 96})
   (let [stream (jvm/stream google-model
                            {:messages [{:role :user :content "reply with exactly: llx google stream demo ok" :timestamp 1}]}
-                           {:max-output-tokens 96
-                            :reasoning         {:level :high :effort :high :summary :detailed}})]
+                           {:max-tokens 96
+                            :reasoning  :high})]
     (collect-stream! stream))
   (let [stream (jvm/stream mistral-model
                            {:messages [{:role :user :content "reply with exactly: llx mistral stream demo ok" :timestamp 1}]}
-                           {:max-output-tokens 96})]
+                           {:max-tokens 96})]
     (collect-stream! stream))
   ;; Handoff: Anthropic -> Google
   (let [user1  {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
         step-1 (jvm/complete anthropic-model
                              {:messages [user1]}
-                             {:max-output-tokens 96})
+                             {:max-tokens 96})
         user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
     (jvm/complete google-model
                   {:messages [user1 step-1 user2]}
-                  {:max-output-tokens 128
-                   :reasoning         {:level :high :effort :high :summary :detailed}}))
+                  {:max-tokens 128
+                   :reasoning  :high}))
   ;; Handoff: Google -> OpenAI Completions
   (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
         step-1 (jvm/complete google-model
                              {:messages [user1]}
-                             {:max-output-tokens 96
-                              :reasoning         {:level :high :effort :high :summary :detailed}})
+                             {:max-tokens 96
+                              :reasoning  :high})
         user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
     (jvm/complete openai-model
                   {:messages [user1 step-1 user2]}
-                  {:max-output-tokens 96
+                  {:max-tokens 96
                    :temperature       0.0}))
   ;; Handoff: Google -> Mistral
   (let [user1       {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
         step-1      (jvm/complete google-model
                                   {:messages [user1]}
-                                  {:max-output-tokens 96
-                                   :reasoning         {:level :high :effort :high :summary :detailed}})
+                                  {:max-tokens 96
+                                   :reasoning  :high})
         user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
     (jvm/complete mistral-model
                   {:messages [user1 step-1 user2]}
-                  {:max-output-tokens 128}))
+                  {:max-tokens 128}))
   ;; Handoff: Mistral -> OpenAI-compatible
   (let [user1       {:role :user :content "Give one short sentence about Clojure macros." :timestamp 1}
         step-1      (jvm/complete mistral-model
                                   {:messages [user1]}
-                                  {:max-output-tokens 96})
+                                  {:max-tokens 96})
         user2       {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
     (jvm/complete ollama-model
                   {:messages [user1 step-1 user2]}
-                  {:max-output-tokens 128
+                  {:max-tokens 128
                    :temperature       0.0}))
   ;;
 
@@ -173,38 +173,34 @@
     ;; Responses complete
     (jvm/complete openai-responses-model
                   {:messages [{:role :user :content "reply with exactly: llx openai responses demo ok" :timestamp 1}]}
-                  {:max-output-tokens 96
-                   :reasoning         {:level :high :effort :high :summary :detailed}
-                   :session-id        "demo-openai-responses"
-                   :cache-control     :short})
-;; ERROR
-;; =>  Schema validation failed
+                  {:max-tokens 96
+                   :reasoning  :high})
 
     ;; Responses stream
     (let [stream (jvm/stream openai-responses-model
                              {:messages [{:role :user :content "reply with exactly: llx openai responses stream demo ok" :timestamp 1}]}
-                             {:max-output-tokens 96
-                              :reasoning         {:level :high :effort :high :summary :detailed}})]
+                             {:max-tokens 96
+                              :reasoning  :high})]
       (collect-stream! stream))
 
     ;; Handoff: OpenAI Responses -> Anthropic
     (let [user1  {:role :user :content "Give one short sentence about Clojure protocols." :timestamp 1}
           step-1 (jvm/complete openai-responses-model
                                {:messages [user1]}
-                               {:max-output-tokens 128
-                                :reasoning         {:level :high :effort :high :summary :detailed}})
+                               {:max-tokens 128
+                                :reasoning  :high})
           user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
       (jvm/complete anthropic-model
                     {:messages [user1 step-1 user2]}
-                    {:max-output-tokens 128}))
+                    {:max-tokens 128}))
 
     ;; Handoff: Anthropic -> OpenAI Responses
     (let [user1  {:role :user :content "Give one short sentence about Lisp history." :timestamp 1}
           step-1 (jvm/complete anthropic-model
                                {:messages [user1]}
-                               {:max-output-tokens 96})
+                               {:max-tokens 96})
           user2  {:role :user :content "Now say hi and summarize your prior sentence." :timestamp 2}]
       (jvm/complete openai-responses-model
                     {:messages [user1 step-1 user2]}
-                    {:max-output-tokens 128
-                     :reasoning         {:level :high :effort :high :summary :detailed}}))))
+                    {:max-tokens 128
+                     :reasoning  :high}))))

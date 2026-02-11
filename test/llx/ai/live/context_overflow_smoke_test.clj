@@ -55,7 +55,7 @@
                                   " max-retries=" (:max-retries opts)))
         call*          (future
                          (try
-                           (client/complete model context opts)
+                           (client/complete* model context opts)
                            (catch clojure.lang.ExceptionInfo e
                              (let [error-data (ex-data e)]
                                (log! (str "ERROR model=" (:id model)

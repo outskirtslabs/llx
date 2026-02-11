@@ -6,21 +6,29 @@
    [llx.ai.impl.utils.tool-validation :as impl.tool-validation]
    [llx.ai.impl.utils.unicode :as impl.unicode]))
 
-(defn complete
-  "Runs one non-streaming assistant turn and returns a canonical assistant message.
+(defn complete*
+  "Runs one non-streaming assistant turn using provider-style options.
 
-  `env` is required and provides runtime hooks (HTTP, JSON, clock, IDs, retries).
+  Use `complete*` when you need provider-level control and adapter-specific
+  options. This is the provider path.
 
-  Use this function when you need full canonical/provider-specific request control.
+  `opts` is validated against `:llx/provider-request-options` in
+  `llx/src/llx/ai/impl/schema/options.cljc`.
 
-  Options:
+  Adapter `build-request` boundaries also validate adapter-specific schemas:
+  `:llx/openai-completions-provider-options`,
+  `:llx/openai-responses-provider-options`,
+  `:llx/anthropic-provider-options`, and
+  `:llx/google-provider-options`.
+
+  Common provider option keys:
 
   | key                  | description                                                 |
   |----------------------|-------------------------------------------------------------|
   | `:max-output-tokens` | Requested output token cap.                                 |
   | `:temperature`       | Sampling temperature.                                       |
   | `:top-p`             | Nucleus sampling probability.                               |
-  | `:reasoning`         | Canonical reasoning map, for example `{:level :high}`.      |
+  | `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
   | `:api-key`           | Provider API key override for this call.                    |
   | `:headers`           | Additional provider request headers.                        |
   | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
@@ -28,23 +36,101 @@
   | `:registry`          | Per-call adapter registry override.                         |
   | `:max-retries`       | Retry count for transient failures (default `2`).           |
 
-  Additional provider-specific option keys are passed through to the selected adapter."
+  Use [[complete]] for the unified API."
   [env model context opts]
-  (impl.client/complete env model context opts))
+  (impl.client/complete* env model context opts))
+
+(defn stream*
+  "Runs one streaming assistant turn using provider-style options.
+
+  Use `stream*` when you need provider-level control and adapter-specific
+  options. This is the provider path.
+
+  `opts` is validated against `:llx/provider-request-options` in
+  `llx/src/llx/ai/impl/schema/options.cljc`, and adapter-specific schemas are
+  enforced at each adapter `build-request` boundary.
+
+  Common provider option keys:
+
+  | key                  | description                                                |
+  |----------------------|------------------------------------------------------------|
+  | `:max-output-tokens` | Requested output token cap.                                |
+  | `:temperature`       | Sampling temperature.                                      |
+  | `:top-p`             | Nucleus sampling probability.                              |
+  | `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
+  | `:api-key`           | Provider API key override for this call.                   |
+  | `:headers`           | Additional provider request headers.                       |
+  | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
+  | `:metadata`          | Request metadata map forwarded to adapter payload builders.|
+  | `:registry`          | Per-call adapter registry override.                        |
+  | `:max-retries`       | Retry count for transient failures (default `2`).          |
+
+  Consume events via [[llx.ai.stream/consume!]]. Stream production starts after
+  consume attachment. Use [[stream]] for the unified API."
+  [env model context opts]
+  (impl.client/stream* env model context opts))
+
+(defn complete
+  "Runs one non-streaming assistant turn using the unified options API.
+
+  This is the unified path and is recommended for most callers.
+  `opts` is validated against `:llx/unified-request-options` in
+  `llx/src/llx/ai/impl/schema/options.cljc`.
+
+  Unified options are normalized and forwarded to provider adapters.
+  For example:
+  - `:max-tokens` -> provider `:max-output-tokens`
+  - `:reasoning` / `:reasoning-effort` -> provider reasoning shape
+
+  Unified option keys:
+
+  | key                 | description                                                       |
+  |---------------------|-------------------------------------------------------------------|
+  | `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+  | `:temperature`      | Sampling temperature.                                             |
+  | `:top-p`            | Nucleus sampling probability.                                     |
+  | `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+  | `:reasoning-effort` | Alias for `:reasoning`.                                           |
+  | `:api-key`          | Provider API key override for this call.                          |
+  | `:headers`          | Additional provider request headers.                              |
+  | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+  | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+  | `:registry`         | Per-call adapter registry override.                               |
+
+  Use [[complete*]] if you need provider-specific options that are outside the
+  unified schema."
+  [env model context unified-opts]
+  (impl.client/complete env model context unified-opts))
 
 (defn stream
-  "Runs one streaming assistant turn and returns an LLX stream handle.
+  "Runs one streaming assistant turn using the unified options API.
 
-  `env` is required and provides runtime hooks (HTTP, JSON, clock, IDs, retries).
+  This is the unified path and is recommended for most callers.
+  `opts` is validated against `:llx/unified-request-options` in
+  `llx/src/llx/ai/impl/schema/options.cljc`.
 
-  Use this function when you need full canonical/provider-specific request control.
+  Unified option keys:
 
-  Consume events and terminal callbacks via [[llx.ai.stream/consume!]].
-  Stream production starts when the stream is consumed.
+  | key                 | description                                                       |
+  |---------------------|-------------------------------------------------------------------|
+  | `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+  | `:temperature`      | Sampling temperature.                                             |
+  | `:top-p`            | Nucleus sampling probability.                                     |
+  | `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+  | `:reasoning-effort` | Alias for `:reasoning`.                                           |
+  | `:api-key`          | Provider API key override for this call.                          |
+  | `:headers`          | Additional provider request headers.                              |
+  | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+  | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+  | `:registry`         | Per-call adapter registry override.                               |
 
-  For Promesa CSP channel consumption, see [[llx.ai.promesa.csp/stream]]."
-  [env model context opts]
-  (impl.client/stream env model context opts))
+  Consume events via [[llx.ai.stream/consume!]]. Stream production starts after
+  consume attachment.
+
+  Use [[stream*]] for provider-specific option control.
+  For Promesa CSP consumption, see [[llx.ai.promesa.csp/stream]]."
+  [env model context unified-opts]
+  (impl.client/stream env model context unified-opts))
 
 (defn get-model
   "Returns the model definition for `provider` and `model-id`, or `nil` when absent."

@@ -7,7 +7,8 @@
   - [[stream->chan]] emits ordered LLX events to a CSP channel.
   - [[result]] resolves to the terminal assistant message.
   - [[drain]] resolves to all observed events.
-  - [[stream]] and [[stream+]] are convenience wrappers around [[llx.ai/stream]] APIs.
+  - [[stream]] is the unified-options convenience wrapper around [[llx.ai/stream]].
+  - [[stream*]] and [[stream+]] are convenience wrappers around [[llx.ai/stream*]].
 
   Buffering defaults to a bounded sliding buffer (`64`) so slow consumers drop
   oldest events first under backpressure.
@@ -88,8 +89,14 @@
   (-> (ai/stream env model context opts)
       (stream->chan)))
 
+(defn stream*
+  "Calls [[llx.ai/stream*]] and returns a CSP channel via [[stream->chan]]."
+  [env model context opts]
+  (-> (ai/stream* env model context opts)
+      (stream->chan)))
+
 (defn stream+
-  "Calls [[llx.ai/stream]] and returns combined stream helpers.
+  "Calls [[llx.ai/stream*]] and returns combined stream helpers.
 
   Returns a map with:
 
@@ -98,7 +105,7 @@
   - `:result` deferred terminal assistant message
   - `:cancel!` idempotent cancel function delegating to [[llx.ai.stream/cancel!]]"
   [env model context opts]
-  (let [st      (ai/stream env model context opts)
+  (let [st      (ai/stream* env model context opts)
         ch      (sp/chan :buf (sp/sliding-buffer 64))
         result* (p/deferred)]
     (stream/consume! st

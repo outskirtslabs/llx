@@ -45,6 +45,37 @@
       (:registry env)
       default-registry))
 
+(defn- clamp-reasoning-level
+  [model level]
+  (if (and (= :xhigh level) (not (models/supports-xhigh? model)))
+    :high
+    level))
+
+(>defn unified-opts->request-opts
+       "Converts unified options to provider-path request options.
+
+  See [[llx.ai/complete]] and [[llx.ai/stream]] for unified option semantics."
+       [model unified-opts]
+       [:llx/model [:maybe :llx/unified-request-options] => :llx/provider-request-options]
+       (let [unified-opts      (or unified-opts {})
+             max-output-tokens (or (:max-tokens unified-opts)
+                                   (min (long (:max-tokens model)) 32000))
+             reasoning-level   (or (:reasoning unified-opts) (:reasoning-effort unified-opts))
+             reasoning-level   (when reasoning-level (clamp-reasoning-level model reasoning-level))
+             reasoning         (when reasoning-level
+                                 (if (= :openai-responses (:api model))
+                                   {:effort reasoning-level}
+                                   {:level reasoning-level}))]
+         (cond-> {:max-output-tokens max-output-tokens}
+           (contains? unified-opts :temperature) (assoc :temperature (:temperature unified-opts))
+           (contains? unified-opts :top-p) (assoc :top-p (:top-p unified-opts))
+           (contains? unified-opts :api-key) (assoc :api-key (:api-key unified-opts))
+           (contains? unified-opts :headers) (assoc :headers (:headers unified-opts))
+           (contains? unified-opts :signal) (assoc :signal (:signal unified-opts))
+           (contains? unified-opts :metadata) (assoc :metadata (:metadata unified-opts))
+           (contains? unified-opts :registry) (assoc :registry (:registry unified-opts))
+           reasoning (assoc :reasoning reasoning))))
+
 (defn- assert-reasoning-level!
   [model opts]
   (when (= :xhigh (get-in opts [:reasoning :level]))
@@ -122,17 +153,17 @@
                 :request-id request-id
                 :body body))))))
 
-(>defn complete
-       "Runs a non-streaming completion request and returns the canonical assistant message."
+(>defn complete*
+       "See [[llx.ai/complete*]]"
        [env model context opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/message-assistant]
-       (let [_                         (schema/assert-valid! [:maybe :llx/request-options] opts)
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/message-assistant]
+       (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
              opts                      (or opts {})
              {:keys [registry-override
                      request-opts]}    (split-client-opts opts)
              _                         (schema/assert-valid! :llx/env env)
              _                         (schema/assert-valid! :llx/model model)
-             _                         (schema/assert-valid! :llx/request-options request-opts)
+             _                         (schema/assert-valid! :llx/provider-request-options request-opts)
              _                         (assert-reasoning-level! model request-opts)
              context                   (assert-context! context)
              call-env                  (assoc env :call/id ((:id/new env)))
@@ -195,17 +226,17 @@
                                   :provider-code (get (ex-data ex) :provider-code)}})
              (throw ex)))))
 
-(>defn stream
-       "Runs a streaming completion request and returns an LLX event-stream map."
+(>defn stream*
+       "See [[llx.ai/stream*]]"
        [env model context opts]
-       [:llx/env :llx/model :llx/context-map [:maybe :llx/request-options] => :llx/stream-map]
-       (let [_                         (schema/assert-valid! [:maybe :llx/request-options] opts)
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/provider-request-options] => :llx/stream-map]
+       (let [_                         (schema/assert-valid! [:maybe :llx/provider-request-options] opts)
              opts                      (or opts {})
              {:keys [registry-override
                      request-opts]}    (split-client-opts opts)
              _                         (schema/assert-valid! :llx/env env)
              _                         (schema/assert-valid! :llx/model model)
-             _                         (schema/assert-valid! :llx/request-options request-opts)
+             _                         (schema/assert-valid! :llx/provider-request-options request-opts)
              _                         (assert-reasoning-level! model request-opts)
              context                   (assert-context! context)
              call-env                  (assoc env :call/id ((:id/new env)))
@@ -258,3 +289,17 @@
                                   :request-id    (get (ex-data ex) :request-id)
                                   :provider-code (get (ex-data ex) :provider-code)}})
              (throw ex)))))
+
+(>defn stream
+       "See [[llx.ai/stream]]"
+       [env model context unified-opts]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/stream-map]
+       (let [_ (schema/assert-valid! [:maybe :llx/unified-request-options] unified-opts)]
+         (stream* env model context (unified-opts->request-opts model unified-opts))))
+
+(>defn complete
+       "See [[llx.ai/complete]]"
+       [env model context unified-opts]
+       [:llx/env :llx/model :llx/context-map [:maybe :llx/unified-request-options] => :llx/message-assistant]
+       (let [_ (schema/assert-valid! [:maybe :llx/unified-request-options] unified-opts)]
+         (complete* env model context (unified-opts->request-opts model unified-opts))))

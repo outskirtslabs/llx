@@ -68,7 +68,7 @@
                  :messages      [{:role      :user
                                   :content   "Reply with exactly: 'Hello test successful'"
                                   :timestamp (System/currentTimeMillis)}]}
-        first-r (client/complete model context opts)]
+        first-r (client/complete* model context opts)]
     (is (= :assistant (:role first-r)))
     (is (seq (:content first-r)))
     (is (> (+ (get-in first-r [:usage :input] 0)
@@ -84,7 +84,7 @@
                                     {:role      :user
                                      :content   "Now say 'Goodbye test successful'"
                                      :timestamp (System/currentTimeMillis)}]}
-          second-r (client/complete model context2 opts)]
+          second-r (client/complete* model context2 opts)]
       (is (= :assistant (:role second-r)))
       (is (seq (:content second-r)))
       (is (> (+ (get-in second-r [:usage :input] 0)
@@ -98,13 +98,13 @@
   "Stream with calculator tool. Verify the library emits the expected event
    sequence and produces a well-shaped tool-call result."
   [model opts]
-  (let [stream    (client/stream model
-                                 {:system-prompt "You are a helpful assistant that uses tools when asked."
-                                  :messages      [{:role      :user
-                                                   :content   "Calculate 15 + 27 using the math_operation tool."
-                                                   :timestamp (System/currentTimeMillis)}]
-                                  :tools         [tool-spec]}
-                                 opts)
+  (let [stream    (client/stream* model
+                                  {:system-prompt "You are a helpful assistant that uses tools when asked."
+                                   :messages      [{:role      :user
+                                                    :content   "Calculate 15 + 27 using the math_operation tool."
+                                                    :timestamp (System/currentTimeMillis)}]
+                                   :tools         [tool-spec]}
+                                  opts)
         collected (collect-stream! stream)
         events    (:events collected)
         result    (:result collected)
@@ -127,12 +127,12 @@
   "Stream 'count from 1 to 3'. Assert text-start/-delta/-end all seen,
    accumulated text length > 0, and result has :text content block."
   [model opts]
-  (let [stream     (client/stream model
-                                  {:system-prompt "You are a helpful assistant."
-                                   :messages      [{:role      :user
-                                                    :content   "Count from 1 to 3"
-                                                    :timestamp (System/currentTimeMillis)}]}
-                                  opts)
+  (let [stream     (client/stream* model
+                                   {:system-prompt "You are a helpful assistant."
+                                    :messages      [{:role      :user
+                                                     :content   "Count from 1 to 3"
+                                                     :timestamp (System/currentTimeMillis)}]}
+                                   opts)
         collected  (collect-stream! stream)
         events     (:events collected)
         result     (:result collected)
@@ -151,12 +151,12 @@
    :thinking content block."
   [model opts]
   (let [rand-num       (rand-int 256)
-        stream         (client/stream model
-                                      {:system-prompt "You are a helpful assistant."
-                                       :messages      [{:role      :user
-                                                        :content   (str "Think long and hard about " rand-num " + 27. Think step by step. Then output the result.")
-                                                        :timestamp (System/currentTimeMillis)}]}
-                                      opts)
+        stream         (client/stream* model
+                                       {:system-prompt "You are a helpful assistant."
+                                        :messages      [{:role      :user
+                                                         :content   (str "Think long and hard about " rand-num " + 27. Think step by step. Then output the result.")
+                                                         :timestamp (System/currentTimeMillis)}]}
+                                       opts)
         collected      (collect-stream! stream)
         events         (:events collected)
         result         (:result collected)
@@ -177,16 +177,16 @@
   [model opts]
   (if-not (contains? (get-in model [:capabilities :input]) :image)
     (is true (str "Skipping image test - model " (:id model) " doesn't support images"))
-    (let [result (client/complete model
-                                  {:system-prompt "You are a helpful assistant."
-                                   :messages      [{:role      :user
-                                                    :content   [{:type :text
-                                                                 :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
-                                                                {:type      :image
-                                                                 :data      test-image-base64
-                                                                 :mime-type "image/png"}]
-                                                    :timestamp (System/currentTimeMillis)}]}
-                                  opts)
+    (let [result (client/complete* model
+                                   {:system-prompt "You are a helpful assistant."
+                                    :messages      [{:role      :user
+                                                     :content   [{:type :text
+                                                                  :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
+                                                                 {:type      :image
+                                                                  :data      test-image-base64
+                                                                  :mime-type "image/png"}]
+                                                     :timestamp (System/currentTimeMillis)}]}
+                                   opts)
           text   (str/lower-case (extract-text result))]
       (is (pos? (count (:content result))))
       (is (str/includes? text "green") "response should mention 'green'")
@@ -207,11 +207,11 @@
     (loop [messages [initial-msg]
            turn     0]
       (when (< turn max-turns)
-        (let [response     (client/complete model
-                                            {:system-prompt "You are a helpful assistant that can use tools to answer questions."
-                                             :messages      messages
-                                             :tools         [tool-spec]}
-                                            opts)
+        (let [response     (client/complete* model
+                                             {:system-prompt "You are a helpful assistant that can use tools to answer questions."
+                                              :messages      messages
+                                              :tools         [tool-spec]}
+                                             opts)
               messages     (conj messages response)
               tool-results (reduce
                             (fn [results block]
@@ -301,13 +301,13 @@
     (testing "handle-thinking"
       (handle-thinking! models/openai-responses (assoc opts
                                                        :max-output-tokens 2048
-                                                       :reasoning {:level :high :effort :high :summary :detailed})))
+                                                       :reasoning {:effort :high})))
     (testing "handle-image"
       (handle-image! models/openai-responses opts))
     (testing "multi-turn"
       (multi-turn! models/openai-responses (assoc opts
                                                   :max-output-tokens 2048
-                                                  :reasoning {:level :high :effort :high :summary :detailed})))))
+                                                  :reasoning {:effort :high})))))
 
 (deftest live-parity-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")

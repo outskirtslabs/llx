@@ -275,10 +275,10 @@
 
 (>defn build-request
        ([env model context opts]
-        [:llx/env :llx/model :llx/context-map :llx/request-options => :llx/adapter-request-map]
+        [:llx/env :llx/model :llx/context-map :llx/openai-completions-provider-options => :llx/adapter-request-map]
         (build-request env model context opts false))
        ([env model context opts stream?]
-        [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
+        [:llx/env :llx/model :llx/context-map :llx/openai-completions-provider-options :boolean => :llx/adapter-request-map]
         (let [compat-profile   (resolve-compat model)
               api-key          (or (:api-key opts)
                                    (env-api-key env (:provider model)))

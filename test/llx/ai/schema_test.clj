@@ -148,33 +148,46 @@
     (is (sut/valid? :llx/event {:type :toolcall-delta :id "call_1" :name "search" :arguments {:q "foo"}}))))
 
 (deftest options-schema
-  (let [opts {:tools             [valid-tool]
-              :tool-choice       :auto
-              :reasoning         {:level :high}
-              :cache-control     :short
-              :session-id        "demo-openai-responses"
-              :temperature       0.3
-              :top-p             0.95
-              :max-output-tokens 1024
-              :signal            ::sig
-              :metadata          {:request-id "abc"}}]
-    (testing "accepts valid request options"
-      (is (sut/valid? :llx/request-options opts)))
+  (let [unified-opts  {:max-tokens       1024
+                       :reasoning        :high
+                       :reasoning-effort :high
+                       :temperature      0.3
+                       :top-p            0.95
+                       :api-key          "k"
+                       :headers          {"x-trace-id" "abc"}
+                       :signal           ::sig
+                       :metadata         {:request-id "abc"}}
+        provider-opts {:tools             [valid-tool]
+                       :tool-choice       :auto
+                       :reasoning         {:level :high}
+                       :cache-control     :short
+                       :session-id        "demo-openai-responses"
+                       :temperature       0.3
+                       :top-p             0.95
+                       :max-output-tokens 1024
+                       :signal            ::sig
+                       :metadata          {:request-id "abc"}
+                       :provider-extra    true}]
+    (testing "accepts valid unified request options"
+      (is (sut/valid? :llx/unified-request-options unified-opts)))
 
-    (testing "rejects unknown request option keys"
-      (is (not (sut/valid? :llx/request-options (assoc opts :unknown 1)))))))
+    (testing "rejects unknown unified request option keys"
+      (is (not (sut/valid? :llx/unified-request-options (assoc unified-opts :unknown 1)))))
 
-(deftest options-schema-rejects-callback-style-option-keys
-  (is (not (sut/valid? :llx/request-options {:payload-callback (fn [_] nil)}))))
+    (testing "accepts valid provider request options including provider-specific keys"
+      (is (sut/valid? :llx/provider-request-options provider-opts)))))
+
+(deftest options-schema-allows-provider-specific-option-keys
+  (is (sut/valid? :llx/provider-request-options {:provider-flag true})))
 
 (deftest schema-registry-rebuilds-when-component-schemas-change
   (with-redefs [schema-options/schemas
                 (assoc schema-options/schemas
-                       :llx/request-options
+                       :llx/unified-request-options
                        [:map {:closed true}
                         [:foo :string]])]
-    (is (sut/valid? :llx/request-options {:foo "bar"}))
-    (is (not (sut/valid? :llx/request-options {:session-id "still-old"})))))
+    (is (sut/valid? :llx/unified-request-options {:foo "bar"}))
+    (is (not (sut/valid? :llx/unified-request-options {:session-id "still-old"})))))
 
 (deftest config-schema
   (let [cfg {:providers {:openai            {:api-key "k1"}

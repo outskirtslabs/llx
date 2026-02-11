@@ -106,7 +106,7 @@
     [:request :llx/adapter-request-map]
     [:out :llx/stream-map]
     [:state* :any]
-    [:request-opts {:optional true} [:maybe :llx/request-options]]]
+    [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
 
    :llx/runtime-run-stream-args
    :llx/runtime-run-stream-input})

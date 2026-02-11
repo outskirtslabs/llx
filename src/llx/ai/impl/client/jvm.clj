@@ -71,14 +71,26 @@
    :thread/sleep             (fn [ms] (Thread/sleep (long ms)))
    :unicode/sanitize-payload unicode/sanitize-payload})
 
-(defn complete
+(defn complete*
   ([model context opts]
-   (complete (default-env) model context opts))
+   (complete* (default-env) model context opts))
   ([env model context opts]
-   (client/complete env model context opts)))
+   (client/complete* env model context opts)))
+
+(defn stream*
+  ([model context opts]
+   (stream* (default-env) model context opts))
+  ([env model context opts]
+   (client/stream* env model context opts)))
+
+(defn complete
+  ([model context simple-opts]
+   (complete (default-env) model context simple-opts))
+  ([env model context simple-opts]
+   (client/complete env model context simple-opts)))
 
 (defn stream
-  ([model context opts]
-   (stream (default-env) model context opts))
-  ([env model context opts]
-   (client/stream env model context opts)))
+  ([model context simple-opts]
+   (stream (default-env) model context simple-opts))
+  ([env model context simple-opts]
+   (client/stream env model context simple-opts)))

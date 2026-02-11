@@ -57,7 +57,7 @@
                            :temperature       0.25
                            :session-id        "session-1"
                            :cache-control     :short
-                           :reasoning         {:level :high :effort :high :summary :detailed}}
+                           :reasoning         {:effort :high :summary :detailed}}
                           false)
         payload          (json/read-str (:body request) {:key-fn keyword})
         input            (:input payload)

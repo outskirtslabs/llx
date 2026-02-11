@@ -74,13 +74,20 @@
     (is (thrown? Throwable @(sut/result st)))))
 
 (deftest stream-wrappers-delegate-to-ai-stream-apis
-  (let [stream-created* (atom 0)]
-    (with-redefs [ai/stream (fn [_env _model _context _opts]
-                              (swap! stream-created* inc)
-                              (stream/create))]
-      (let [ch            (sut/stream {} {:id "m"} {:messages []} {})
+  (let [simple-calls*   (atom 0)
+        advanced-calls* (atom 0)]
+    (with-redefs [ai/stream  (fn [_env _model _context _opts]
+                               (swap! simple-calls* inc)
+                               (stream/create))
+                  ai/stream* (fn [_env _model _context _opts]
+                               (swap! advanced-calls* inc)
+                               (stream/create))]
+      (let [simple-ch     (sut/stream {} {:id "m"} {:messages []} {})
+            advanced-ch   (sut/stream* {} {:id "m"} {:messages []} {})
             stream+-value (sut/stream+ {} {:id "m"} {:messages []} {})]
-        (is (= 2 @stream-created*))
-        (is (some? ch))
+        (is (= 1 @simple-calls*))
+        (is (= 2 @advanced-calls*))
+        (is (some? simple-ch))
+        (is (some? advanced-ch))
         (is (stream/stream? (:stream stream+-value)))
         (is (fn? (:cancel! stream+-value)))))))

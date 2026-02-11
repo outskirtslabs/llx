@@ -57,7 +57,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (client/complete model context opts)]
+        result  (client/complete* model context opts)]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))
@@ -91,7 +91,7 @@
                                  {:role      :user
                                   :content   "What do you see in the screenshot? Describe the shape and color."
                                   :timestamp (System/currentTimeMillis)}]}
-        result  (client/complete model context opts)]
+        result  (client/complete* model context opts)]
     (is (= :assistant (:role result)))
     (is (= :stop (:stop-reason result))
         (str "expected :stop, got " (:stop-reason result) " error=" (:error-message result)))

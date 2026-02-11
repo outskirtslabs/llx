@@ -222,10 +222,10 @@
 
 (>defn build-request
        ([env model context opts]
-        [:llx/env :llx/model :llx/context-map :llx/request-options => :llx/adapter-request-map]
+        [:llx/env :llx/model :llx/context-map :llx/anthropic-provider-options => :llx/adapter-request-map]
         (build-request env model context opts false))
        ([env model context opts stream?]
-        [:llx/env :llx/model :llx/context-map :llx/request-options :boolean => :llx/adapter-request-map]
+        [:llx/env :llx/model :llx/context-map :llx/anthropic-provider-options :boolean => :llx/adapter-request-map]
         (let [api-key          (or (:api-key opts)
                                    (when-let [env-get (:env/get env)]
                                      (env-get "ANTHROPIC_API_KEY")))

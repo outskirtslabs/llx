@@ -12,11 +12,11 @@
   (let [user1  {:role      :user
                 :content   prompt-a
                 :timestamp 1}
-        step-1 (client/complete model-a {:messages [user1]} opts-a)
+        step-1 (client/complete* model-a {:messages [user1]} opts-a)
         user2  {:role      :user
                 :content   "Now say hi and mention the previous sentence briefly."
                 :timestamp 2}
-        step-2 (client/complete model-b {:messages [user1 step-1 user2]} opts-b)]
+        step-2 (client/complete* model-b {:messages [user1 step-1 user2]} opts-b)]
     (is (not= :error (:stop-reason step-1)))
     (is (not= :error (:stop-reason step-2)))
     (is (seq (:content step-2)))
@@ -46,7 +46,7 @@
         (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
         (handoff-check! models/openai-responses {:api-key           openai-key
                                                  :max-output-tokens 128
-                                                 :reasoning         {:level :high :effort :high :summary :detailed}}
+                                                 :reasoning         {:effort :high :summary :detailed}}
                         "Give one short sentence about Clojure macros."
                         models/anthropic {:api-key anthropic-key :max-output-tokens 128}))))
   (testing "Anthropic -> OpenAI Responses"
@@ -58,14 +58,14 @@
                         "Give one short sentence about Lisp history."
                         models/openai-responses {:api-key           openai-key
                                                  :max-output-tokens 128
-                                                 :reasoning         {:level :high :effort :high :summary :detailed}}))))
+                                                 :reasoning         {:effort :high :summary :detailed}}))))
   (testing "OpenAI Responses -> OpenAI Completions"
     (let [openai-key (live-env/get-env "OPENAI_API_KEY")]
       (if-not openai-key
         (is true "Skipping: OPENAI_API_KEY required")
         (handoff-check! models/openai-responses {:api-key           openai-key
                                                  :max-output-tokens 128
-                                                 :reasoning         {:level :high :effort :high :summary :detailed}}
+                                                 :reasoning         {:effort :high :summary :detailed}}
                         "Give one short sentence about Clojure protocols."
                         models/openai-completions {:api-key openai-key :max-output-tokens 128}))))
   (testing "Anthropic -> Google"
@@ -77,7 +77,7 @@
                         "Give one short sentence about Clojure macros."
                         models/google {:api-key           google-key
                                        :max-output-tokens 128
-                                       :reasoning         {:level :high :effort :high :summary :detailed}}))))
+                                       :reasoning         {:level :high :effort :high}}))))
   (testing "Google -> OpenAI Completions"
     (let [openai-key (live-env/get-env "OPENAI_API_KEY")
           google-key (live-env/get-env "GEMINI_API_KEY")]
@@ -85,7 +85,7 @@
         (is true "Skipping: GEMINI_API_KEY and OPENAI_API_KEY required")
         (handoff-check! models/google {:api-key           google-key
                                        :max-output-tokens 96
-                                       :reasoning         {:level :high :effort :high :summary :detailed}}
+                                       :reasoning         {:level :high :effort :high}}
                         "Give one short sentence about Clojure protocols."
                         models/openai-completions {:api-key openai-key :max-output-tokens 128}))))
   (testing "Google -> Mistral"
@@ -95,7 +95,7 @@
         (is true "Skipping: GEMINI_API_KEY and MISTRAL_API_KEY required")
         (handoff-check! models/google {:api-key           google-key
                                        :max-output-tokens 96
-                                       :reasoning         {:level :high :effort :high :summary :detailed}}
+                                       :reasoning         {:level :high :effort :high}}
                         "Give one short sentence about Clojure protocols."
                         models/mistral {:api-key mistral-key :max-output-tokens 128}))))
   (testing "Mistral -> OpenAI-compatible"
