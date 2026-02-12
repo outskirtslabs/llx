@@ -9,7 +9,22 @@
   {:target                                                      :node-test
    :output-to                                                   "target/tests.js"
    :output-dir                                                  "target/test/"
-   :ns-regexp                                                   "^llx.*-test$"
+   :ns-regexp                                                   "^(?!llx\\.ai\\.live\\.).*-test$"
+   :autorun                                                     true
+
+   :compiler-options
+   {:output-feature-set                 :es2020
+    :output-wrapper                     false
+    :source-map                         true
+    :source-map-include-sources-content true
+    :source-map-detail-level            :all
+    :warnings                           {:fn-deprecated false}}}
+
+  :test-live
+  {:target                                                      :node-test
+   :output-to                                                   "target/tests-live.js"
+   :output-dir                                                  "target/test-live/"
+   :ns-regexp                                                   "^llx\\.ai\\.live\\..*-test$"
    :autorun                                                     true
 
    :compiler-options
@@ -36,5 +51,4 @@
     {:fn-invoke-direct      true
      :elide-asserts         true
      :anon-fn-naming-policy :off}}}}}
-
 

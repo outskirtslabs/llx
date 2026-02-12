@@ -3,7 +3,7 @@
   (:require
    [llx.ai.live.env :as live-env]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def openai-responses
   {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_MODEL") "gpt-5-mini")

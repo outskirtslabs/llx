@@ -31,10 +31,20 @@
           :task (apply clojure "-M:dev:shadow-cljs" "compile" "test"
                        "--config-merge" "{:autorun false}" *command-line-args*)}
 
+         test:build-cljs-live
+         {:doc  "Compile CLJS live tests with shadow-cljs without autorun"
+          :task (apply clojure "-M:dev:shadow-cljs" "compile" "test-live"
+                       "--config-merge" "{:autorun false}" *command-line-args*)}
+
          test:cljs
          {:doc     "Compile and run CLJS tests with shadow-cljs"
           :depends [test:build-cljs]
           :task    (shell "node" "target/tests.js")}
+
+         test:cljs-live
+         {:doc     "Compile and run CLJS live tests with shadow-cljs"
+          :depends [test:build-cljs-live]
+          :task    (shell "node" "target/tests-live.js")}
 
          test
          {:doc     "TODO this description"
