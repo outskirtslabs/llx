@@ -201,10 +201,6 @@
   [payload]
   {:type :payload :payload payload})
 
-(defn eof-msg
-  []
-  {:type :eof})
-
 (defn error-msg
   [ex]
   {:type :error :error ex})
