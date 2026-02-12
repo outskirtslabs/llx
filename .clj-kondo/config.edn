@@ -1,9 +1,9 @@
-{:lint-as {com.fulcrologic.guardrails.malli.core/>defn clojure.core/defn
+{:lint-as {com.fulcrologic.guardrails.malli.core/>defn  clojure.core/defn
            com.fulcrologic.guardrails.malli.core/>defn- clojure.core/defn
-           com.fulcrologic.guardrails.malli.core/>def clojure.core/def
-           com.fulcrologic.guardrails.malli.core/>fdef clojure.core/def}
- :hooks {:analyze-call {llx-ai.test-util/with-captured-logs hooks.llx-ai.test-util/with-captured-logs
-                        llx.ai.test-util/with-captured-logs hooks.llx-ai.test-util/with-captured-logs}}
+           com.fulcrologic.guardrails.malli.core/>def   clojure.core/def
+           com.fulcrologic.guardrails.malli.core/>fdef  clojure.core/def}
+ :hooks   {:analyze-call {llx.ai.test-util/with-captured-logs hooks.llx.ai.test-util/with-captured-logs
+                          llx.ai.test-util/async              hooks.llx.ai.test-util/async}}
  :linters {:unresolved-symbol {:exclude [=> | ?
                                          com.fulcrologic.guardrails.malli.core/=>
                                          com.fulcrologic.guardrails.malli.core/|

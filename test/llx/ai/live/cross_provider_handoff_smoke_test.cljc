@@ -3,7 +3,7 @@
    #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.test-util :as util]]
        :cljs [[cljs.test :refer [deftest is async]]
-              [llx.ai.live.support :as support]])
+              [llx.ai.test-util :as util]])
    [llx.ai :as client]
    [llx.ai.live.models :as models]
    [promesa.core :as p]))
@@ -41,7 +41,7 @@
      [done deferred]
      (-> deferred
          (p/then (fn [_] (done)))
-         (p/catch (partial support/fail-and-done! done)))))
+         (p/catch (partial util/fail-and-done! done)))))
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-to-anthropic
   #?(:clj

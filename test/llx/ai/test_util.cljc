@@ -1,11 +1,13 @@
 (ns llx.ai.test-util
   (:require
    #?@(:clj [[babashka.json :as json]
+             [clojure.test :refer [is]]
              [clojure.edn :as edn]
              [llx.ai.impl.client.event-stream :as stream]]
        :cljs [[cljs.reader :as reader]
-              [promesa.core :as p]
+              [cljs.test :refer [is]]
               ["node:fs" :as fs]])
+   [promesa.core :as p]
    [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
 
@@ -48,6 +50,51 @@
   []
   #?(:clj (System/currentTimeMillis)
      :cljs (.now js/Date)))
+
+(defn collect-events*
+  [ch timeout-ms]
+  (let [deadline-ms   (+ (now-ms) timeout-ms)
+        timeout-token #?(:clj (Object.) :cljs (js-obj))]
+    (p/loop [events []]
+      (let [remaining-ms (- deadline-ms (now-ms))]
+        (if (<= remaining-ms 0)
+          ::timeout
+          (p/let [event (p/race [(sp/take ch)
+                                 (p/delay remaining-ms timeout-token)])]
+            (cond
+              (identical? event timeout-token)
+              ::timeout
+
+              (nil? event)
+              events
+
+              :else
+              (p/recur (conj events event)))))))))
+
+(defn collect-stream*
+  [ch timeout-ms]
+  (-> (collect-events* ch timeout-ms)
+      (p/then (fn [events]
+                (if (= ::timeout events)
+                  {:events events :result ::timeout}
+                  {:events events
+                   :result (:assistant-message (last events))})))))
+
+(defn read-file-base64
+  [path]
+  #?(:clj (let [bytes (java.nio.file.Files/readAllBytes (.toPath (java.io.File. path)))]
+            (.encodeToString (java.util.Base64/getEncoder) bytes))
+     :cljs (-> (.readFileSync fs path)
+               (.toString "base64"))))
+
+(defn run-with-timeout*
+  [deferred timeout-ms]
+  (p/race [deferred
+           (p/delay timeout-ms ::timeout)]))
+
+(defn timeout-result?
+  [x]
+  (= ::timeout x))
 
 #?(:clj
    (defn await!
@@ -181,3 +228,52 @@
                  (identical? event timeout-token) ::timeout
                  (nil? event) events
                  :else (recur (conj events event))))))))))
+
+(defn async*
+  "Runs `f` in a host-appropriate async test boundary.
+
+  On CLJS this wraps `f` in `cljs.test/async`.
+  On CLJ this executes `f` on a daemon thread and blocks until `done` is called."
+  [f]
+  #?(:clj
+     (let [latch        (java.util.concurrent.CountDownLatch. 1)
+           done-called* (atom false)
+           err*         (atom nil)
+           done         (fn []
+                          (when (compare-and-set! done-called* false true)
+                            (.countDown latch)))]
+       (try
+         (f done)
+         (catch Throwable t
+           (reset! err* t)
+           (done)))
+       (when-not (.await ^java.util.concurrent.CountDownLatch latch
+                         60000
+                         java.util.concurrent.TimeUnit/MILLISECONDS)
+         (throw (ex-info "Async test timed out waiting for done callback."
+                         {:type       :llx/test-timeout
+                          :timeout-ms 60000})))
+       (when-let [err @err*]
+         (throw err))
+       true)
+     :cljs
+     (cljs.test/async done
+                      (f done))))
+
+(defmacro async
+  "Runs `body` in a host-appropriate async test boundary.
+
+  Usage:
+    (deftest my-test
+      (util/async done
+        (-> (some-deferred)
+            (p/then (fn [_] (done)))
+            (p/catch (partial util/fail-and-done! done)))))"
+  [done-binding & body]
+  `(async* (fn [~done-binding]
+             ~@body)))
+
+(defn fail-and-done!
+  [done err]
+  (is nil (str err))
+  (done))

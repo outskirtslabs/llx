@@ -5,7 +5,6 @@
    [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
-   [llx.ai.live.support :as support]
    [llx.ai.impl.utils.overflow :as overflow]
    [llx.ai.impl.utils.rate-limit :as rate-limit]
    [llx.ai.test-util :as util]
@@ -89,14 +88,14 @@
                                   " call-timeout-ms=" timeout-ms
                                   " max-retries=" (:max-retries opts)))
         call-d         (overflow-call* model context opts)]
-    (-> (support/run-with-timeout* call-d timeout-ms)
+    (-> (util/run-with-timeout* call-d timeout-ms)
         (p/then (fn [result]
-                  (when (support/timeout-result? result)
+                  (when (util/timeout-result? result)
                     (log! (str "TIMEOUT model=" (:id model) " call-timeout-ms=" timeout-ms)))
                   (log! (str "RESULT model=" (:id model)
                              " stop-reason=" (:stop-reason result)
                              " error-type=" (:error-type result)))
-                  (if (support/timeout-result? result)
+                  (if (util/timeout-result? result)
                     (is true
                         (str "Skipping overflow assertion for " (:id model)
                              " due to client call timeout"
@@ -131,7 +130,7 @@
        (async done
               (-> (run-live! (test-context-overflow!* models/anthropic {:max-output-tokens 128}))
                   (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+                  (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest ^:llx/openai live-overflow-openai-completions
   (testing "openai completions overflow detection"
@@ -141,7 +140,7 @@
        (async done
               (-> (run-live! (test-context-overflow!* models/openai-completions {:max-output-tokens 128}))
                   (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+                  (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest ^:llx/openai live-overflow-openai-responses
   (testing "openai responses overflow detection"
@@ -151,7 +150,7 @@
        (async done
               (-> (run-live! (test-context-overflow!* models/openai-responses {:max-output-tokens 128}))
                   (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+                  (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest ^:llx/google live-overflow-google
   (testing "google overflow detection"
@@ -161,7 +160,7 @@
        (async done
               (-> (run-live! (test-context-overflow!* models/google {:max-output-tokens 128}))
                   (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+                  (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest ^:llx/mistral live-overflow-mistral
   (testing "mistral overflow detection"
@@ -171,4 +170,4 @@
        (async done
               (-> (run-live! (test-context-overflow!* models/mistral {:max-output-tokens 128}))
                   (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+                  (p/catch (partial util/fail-and-done! done)))))))

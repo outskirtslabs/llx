@@ -5,7 +5,6 @@
    [clojure.string :as str]
    [llx.ai :as client]
    [llx.ai.live.models :as models]
-   [llx.ai.live.support :as support]
    [llx.ai.test-util :as util]
    [promesa.core :as p]))
 
@@ -15,7 +14,7 @@
   (client/default-env))
 
 (def ^:private test-image-base64
-  (support/read-file-base64 "test/llx/ai/fixtures/test-image.png"))
+  (util/read-file-base64 "test/llx/ai/fixtures/test-image.png"))
 
 (defn- extract-text
   [assistant-message]
@@ -127,7 +126,7 @@
      (async done
             (-> (run-live! (run-image-suite!* models/openai-completions {}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/openai live-image-tool-result-openai-responses
   #?(:clj
@@ -136,7 +135,7 @@
      (async done
             (-> (run-live! (run-image-suite!* models/openai-responses {}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/anthropic live-image-tool-result-anthropic
   #?(:clj
@@ -145,7 +144,7 @@
      (async done
             (-> (run-live! (run-image-suite!* models/anthropic {}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/google live-image-tool-result-google
   #?(:clj
@@ -154,4 +153,4 @@
      (async done
             (-> (run-live! (run-image-suite!* models/google {}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))

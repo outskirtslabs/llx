@@ -2,10 +2,10 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.test-util :as util]]
-       :cljs [[cljs.test :refer [deftest is async]]])
+       :cljs [[cljs.test :refer [deftest is async]]
+              [llx.ai.test-util :as util]])
    [llx.ai :as client]
    [llx.ai.live.models :as models]
-   [llx.ai.live.support :as support]
    [promesa.core :as p]))
 
 #?(:clj (set! *warn-on-reflection* true))
@@ -21,7 +21,7 @@
 
 (defn- assert-stream-ok*
   [stream]
-  (-> (support/collect-stream* stream 60000)
+  (-> (util/collect-stream* stream 60000)
       (p/then (fn [{:keys [events result]}]
                 (is (= :start (:type (first events))))
                 (is (#{:done :error} (:type (last events))))
@@ -68,7 +68,7 @@
                                        :complete-prompt "reply with exactly: llx anthropic smoke ok"
                                        :stream-prompt   "reply with exactly: llx anthropic stream ok"}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/google live-google-smoke
   #?(:clj
@@ -87,7 +87,7 @@
                                        :complete-prompt "reply with exactly: llx google smoke ok"
                                        :stream-prompt   "reply with exactly: llx google stream ok"}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/mistral live-mistral-smoke
   #?(:clj
@@ -104,7 +104,7 @@
                                        :complete-prompt "reply with exactly: llx mistral smoke ok"
                                        :stream-prompt   "reply with exactly: llx mistral stream ok"}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/ollama live-ollama-smoke
   #?(:clj
@@ -121,7 +121,7 @@
                                        :complete-prompt "reply with exactly: llx ollama smoke ok"
                                        :stream-prompt   "reply with exactly: llx ollama stream ok"}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/openai live-openai-smoke
   #?(:clj
@@ -143,7 +143,7 @@
                   (assert-complete-ok out)
                   true)
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
 
 (deftest ^:llx/openai live-openai-responses-smoke
   #?(:clj
@@ -162,4 +162,4 @@
                                        :complete-prompt "reply with exactly: llx openai responses smoke ok"
                                        :stream-prompt   "reply with exactly: llx openai responses stream ok"}))
                 (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+                (p/catch (partial util/fail-and-done! done))))))
