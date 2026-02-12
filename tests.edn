@@ -20,24 +20,24 @@
 
   ;; :kaocha-retry.plugin/retry?                                               false
   ;; :kaocha-retry.plugin/max-retries                                          3
-  ;; :kaocha-retry.plugin/retrying-tests-regexes                               ["llx\\.ai\\.live\\."]
+  ;; :kaocha-retry.plugin/retrying-tests-regexes                               ["llx\\.[^.]+\\.live\\."]
 
   :tests
   [{:id          :unit
     :test-paths  ["test"]
-    :ns-patterns ["^(?!llx\\.ai\\.live\\.).*-test$"]}
+    :ns-patterns ["^(?!(llx\\.[^.]+\\.live\\.)).*-test$"]}
    {:id          :live
     :test-paths  ["test"]
-    :ns-patterns ["^llx\\.ai\\.live\\..*-test$"]}
+    :ns-patterns ["^llx\\.[^.]+\\.live\\..*-test$"]}
    {:id                        :cljs
     :type                      :kaocha.type/cljs2
     :test-paths                ["test"]
-    :ns-patterns               ["^(?!llx\\.ai\\.live\\.).*-test$"]
+    :ns-patterns               ["^(?!(llx\\.[^.]+\\.live\\.)).*-test$"]
     :kaocha.cljs2/clients-hook llx.kaocha-hooks/cljs2-clients-hook
     :kaocha.cljs2/timeout      60000}
    {:id                        :cljs-live
     :type                      :kaocha.type/cljs2
     :test-paths                ["test"]
-    :ns-patterns               ["^llx\\.ai\\.live\\..*-test$"]
+    :ns-patterns               ["^llx\\.[^.]+\\.live\\..*-test$"]
     :kaocha.cljs2/clients-hook llx.kaocha-hooks/cljs2-clients-hook
     :kaocha.cljs2/timeout      60000}]}
