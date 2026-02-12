@@ -99,6 +99,22 @@
     [:assistant-message :llx/message-assistant]
     [:events [:vector :llx/event]]]
 
+   :llx/runtime-start-source-input
+   [:map {:closed true}
+    [:adapter :llx/adapter]
+    [:env :llx/env]
+    [:model :llx/model]
+    [:request :llx/adapter-request-map]
+    [:response :llx/http-response-map]
+    [:payload-ch :llx/stream-channel]
+    [:control-ch :llx/stream-channel]
+    [:cancelled? :llx/fn]]
+
+   :llx/runtime-start-source-result
+   [:maybe
+    [:map {:closed true}
+     [:stop-fn {:optional true} :llx/fn]]]
+
    :llx/runtime-run-stream-base-input
    [:map
     [:adapter :llx/adapter]
@@ -121,6 +137,13 @@
     [:cancel! {:optional true} :llx/fn]
     [:start-source! :llx/fn]
     [:open-stream! :llx/fn]]
+
+   :llx/runtime-run-stream-result
+   [:map {:closed true}
+    [:cancel-fn :llx/fn]
+    [:done? :llx/fn]
+    [:payload-ch {:optional true} :llx/stream-channel]
+    [:control-ch {:optional true} :llx/stream-channel]]
 
    :llx/runtime-run-stream-args
    :llx/runtime-run-stream-base-input})

@@ -1,6 +1,37 @@
 (ns llx.ai.impl.client.stream
+  "Shared stream runtime orchestration for all hosts.
+
+  ## Why
+
+  Host runtimes should differ only in transport concerns (how bytes arrive, how
+  cancellation reaches the underlying request). Event decoding, lifecycle
+  emission, finalize behavior, and terminal error handling must stay identical.
+
+  ## What
+
+  This namespace owns the shared stream loop:
+  - opens a provider stream with retry policy
+  - emits canonical `:start` / delta / `:done` events
+  - converts runtime failures into canonical terminal error events
+  - coordinates cancellation across producer/source and consumer/output channel
+
+  ## How
+
+  Hosts inject two hooks:
+  - `:open-stream!` to acquire the transport stream response
+  - `:start-source!` to push provider payloads onto `payload-ch`
+
+  The shared loop consumes payload/control channels with Promesa CSP, applies
+  adapter decode/finalize functions, and emits canonical events to `out`.
+
+  ## Related Namespaces
+
+  - [[llx.ai.impl.client.jvm]]
+  - [[llx.ai.impl.client.node]]
+  - [[llx.ai.impl.client]]"
   (:require
    #?@(:clj [[clojure.main :as main]])
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.client :as client]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
@@ -43,19 +74,26 @@
   [ms]
   (p/delay (long (max 0 (or ms 0))) nil))
 
-(defn open-stream-with-retries*
-  [{:keys [adapter env model request request-opts]}]
-  (let [max-retries (get request-opts :max-retries 2)
-        sleep-fn    (or (:thread/sleep env) default-sleep)]
-    (-> (errors/retry-loop-async
-         (fn []
-           ((:open-stream adapter) env model request))
-         max-retries
-         sleep-fn
-         {:call-id  (:call/id env)
-          :provider (:provider model)})
-        (p/then (fn [response]
-                  (schema/assert-valid! :llx/http-response-map response))))))
+(>defn open-stream-with-retries*
+       [{:keys [adapter env model request request-opts]}]
+       [[:map
+         [:adapter :llx/adapter]
+         [:env :llx/env]
+         [:model :llx/model]
+         [:request :llx/adapter-request-map]
+         [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
+        => :llx/deferred]
+       (let [max-retries (get request-opts :max-retries 2)
+             sleep-fn    (or (:thread/sleep env) default-sleep)]
+         (-> (errors/retry-loop-async
+              (fn []
+                ((:open-stream adapter) env model request))
+              max-retries
+              sleep-fn
+              {:call-id  (:call/id env)
+               :provider (:provider model)})
+             (p/then (fn [response]
+                       (schema/assert-valid! :llx/http-response-map response))))))
 
 (defn emit-events*
   [{:keys [emit! cancel-fn events]}]
@@ -187,105 +225,114 @@
     (reset! source-stop-fn* nil)
     (stop-fn)))
 
-(defn run-stream!
-  [{:keys [adapter env model request out state* cancel! start-source! open-stream!]
-    :as   args}]
-  (schema/assert-valid! :llx/runtime-run-stream-input args)
-  (let [cancelled*      (atom false)
-        done*           (atom false)
-        source-stop-fn* (atom nil)
-        payload-ch      (sp/chan)
-        control-ch      (sp/chan :buf (sp/sliding-buffer 1))
-        cancelled-now?  (fn []
-                          (or @cancelled* (sp/closed? out)))
-        cancel-fn       (fn []
-                          (when (compare-and-set! cancelled* false true)
-                            (when cancel!
-                              (cancel!))
-                            (stop-source! source-stop-fn*)
-                            (sp/close control-ch)
-                            true))
-        emit-event!     (fn [event]
-                          (emit! out event))
-        stream-step-ctx {:adapter   adapter
-                         :env       env
-                         :model     model
-                         :state*    state*
-                         :emit!     emit-event!
-                         :cancel-fn cancel-fn}
-        consume-stream! (fn []
-                          (p/loop [item-index 0]
-                            (if (cancelled-now?)
-                              nil
-                              (p/let [[msg ch] (sp/alts [payload-ch control-ch])]
-                                (cond
-                                  (= ch control-ch)
-                                  nil
+(>defn run-stream!
+       [{:keys [adapter env model request out state* cancel! start-source! open-stream!]
+         :as   args}]
+       [:llx/runtime-run-stream-input => :llx/runtime-run-stream-result]
+       (schema/assert-valid! :llx/runtime-run-stream-input args)
+       (let [cancelled*      (atom false)
+             done*           (atom false)
+             source-stop-fn* (atom nil)
+             payload-ch      (sp/chan)
+             control-ch      (sp/chan :buf (sp/sliding-buffer 1))
+             cancelled-now?  (fn []
+                               (or @cancelled* (sp/closed? out)))
+             cancel-fn       (fn []
+                               (when cancel!
+                                 (cancel!))
+                               (when (compare-and-set! cancelled* false true)
+                                 (stop-source! source-stop-fn*)
+                                 (sp/close control-ch)
+                                 true))
+             emit-event!     (fn [event]
+                               (emit! out event))
+             stream-step-ctx {:adapter   adapter
+                              :env       env
+                              :model     model
+                              :state*    state*
+                              :emit!     emit-event!
+                              :cancel-fn cancel-fn}
+             consume-stream! (fn []
+                               (p/loop [item-index 0]
+                                 (if (cancelled-now?)
+                                   nil
+                                   (p/let [[msg ch] (sp/alts [payload-ch control-ch])]
+                                     (cond
+                                       (= ch control-ch)
+                                       nil
 
-                                  (or (nil? msg)
-                                      (= :eof (:type msg)))
-                                  (if (cancelled-now?)
-                                    nil
-                                    (finalize-stream* stream-step-ctx))
+                                       (or (nil? msg)
+                                           (= :eof (:type msg)))
+                                       (if (cancelled-now?)
+                                         nil
+                                         (finalize-stream* stream-step-ctx))
 
-                                  (= :error (:type msg))
-                                  (p/rejected (:error msg))
+                                       (= :error (:type msg))
+                                       (p/rejected (:error msg))
 
-                                  (= :payload (:type msg))
-                                  (p/let [{:keys [ok? next-item-index]}
-                                          (process-payload-step* stream-step-ctx
-                                                                 item-index
-                                                                 (:payload msg))]
-                                    (if ok?
-                                      (p/recur next-item-index)
-                                      nil))
+                                       (= :payload (:type msg))
+                                       (p/let [{:keys [ok? next-item-index]}
+                                               (process-payload-step* stream-step-ctx
+                                                                      item-index
+                                                                      (:payload msg))]
+                                         (if ok?
+                                           (p/recur next-item-index)
+                                           nil))
 
-                                  :else
-                                  (p/recur item-index))))))
-        run-worker!     (fn []
-                          (p/let [response                 (open-stream!)
-                                  response                 (schema/assert-valid! :llx/http-response-map response)
-                                  cancelled-after-open?    (cancelled-now?)
-                                  _                        (when cancelled-after-open?
-                                                             (cancel-fn))
-                                  start-ok?                (if cancelled-after-open?
-                                                             false
-                                                             (emit-start* {:emit!     emit-event!
-                                                                           :cancel-fn cancel-fn
-                                                                           :env       env
-                                                                           :model     model}))
-                                  cancelled-before-source? (cancelled-now?)
-                                  _                        (when cancelled-before-source?
-                                                             (cancel-fn))
-                                  source-stop              (if (or (not start-ok?) cancelled-before-source?)
-                                                             nil
-                                                             (start-source! {:adapter    adapter
-                                                                             :env        env
-                                                                             :model      model
-                                                                             :request    request
-                                                                             :response   response
-                                                                             :payload-ch payload-ch
-                                                                             :control-ch control-ch
-                                                                             :cancelled? cancelled-now?}))]
-                            (when-let [stop-fn (:stop-fn source-stop)]
-                              (if (cancelled-now?)
-                                (stop-fn)
-                                (reset! source-stop-fn* stop-fn)))
-                            (if (or (not start-ok?) (cancelled-now?))
-                              nil
-                              (consume-stream!))))]
-      (-> (run-worker!)
-          (p/catch (fn [stream-ex]
-                     (if (cancelled-now?)
-                       nil
-                       (emit-terminal-error* stream-step-ctx stream-ex))))
-          (p/finally (fn [_ _]
-                       (stop-source! source-stop-fn*)
-                       (reset! done* true)
-                       (sp/close payload-ch)
-                       (sp/close control-ch)
-                       (sp/close out))))
-      {:cancel-fn  cancel-fn
-       :done?      (fn [] (boolean @done*))
-       :payload-ch payload-ch
-       :control-ch control-ch}))
+                                       :else
+                                       (p/recur item-index))))))
+             run-worker!     (fn []
+                               (p/let [response                 (open-stream!)
+                                       response                 (schema/assert-valid! :llx/http-response-map response)
+                                       cancelled-after-open?    (cancelled-now?)
+                                       _                        (when cancelled-after-open?
+                                                                  (cancel-fn))
+                                       start-ok?                (if cancelled-after-open?
+                                                                  false
+                                                                  (emit-start* {:emit!     emit-event!
+                                                                                :cancel-fn cancel-fn
+                                                                                :env       env
+                                                                                :model     model}))
+                                       cancelled-before-source? (cancelled-now?)
+                                       _                        (when cancelled-before-source?
+                                                                  (cancel-fn))
+                                       source-input             (if (or (not start-ok?) cancelled-before-source?)
+                                                                  nil
+                                                                  {:adapter    adapter
+                                                                   :env        env
+                                                                   :model      model
+                                                                   :request    request
+                                                                   :response   response
+                                                                   :payload-ch payload-ch
+                                                                   :control-ch control-ch
+                                                                   :cancelled? cancelled-now?})
+                                       source-stop              (when source-input
+                                                                  (let [validated-source-input
+                                                                        (schema/assert-valid! :llx/runtime-start-source-input
+                                                                                              source-input)]
+                                                                    (schema/assert-valid! :llx/runtime-start-source-result
+                                                                                          (start-source! validated-source-input))))]
+                                 (when-let [stop-fn (:stop-fn source-stop)]
+                                   (if (cancelled-now?)
+                                     (stop-fn)
+                                     (reset! source-stop-fn* stop-fn)))
+                                 (if (or (not start-ok?) (cancelled-now?))
+                                   nil
+                                   (consume-stream!))))]
+         (-> (run-worker!)
+             (p/catch (fn [stream-ex]
+                        (if (cancelled-now?)
+                          nil
+                          (emit-terminal-error* stream-step-ctx stream-ex))))
+             (p/finally (fn [_ _]
+                          (stop-source! source-stop-fn*)
+                          (reset! done* true)
+                          (sp/close payload-ch)
+                          (sp/close control-ch)
+                          (sp/close out))))
+         (schema/assert-valid!
+          :llx/runtime-run-stream-result
+          {:cancel-fn  cancel-fn
+           :done?      (fn [] (boolean @done*))
+           :payload-ch payload-ch
+           :control-ch control-ch})))

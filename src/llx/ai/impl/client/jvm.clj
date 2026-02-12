@@ -3,10 +3,11 @@
    [babashka.http-client :as http]
    [babashka.json :as json]
    [clojure.java.io :as io]
-   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.ai.impl.client :as client]
    [llx.ai.impl.client.stream :as stream]
    [llx.ai.impl.errors :as errors]
+   [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.core :as p]
    [promesa.exec.csp :as sp])
@@ -58,55 +59,71 @@
         (.close ^java.io.Closeable body))
       (catch Exception _))))
 
-(defn- start-jvm-source!
-  [{:keys [response payload-ch cancelled?]}]
-  (let [reader-future* (atom nil)]
-    (reset! reader-future*
-            (future
-              (try
-                (with-open [reader (io/reader (:body response))]
-                  (loop [remaining (line-seq reader)]
-                    (when (and (seq remaining)
-                               (not (cancelled?)))
-                      (when-let [payload (client/runtime-data-line->payload (first remaining))]
-                        (when-not (boolean (sp/put! payload-ch (stream/payload-msg payload)))
-                          (throw (ex-info "Payload channel closed while streaming" {}))))
-                      (recur (next remaining)))))
-                (catch java.lang.InterruptedException _
-                  nil)
-                (catch Exception ex
-                  (sp/put! payload-ch (stream/error-msg ex)))
-                (finally
-                  (sp/close payload-ch)))))
-    {:stop-fn (fn []
-                (close-stream-body! response)
-                (when-let [f @reader-future*]
-                  (future-cancel f))
-                (sp/close payload-ch))}))
+(>defn- start-jvm-source!
+        [{:keys [response payload-ch cancelled?] :as input}]
+        [:llx/runtime-start-source-input => :llx/runtime-start-source-result]
+        (schema/assert-valid! :llx/runtime-start-source-input input)
+        (let [reader-future* (atom nil)]
+          (reset! reader-future*
+                  (future
+                    (try
+                      (with-open [reader (io/reader (:body response))]
+                        (loop [remaining (line-seq reader)]
+                          (when (and (seq remaining)
+                                     (not (cancelled?)))
+                            (when-let [payload (client/runtime-data-line->payload (first remaining))]
+                              (when-not (boolean (sp/put! payload-ch (stream/payload-msg payload)))
+                                (throw (ex-info "Payload channel closed while streaming" {}))))
+                            (recur (next remaining)))))
+                      (catch java.lang.InterruptedException _
+                        nil)
+                      (catch Exception ex
+                        (sp/put! payload-ch (stream/error-msg ex)))
+                      (finally
+                        (sp/close payload-ch)))))
+          {:stop-fn (fn []
+                      (close-stream-body! response)
+                      (when-let [f @reader-future*]
+                        (future-cancel f))
+                      (sp/close payload-ch))}))
 
-(defn- open-stream-jvm!
-  [{:keys [adapter env model request request-opts]}]
-  (p/future
-    (stream/await!
-     (stream/open-stream-with-retries*
-      {:adapter      adapter
-       :env          env
-       :model        model
-       :request      request
-       :request-opts request-opts}))))
+(>defn- open-stream-jvm!
+        [{:keys [adapter env model request request-opts]}]
+        [[:map
+          [:adapter :llx/adapter]
+          [:env :llx/env]
+          [:model :llx/model]
+          [:request :llx/adapter-request-map]
+          [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
+         => :llx/deferred]
+        (p/future
+          (stream/await!
+           (stream/open-stream-with-retries*
+            {:adapter      adapter
+             :env          env
+             :model        model
+             :request      request
+             :request-opts request-opts}))))
 
 (>defn run-stream!
        [{:keys [adapter env model request request-opts] :as input}]
-       [:llx/runtime-run-stream-base-input => any?]
-       (stream/run-stream!
-        (assoc input
-               :open-stream! (fn []
-                               (open-stream-jvm! {:adapter      adapter
-                                                  :env          env
-                                                  :model        model
-                                                  :request      request
-                                                  :request-opts request-opts}))
-               :start-source! start-jvm-source!)))
+       [:llx/runtime-run-stream-base-input => :llx/runtime-run-stream-result]
+       (let [response*      (atom nil)
+             runtime-result (stream/run-stream!
+                             (assoc input
+                                    :cancel! (fn []
+                                               (close-stream-body! @response*))
+                                    :open-stream! (fn []
+                                                    (-> (open-stream-jvm! {:adapter      adapter
+                                                                           :env          env
+                                                                           :model        model
+                                                                           :request      request
+                                                                           :request-opts request-opts})
+                                                        (p/then (fn [response]
+                                                                  (reset! response* response)
+                                                                  response))))
+                                    :start-source! start-jvm-source!))]
+         (schema/assert-valid! :llx/runtime-run-stream-result runtime-result)))
 
 (defn default-env
   []

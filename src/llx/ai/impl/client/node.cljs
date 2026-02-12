@@ -1,7 +1,7 @@
 (ns llx.ai.impl.client.node
   (:require
    [clojure.string :as str]
-   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.ai.impl.client :as client]
    [llx.ai.impl.client.stream :as stream]
    [llx.ai.impl.errors :as errors]
@@ -104,66 +104,68 @@
             (p/recur (next remaining)))
           (p/recur (next remaining)))))))
 
-(defn- start-node-source!
-  [{:keys [response payload-ch cancelled?]}]
-  (let [reader*          (atom nil)
-        local-cancelled* (atom false)
-        cancelled-now?   (fn []
-                           (or @local-cancelled*
-                               (cancelled?)))]
-    (letfn [(cancel-reader! []
-              (when-let [reader @reader*]
-                (.cancel reader)
-                (reset! reader* nil)))
-            (read-loop! [decoder line-buffer]
-              (if (cancelled-now?)
-                (p/resolved nil)
-                (p/let [chunk (.read @reader*)]
-                  (if (.-done chunk)
-                    (if (seq line-buffer)
-                      (process-lines! {:payload-ch payload-ch
-                                       :cancelled? cancelled-now?}
-                                      [line-buffer])
-                      true)
-                    (let [chunk-text          (.decode decoder (.-value chunk) #js {:stream true})
-                          combined            (str line-buffer chunk-text)
-                          {:keys [lines
-                                  remainder]} (client/runtime-split-lines combined)]
-                      (p/let [ok? (process-lines! {:payload-ch payload-ch
-                                                   :cancelled? cancelled-now?}
-                                                  lines)]
-                        (if ok?
-                          (read-loop! decoder remainder)
-                          false)))))))]
-      (-> (p/resolved nil)
-          (p/then (fn [_]
-                    (let [stream-body (:body response)]
-                      (when-not stream-body
-                        (throw (errors/invalid-response
-                                "unknown"
-                                "Stream response missing body"
-                                :context {:status (:status response)})))
-                      (let [reader  (.getReader stream-body)
-                            decoder (js/TextDecoder.)]
-                        (reset! reader* reader)
-                        (read-loop! decoder "")))))
-          (p/catch (fn [ex]
-                     (if (cancelled-now?)
-                       nil
-                       (sp/put payload-ch (stream/error-msg ex)))))
-          (p/finally (fn [_ _]
-                       (cancel-reader!)
-                       (sp/close payload-ch)))))
-    {:stop-fn (fn []
-                (when (compare-and-set! local-cancelled* false true)
-                  (when-let [reader @reader*]
-                    (.cancel reader)
-                    (reset! reader* nil))
-                  (sp/close payload-ch)))}))
+(>defn- start-node-source!
+        [{:keys [response payload-ch cancelled?] :as input}]
+        [:llx/runtime-start-source-input => :llx/runtime-start-source-result]
+        (schema/assert-valid! :llx/runtime-start-source-input input)
+        (let [reader*          (atom nil)
+              local-cancelled* (atom false)
+              cancelled-now?   (fn []
+                                 (or @local-cancelled*
+                                     (cancelled?)))]
+          (letfn [(cancel-reader! []
+                    (when-let [reader @reader*]
+                      (.cancel reader)
+                      (reset! reader* nil)))
+                  (read-loop! [decoder line-buffer]
+                    (if (cancelled-now?)
+                      (p/resolved nil)
+                      (p/let [chunk (.read @reader*)]
+                        (if (.-done chunk)
+                          (if (seq line-buffer)
+                            (process-lines! {:payload-ch payload-ch
+                                             :cancelled? cancelled-now?}
+                                            [line-buffer])
+                            true)
+                          (let [chunk-text          (.decode decoder (.-value chunk) #js {:stream true})
+                                combined            (str line-buffer chunk-text)
+                                {:keys [lines
+                                        remainder]} (client/runtime-split-lines combined)]
+                            (p/let [ok? (process-lines! {:payload-ch payload-ch
+                                                         :cancelled? cancelled-now?}
+                                                        lines)]
+                              (if ok?
+                                (read-loop! decoder remainder)
+                                false)))))))]
+            (-> (p/resolved nil)
+                (p/then (fn [_]
+                          (let [stream-body (:body response)]
+                            (when-not stream-body
+                              (throw (errors/invalid-response
+                                      "unknown"
+                                      "Stream response missing body"
+                                      :context {:status (:status response)})))
+                            (let [reader  (.getReader stream-body)
+                                  decoder (js/TextDecoder.)]
+                              (reset! reader* reader)
+                              (read-loop! decoder "")))))
+                (p/catch (fn [ex]
+                           (if (cancelled-now?)
+                             nil
+                             (sp/put payload-ch (stream/error-msg ex)))))
+                (p/finally (fn [_ _]
+                             (cancel-reader!)
+                             (sp/close payload-ch)))))
+          {:stop-fn (fn []
+                      (when (compare-and-set! local-cancelled* false true)
+                        (when-let [reader @reader*]
+                          (.cancel reader)
+                          (reset! reader* nil))
+                        (sp/close payload-ch)))}))
 
 (>defn run-stream!
        [{:keys [adapter env model request request-opts] :as input}]
-       [:llx/runtime-run-stream-base-input => any?]
+       [:llx/runtime-run-stream-base-input => :llx/runtime-run-stream-result]
        (let [abort-controller    (js/AbortController.)
              request             (assoc request :signal (or (:signal request)
                                                             (.-signal abort-controller)))
@@ -201,17 +203,19 @@
                                                              (name (or (:provider model) "unknown"))
                                                              "Stream response missing body"
                                                              :context {:status (:status response)}))))))))]
-         (stream/run-stream!
-          (assoc input
-                 :request request
-                 :cancel! cancel-request!
-                 :open-stream! open-stream!
-                 :start-source! (fn [args]
-                                  (let [base-stop-fn (:stop-fn (start-node-source! args))]
-                                    {:stop-fn (fn []
-                                                (cancel-request!)
-                                                (when base-stop-fn
-                                                  (base-stop-fn)))}))))))
+         (schema/assert-valid!
+          :llx/runtime-run-stream-result
+          (stream/run-stream!
+           (assoc input
+                  :request request
+                  :cancel! cancel-request!
+                  :open-stream! open-stream!
+                  :start-source! (fn [args]
+                                   (let [base-stop-fn (:stop-fn (start-node-source! args))]
+                                     {:stop-fn (fn []
+                                                 (cancel-request!)
+                                                 (when base-stop-fn
+                                                   (base-stop-fn)))})))))))
 
 (defn default-env
   []
