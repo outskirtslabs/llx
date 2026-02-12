@@ -1,11 +1,12 @@
 (ns llx.ai.schema-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.schema.options :as schema-options]
    [llx.ai.impl.schema :as sut]
    [promesa.exec.csp :as sp]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def valid-model
   {:id             "gpt-5"
@@ -229,6 +230,15 @@
         valid-http-response    {:status  200
                                 :headers {"content-type" "application/json"}
                                 :body    {:ok true}}
+        valid-start-source-input {:adapter    valid-adapter
+                                  :env        valid-env
+                                  :model      valid-model
+                                  :request    {:method :post :url "https://example.invalid"}
+                                  :response   valid-http-response
+                                  :payload-ch (sp/chan)
+                                  :control-ch (sp/chan)
+                                  :cancelled? (fn [] false)}
+        valid-start-source-result {:stop-fn (fn [])}
         valid-run-stream-base-input {:adapter valid-adapter
                                      :env     valid-env
                                      :model   valid-model
@@ -238,6 +248,10 @@
         valid-run-stream-input      (assoc valid-run-stream-base-input
                                            :open-stream! (fn [] {:status 200})
                                            :start-source! (fn [_args] {:stop-fn (fn [])}))
+        valid-run-stream-result     {:cancel-fn  (fn [])
+                                     :done?      (fn [] false)
+                                     :payload-ch (sp/chan)
+                                     :control-ch (sp/chan)}
         valid-run-stream-args       valid-run-stream-base-input]
     (testing "accepts runtime adapter boundary maps"
       (is (sut/valid? :llx/http-response-map valid-http-response))
@@ -256,8 +270,11 @@
       (is (sut/valid? :llx/registry-map {:llx.registry/adapters {:openai-completions {:adapter valid-adapter}}}))
       (is (sut/valid? :llx/runtime-decode-event-result valid-event-transition))
       (is (sut/valid? :llx/runtime-finalize-result valid-finalize-result))
+      (is (sut/valid? :llx/runtime-start-source-input valid-start-source-input))
+      (is (sut/valid? :llx/runtime-start-source-result valid-start-source-result))
       (is (sut/valid? :llx/runtime-run-stream-base-input valid-run-stream-base-input))
-      (is (sut/valid? :llx/runtime-run-stream-input valid-run-stream-input)))
+      (is (sut/valid? :llx/runtime-run-stream-input valid-run-stream-input))
+      (is (sut/valid? :llx/runtime-run-stream-result valid-run-stream-result)))
 
     (testing "rejects malformed runtime boundary maps"
       (is (not (sut/valid? :llx/http-response-map {:status -1})))
@@ -269,8 +286,11 @@
       (is (not (sut/valid? :llx/registry-entry {:adapter valid-adapter :source-id :x :extra true})))
       (is (not (sut/valid? :llx/runtime-decode-event-result {:state {} :events [{:type :toolcall-delta :id "c1" :name "tool"}]})))
       (is (not (sut/valid? :llx/runtime-finalize-result {:assistant-message {:role :assistant} :events []})))
+      (is (not (sut/valid? :llx/runtime-start-source-input (dissoc valid-start-source-input :payload-ch))))
+      (is (not (sut/valid? :llx/runtime-start-source-result {:stop-fn 42})))
       (is (not (sut/valid? :llx/runtime-run-stream-base-input (assoc valid-run-stream-base-input :out :not-a-chan))))
-      (is (not (sut/valid? :llx/runtime-run-stream-input valid-run-stream-base-input))))
+      (is (not (sut/valid? :llx/runtime-run-stream-input valid-run-stream-base-input)))
+      (is (not (sut/valid? :llx/runtime-run-stream-result {:done? (fn [] true)}))))
 
     (testing "accepts run-stream argument map contract"
       (is (sut/valid? :llx/runtime-run-stream-args valid-run-stream-args)))))

@@ -1,9 +1,10 @@
 (ns llx.ai.registry-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.registry :as registry]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def valid-adapter
   {:api             :openai-responses
@@ -44,6 +45,6 @@
       (is (empty? (registry/get-adapters cleared)))))
   (testing "rejects invalid api value"
     (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
+         #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
          #"Schema validation failed|Validation Error"
          (registry/get-adapter (registry/immutable-registry) "openai-responses")))))

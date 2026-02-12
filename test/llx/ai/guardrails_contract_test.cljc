@@ -1,28 +1,27 @@
 (ns llx.ai.guardrails-contract-test
   (:require
-   [babashka.json :as json]
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.client :as client]
-   [llx.ai.impl.client.jvm :as runtime]
+   #?@(:clj [[llx.ai.impl.client.jvm :as runtime]])
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
    [llx.ai.impl.registry :as registry]
+   [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.utils.unicode :as unicode]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (defn- stub-env
   [handler]
   {:http/request             handler
-   :json/encode              json/write-str
-   :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
-   :json/decode-safe         (fn [s _opts]
-                               (try
-                                 (json/read-str s {:key-fn keyword})
-                                 (catch Exception _ nil)))
-   :http/read-body-string    (fn [body] (slurp body))
+   :json/encode              util/json-write
+   :json/decode              (fn [s _opts] (util/json-read s {:key-fn keyword}))
+   :json/decode-safe         (fn [s _opts] (util/json-read-safe s {:key-fn keyword}))
+   :http/read-body-string    #?(:clj (fn [body] (slurp body))
+                                :cljs (fn [body] (if (string? body) body (str body))))
    :stream/run!              (fn [_] nil)
    :registry                 client/default-registry
    :clock/now-ms             (constantly 1730000000000)
@@ -45,21 +44,22 @@
 (deftest guardrails-enforces-boundary-shapes
   (let [env (stub-env (fn [_request]
                         {:status 200
-                         :body   (json/write-str
+                         :body   (util/json-write
                                   {:choices [{:finish_reason "stop"
                                               :message       {:role "assistant" :content "ok"}}]
                                    :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))]
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                           (client/complete* env test-model {} {:api-key "x"})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                           (client/stream* env test-model {} {:api-key "x"})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                           (openai-completions/build-request env test-model {} {:api-key "x"} false)))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
-                          (runtime/run-stream! {})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+    #?(:clj
+       (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
+                             (runtime/run-stream! {}))))
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                           (registry/register-adapter (registry/immutable-registry) {:api :openai-completions})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                           (registry/get-adapter (registry/immutable-registry) "openai-responses")))
     (testing "decode-event boundary is enforced for all adapters"
       (doseq [[label decode-event]
@@ -67,6 +67,6 @@
                ["openai-responses" openai-responses/decode-event]
                ["anthropic-messages" anthropic-messages/decode-event]
                ["google-generative-ai" google-generative-ai/decode-event]]]
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo bad-contract-re
+        (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) bad-contract-re
                               (decode-event env {} "{}"))
             label)))))

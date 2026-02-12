@@ -1,17 +1,15 @@
 (ns llx.ai.adapters.google-generative-ai-test
   (:require
-   [babashka.json :as json]
-   [clojure.edn :as edn]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [async deftest is testing]]
+              [promesa.core :as p]])
    [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.google-generative-ai :as sut]
    [llx.ai.live.models :as live-models]
-   [llx.ai.impl.client.stream :as await]
-   [llx.ai.impl.utils.unicode :as unicode]
-   ))
+   [llx.ai.impl.utils.unicode :as unicode]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def google-model
   {:id             "gemini-2.5-flash"
@@ -35,9 +33,7 @@
 
 (defn- fixture
   [name]
-  (-> (str "test/llx/ai/fixtures/google/" name ".edn")
-      slurp
-      edn/read-string))
+  (util/read-edn-file (str "test/llx/ai/fixtures/google/" name ".edn")))
 
 (defn- stub-env
   ([]
@@ -45,12 +41,10 @@
   ([overrides]
    (merge
     {:http/request             (fn [_] {:status 200 :body "{}"})
-     :json/encode              json/write-str
-     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/encode              util/json-write
+     :json/decode              (fn [s _opts] (util/json-read s {:key-fn keyword}))
      :json/decode-safe         (fn [s _opts]
-                                 (try
-                                   (json/read-str s {:key-fn keyword})
-                                   (catch Exception _ nil)))
+                                 (util/json-read-safe s {:key-fn keyword}))
      :clock/now-ms             (fn [] 1730000000000)
      :id/new                   (fn [] "generated-id")
      :env/get                  (fn [k]
@@ -63,7 +57,7 @@
 (deftest build-request-converts-canonical-context-to-google-payload
   (let [context (fixture "request_context")
         request (sut/build-request (stub-env) google-model context {:max-output-tokens 256 :temperature 0.25} false)
-        payload (json/read-str (:body request) {:key-fn keyword})]
+        payload (util/json-read (:body request) {:key-fn keyword})]
     (is (= {:method  :post
             :url     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
             :headers {"Content-Type"   "application/json"
@@ -120,21 +114,22 @@
     (is (re-matches #"[A-Za-z0-9_-]{64}" out-id))))
 
 (deftest build-request-emits-provider-payload-trove-signal
-  (util/with-captured-logs [logs*]
-    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-          request (sut/build-request (stub-env) google-model context {} false)
-          payload (json/read-str (:body request) {:key-fn keyword})
-          event   (util/first-event logs* :llx.obs/provider-payload)]
-      (is (util/submap?
-           {:id    :llx.obs/provider-payload
-            :level :trace
-            :data  {:provider :google
-                    :api      :google-generative-ai
-                    :model-id "gemini-2.5-flash"
-                    :stream?  false
-                    :url      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-                    :payload  payload}}
-           (util/strip-generated event [:call-id]))))))
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+           request (sut/build-request (stub-env) google-model context {} false)
+           payload (util/json-read (:body request) {:key-fn keyword})
+           event   (util/first-event logs* :llx.obs/provider-payload)]
+       (is (util/submap?
+            {:id    :llx.obs/provider-payload
+             :level :trace
+             :data  {:provider :google
+                     :api      :google-generative-ai
+                     :model-id "gemini-2.5-flash"
+                     :stream?  false
+                     :url      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                     :payload  payload}}
+            (util/strip-generated event [:call-id])))))))
 
 (deftest build-request-tool-result-image-forwarding-by-model-capability
   (let [context            {:messages [{:role      :user
@@ -148,10 +143,10 @@
                                         :timestamp    2}]}
         multimodal-payload (-> (sut/build-request (stub-env) google-gemini3-model context {} false)
                                :body
-                               (json/read-str {:key-fn keyword}))
+                               (util/json-read {:key-fn keyword}))
         text-only-payload  (-> (sut/build-request (stub-env) google-text-only-model context {} false)
                                :body
-                               (json/read-str {:key-fn keyword}))]
+                               (util/json-read {:key-fn keyword}))]
     (testing "gemini-3 multimodal model forwards image in functionResponse parts"
       (is (= {:contents
               [{:role "user" :parts [{:text "use the tool"}]}
@@ -173,7 +168,7 @@
         chunks    (fixture "stream_events")
         reduced   (reduce (fn [{:keys [state events]} chunk]
                             (let [{next-state :state next-events :events}
-                                  (sut/decode-event env state (json/write-str chunk))]
+                                  (sut/decode-event env state (util/json-write chunk))]
                               {:state  next-state
                                :events (into events next-events)}))
                           {:state  {:model google-model}
@@ -205,7 +200,7 @@
 
 (deftest finalize-calculates-usage-costs
   (let [response {:status 200
-                  :body   (json/write-str
+                  :body   (util/json-write
                            {:candidates    [{:content      {:parts [{:text "ok"}]}
                                              :finishReason "STOP"}]
                             :usageMetadata {:promptTokenCount        100
@@ -225,7 +220,7 @@
                                :thoughtsTokenCount      25
                                :cachedContentTokenCount 10
                                :totalTokenCount         185}}
-        out   (sut/decode-event (stub-env) state (json/write-str chunk))]
+        out   (sut/decode-event (stub-env) state (util/json-write chunk))]
     (is (= {:input 0.1 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.28}
            (get-in out [:state :assistant-message :usage :cost])))))
 
@@ -233,7 +228,7 @@
   (let [env    (stub-env)
         state  {:model google-model}
         chunk  {:candidates [{:content {:parts [{:text "plain text" :thoughtSignature "opaque"}]}}]}
-        result (sut/decode-event env state (json/write-str chunk))]
+        result (sut/decode-event env state (util/json-write chunk))]
     (is (= [{:type :text-start}
             {:type :text-delta :text "plain text"}]
            (:events result)))
@@ -246,7 +241,7 @@
   (let [env    (stub-env)
         chunk  {:candidates [{:content      {:parts [{:functionCall {:name "get_status"}}]}
                               :finishReason "STOP"}]}
-        result (sut/decode-event env {:model google-model} (json/write-str chunk))
+        result (sut/decode-event env {:model google-model} (util/json-write chunk))
         done   (sut/finalize env (:state result))]
     (is (= [{:type :toolcall-start :id "get_status_generated-id" :name "get_status"}
             {:type :toolcall-delta :id "get_status_generated-id" :name "get_status" :arguments {}}
@@ -258,13 +253,13 @@
 
 (deftest finalize-throws-on-unknown-stop-reason
   (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
+       #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
        #"Unknown Google finish reason"
        (sut/finalize
         (stub-env)
         {:model    google-model
          :response {:status 200
-                    :body   (json/write-str
+                    :body   (util/json-write
                              {:candidates    [{:content      {:parts [{:text "ok"}]}
                                                :finishReason "BRAND_NEW"}]
                               :usageMetadata {:promptTokenCount     1
@@ -272,21 +267,41 @@
                                               :totalTokenCount      2}})}}))))
 
 (deftest open-stream-non-2xx-throws-structured-error
-  (let [ex (try
-             (await/await!
-              (sut/open-stream
-               (stub-env {:http/request (fn [_]
-                                          {:status 401
-                                           :body   (json/write-str {:error {:message "bad key"}})})})
-               google-model
-               {:method :post :url "https://example.invalid"}))
-             (catch clojure.lang.ExceptionInfo e e))]
-    (is (= {:type         :llx/authentication-error
-            :message      "bad key"
-            :recoverable? false
-            :provider     "google"
-            :http-status  401}
-           (ex-data ex)))))
+  #?(:clj
+     (let [ex (try
+                (util/await!
+                 (sut/open-stream
+                  (stub-env {:http/request (fn [_]
+                                             {:status 401
+                                              :body   (util/json-write {:error {:message "bad key"}})})})
+                  google-model
+                  {:method :post :url "https://example.invalid"}))
+                (catch #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) e e))]
+       (is (= {:type         :llx/authentication-error
+               :message      "bad key"
+               :recoverable? false
+               :provider     "google"
+               :http-status  401}
+              (ex-data ex))))
+     :cljs
+     (async done
+            (-> (sut/open-stream
+                 (stub-env {:http/request (fn [_]
+                                            {:status 401
+                                             :body   (util/json-write {:error {:message "bad key"}})})})
+                 google-model
+                 {:method :post :url "https://example.invalid"})
+                (p/then (fn [_]
+                          (is nil "Expected open-stream to reject")
+                          (done)))
+                (p/catch (fn [e]
+                           (is (= {:type         :llx/authentication-error
+                                   :message      "bad key"
+                                   :recoverable? false
+                                   :provider     "google"
+                                   :http-status  401}
+                                  (ex-data e)))
+                           (done)))))))
 
 (deftest stream-error-normalization-contract
   (let [out (sut/normalize-error
@@ -334,7 +349,7 @@
                                    {:messages [{:role :user :content "think" :timestamp 1}]}
                                    (if reasoning-level {:reasoning {:level reasoning-level}} {})
                                    false)
-        payload (json/read-str (:body req) {:key-fn keyword})]
+        payload (util/json-read (:body req) {:key-fn keyword})]
     (get-in payload [:generationConfig :thinkingConfig])))
 
 (deftest reasoning-config-gemini-3-pro-uses-level
@@ -362,32 +377,37 @@
 (deftest map-stop-reason-fail-fast-on-unknown
   (testing "unknown finish reason in stream decode fails fast"
     (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
+         #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
          #"Unknown Google finish reason"
          (sut/decode-event
           (stub-env)
           {:model google-model}
-          (json/write-str {:candidates [{:finishReason "UNRECOGNIZED_REASON"}]}))))))
+          (util/json-write {:candidates [{:finishReason "UNRECOGNIZED_REASON"}]}))))))
+
+(defn- string-from-code-units
+  [units]
+  #?(:clj (String. (char-array (map char units)))
+     :cljs (apply str (map (fn [u] (.fromCharCode js/String u)) units))))
 
 (defn- string-with-unpaired-high
   []
-  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D]) " World"))
 
 (defn- valid-emoji-string
   []
-  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D 0xDE48]) " World"))
 
 (deftest build-request-sanitizes-unpaired-surrogates-in-user-and-system
   (let [env      (stub-env)
         context  {:system-prompt (string-with-unpaired-high)
                   :messages      [{:role :user :content (string-with-unpaired-high) :timestamp 1}]}
         request  (sut/build-request env google-model context {} false)
-        payload  (json/read-str (:body request) {:key-fn keyword})
+        payload  (util/json-read (:body request) {:key-fn keyword})
         sys-text (get-in payload [:systemInstruction :parts 0 :text])
         usr-text (get-in payload [:contents 0 :parts 0 :text])]
-    (is (not (str/includes? (str sys-text) (String. (char-array [(char 0xD83D)]))))
+    (is (not (str/includes? (str sys-text) (string-from-code-units [0xD83D])))
         "system prompt should not contain unpaired high surrogate")
-    (is (not (str/includes? (str usr-text) (String. (char-array [(char 0xD83D)]))))
+    (is (not (str/includes? (str usr-text) (string-from-code-units [0xD83D])))
         "user text should not contain unpaired high surrogate")))
 
 (deftest build-request-preserves-valid-emoji-surrogate-pairs
@@ -395,7 +415,7 @@
         emoji    (valid-emoji-string)
         context  {:messages [{:role :user :content emoji :timestamp 1}]}
         request  (sut/build-request env google-model context {} false)
-        payload  (json/read-str (:body request) {:key-fn keyword})
+        payload  (util/json-read (:body request) {:key-fn keyword})
         usr-text (get-in payload [:contents 0 :parts 0 :text])]
-    (is (str/includes? (str usr-text) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
+    (is (str/includes? (str usr-text) (valid-emoji-string))
         "valid emoji surrogate pair should be preserved")))

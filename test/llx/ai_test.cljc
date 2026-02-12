@@ -1,18 +1,24 @@
 (ns llx.ai-test
   (:require
-   [clojure.test :refer [deftest is]]
+   #?@(:clj [[clojure.test :refer [deftest is]]]
+       :cljs [[cljs.test :refer-macros [deftest is]]])
    [llx.ai :as ai]
    [llx.ai.impl.client :as impl.client]
-   [llx.ai.impl.client.jvm :as impl.jvm]
+   #?@(:clj [[llx.ai.impl.client.jvm :as impl.jvm]]
+       :cljs [[llx.ai.impl.client.node :as impl.node]])
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (deftest default-env-delegates-to-jvm-provider
   (let [sentinel {:env :default}]
-    (with-redefs [impl.jvm/default-env (fn [] sentinel)]
-      (is (identical? sentinel (ai/default-env))))))
+    #?(:clj
+       (with-redefs [impl.jvm/default-env (fn [] sentinel)]
+         (is (identical? sentinel (ai/default-env))))
+       :cljs
+       (with-redefs [impl.node/default-env (fn [] sentinel)]
+         (is (identical? sentinel (ai/default-env)))))))
 
 (deftest api-functions-delegate-with-explicit-env
   (let [env           {:env :explicit}

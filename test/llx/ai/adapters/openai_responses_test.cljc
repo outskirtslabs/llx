@@ -1,16 +1,15 @@
 (ns llx.ai.adapters.openai-responses-test
   (:require
-   [babashka.json :as json]
-   [clojure.edn :as edn]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+      [clojure.string :as str]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.openai-responses :as sut]
    [llx.ai.live.models :as live-models]
    [llx.ai.impl.transform-messages :as transform-messages]
    [llx.ai.impl.utils.unicode :as unicode]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def openai-responses-model
   {:id             "gpt-5-mini"
@@ -25,9 +24,7 @@
 
 (defn- fixture
   [name]
-  (-> (str "test/llx/ai/fixtures/openai_responses/" name ".edn")
-      slurp
-      edn/read-string))
+  (util/read-edn-file (str "test/llx/ai/fixtures/openai_responses/" name ".edn")))
 
 (defn- stub-env
   ([]
@@ -35,12 +32,10 @@
   ([overrides]
    (merge
     {:http/request             (fn [_] {:status 200 :body "{}"})
-     :json/encode              json/write-str
-     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/encode              util/json-write
+     :json/decode              (fn [s _opts] (util/json-read s {:key-fn keyword}))
      :json/decode-safe         (fn [s _opts]
-                                 (try
-                                   (json/read-str s {:key-fn keyword})
-                                   (catch Exception _ nil)))
+                                 (util/json-read-safe s {:key-fn keyword}))
      :clock/now-ms             (fn [] 1730000000000)
      :id/new                   (fn [] "id-1")
      :unicode/sanitize-payload unicode/sanitize-payload}
@@ -59,7 +54,7 @@
                            :cache-control     :short
                            :reasoning         {:effort :high :summary :detailed}}
                           false)
-        payload          (json/read-str (:body request) {:key-fn keyword})
+        payload          (util/json-read (:body request) {:key-fn keyword})
         input            (:input payload)
         user-msg         (first (filter #(= "user" (:role %)) input))
         reasoning-items  (filter #(= "reasoning" (:type %)) input)
@@ -86,21 +81,22 @@
            (:include payload)))))
 
 (deftest build-request-emits-provider-payload-trove-signal
-  (util/with-captured-logs [logs*]
-    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-          request (sut/build-request (stub-env) openai-responses-model context {:api-key "k"} false)
-          payload (json/read-str (:body request) {:key-fn keyword})
-          event   (util/first-event logs* :llx.obs/provider-payload)]
-      (is (util/submap?
-           {:id    :llx.obs/provider-payload
-            :level :trace
-            :data  {:provider :openai
-                    :api      :openai-responses
-                    :model-id "gpt-5-mini"
-                    :stream?  false
-                    :url      "https://api.openai.com/v1/responses"
-                    :payload  payload}}
-           (util/strip-generated event [:call-id]))))))
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+           request (sut/build-request (stub-env) openai-responses-model context {:api-key "k"} false)
+           payload (util/json-read (:body request) {:key-fn keyword})
+           event   (util/first-event logs* :llx.obs/provider-payload)]
+       (is (util/submap?
+            {:id    :llx.obs/provider-payload
+             :level :trace
+             :data  {:provider :openai
+                     :api      :openai-responses
+                     :model-id "gpt-5-mini"
+                     :stream?  false
+                     :url      "https://api.openai.com/v1/responses"
+                     :payload  payload}}
+            (util/strip-generated event [:call-id])))))))
 
 (deftest normalize-tool-call-id-normalizes-pipe-ids-and-preserves-pairing
   (let [messages  (fixture "pipe_id_prefilled")
@@ -161,7 +157,7 @@
                     :session-id    "session-none"
                     :cache-control :none}
                    true)
-          payload (json/read-str (:body request) {:key-fn keyword})]
+          payload (util/json-read (:body request) {:key-fn keyword})]
       (is (nil? (:prompt_cache_key payload)))
       (is (nil? (:prompt_cache_retention payload)))))
 
@@ -175,7 +171,7 @@
                     :session-id    "session-long"
                     :cache-control :long}
                    true)
-          payload (json/read-str (:body request) {:key-fn keyword})]
+          payload (util/json-read (:body request) {:key-fn keyword})]
       (is (= "session-long" (:prompt_cache_key payload)))
       (is (= "24h" (:prompt_cache_retention payload)))))
 
@@ -190,7 +186,7 @@
                         :session-id    "session-long"
                         :cache-control :long}
                        true)
-          payload     (json/read-str (:body request) {:key-fn keyword})]
+          payload     (util/json-read (:body request) {:key-fn keyword})]
       (is (= "session-long" (:prompt_cache_key payload)))
       (is (nil? (:prompt_cache_retention payload))))))
 
@@ -205,7 +201,7 @@
                   (stub-env)
                   {:model    openai-responses-model
                    :response {:status 200
-                              :body   (json/write-str
+                              :body   (util/json-write
                                        {:status status
                                         :output [{:type    "message"
                                                   :id      "msg_1"
@@ -218,7 +214,7 @@
                      (stub-env)
                      {:model    openai-responses-model
                       :response {:status 200
-                                 :body   (json/write-str
+                                 :body   (util/json-write
                                           {:status "completed"
                                            :output [{:type      "function_call"
                                                      :id        "fc_1"
@@ -231,13 +227,13 @@
 
 (deftest finalize-throws-on-unknown-stop-reason
   (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
+       #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
        #"Unknown OpenAI responses stop reason"
        (sut/finalize
         (stub-env)
         {:model    openai-responses-model
          :response {:status 200
-                    :body   (json/write-str
+                    :body   (util/json-write
                              {:status "brand_new_reason"
                               :output [{:type    "message"
                                         :id      "msg_1"
@@ -251,7 +247,7 @@
                          (stub-env)
                          {:model    model-with-cost
                           :response {:status 200
-                                     :body   (json/write-str
+                                     :body   (util/json-write
                                               {:status       "completed"
                                                :service_tier "priority"
                                                :output       [{:type    "message"
@@ -281,7 +277,7 @@
         {:keys [state events]}
         (reduce (fn [{:keys [state events]} chunk]
                   (let [{next-state :state next-events :events}
-                        (sut/decode-event env state (json/write-str chunk))]
+                        (sut/decode-event env state (util/json-write chunk))]
                     {:state  next-state
                      :events (into events next-events)}))
                 {:state init-state :events []}
@@ -315,12 +311,12 @@
   (let [env        (stub-env)
         init-state {:model openai-responses-model}
         start-out  (sut/decode-event env init-state
-                                     (json/write-str {:type "response.output_item.added"
+                                     (util/json-write {:type "response.output_item.added"
                                                       :item {:type    "reasoning"
                                                              :id      "rs_1"
                                                              :summary []}}))
         done-out   (sut/decode-event env (:state start-out)
-                                     (json/write-str {:type "response.reasoning_summary_part.done"}))]
+                                     (util/json-write {:type "response.reasoning_summary_part.done"}))]
     (is (= [:thinking-start] (mapv :type (:events start-out))))
     (is (= [] (:events done-out)))
     (is (= "" (get-in done-out [:state :assistant-message :content 0 :thinking])))))
@@ -343,26 +339,31 @@
     (is (= :error (:stop-reason out)))
     (is (= [{:type :text :text "partial"}] (:content out)))
     (is (string? (:error-message out)))
-    (is (.contains ^String (:error-message out) "bad gateway"))))
+    (is (str/includes? (:error-message out) "bad gateway"))))
+
+(defn- string-from-code-units
+  [units]
+  #?(:clj (String. (char-array (map char units)))
+     :cljs (apply str (map (fn [u] (.fromCharCode js/String u)) units))))
 
 (defn- string-with-unpaired-high
   []
-  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D]) " World"))
 
 (defn- valid-emoji-string
   []
-  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D 0xDE48]) " World"))
 
 (deftest build-request-sanitizes-unpaired-surrogates-in-user-text
   (let [env         (stub-env)
         context     {:system-prompt (string-with-unpaired-high)
                      :messages      [{:role :user :content (string-with-unpaired-high) :timestamp 1}]}
         request     (sut/build-request env openai-responses-model context {:api-key "x"} false)
-        payload     (json/read-str (:body request) {:key-fn keyword})
+        payload     (util/json-read (:body request) {:key-fn keyword})
         input-items (:input payload)
         sys-item    (first input-items)
         usr-item    (second input-items)
-        unpaired    (String. (char-array [(char 0xD83D)]))]
+        unpaired    (string-from-code-units [0xD83D])]
     (is (not (str/includes? (str (:content sys-item)) unpaired))
         "system prompt should not contain unpaired high surrogate")
     (is (not (str/includes? (str (get-in usr-item [:content 0 :text])) unpaired))
@@ -373,8 +374,8 @@
         emoji    (valid-emoji-string)
         context  {:messages [{:role :user :content emoji :timestamp 1}]}
         request  (sut/build-request env openai-responses-model context {:api-key "x"} false)
-        payload  (json/read-str (:body request) {:key-fn keyword})
+        payload  (util/json-read (:body request) {:key-fn keyword})
         usr-item (first (:input payload))
-        pair     (String. (char-array [(char 0xD83D) (char 0xDE48)]))]
+        pair     (string-from-code-units [0xD83D 0xDE48])]
     (is (str/includes? (str (get-in usr-item [:content 0 :text])) pair)
         "valid emoji surrogate pair should be preserved")))

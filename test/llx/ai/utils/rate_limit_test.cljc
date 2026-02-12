@@ -1,6 +1,7 @@
 (ns llx.ai.utils.rate-limit-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.utils.rate-limit :as sut]))
 
 (deftest rate-limited-detection

@@ -1,13 +1,15 @@
 (ns llx.ai.utils.unicode-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.utils.unicode :as sut]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (defn- string-from-code-units
   [units]
-  (String. (char-array (map char units))))
+  #?(:clj (String. (char-array (map char units)))
+     :cljs (apply str (map (fn [u] (.fromCharCode js/String u)) units))))
 
 (deftest sanitize-surrogates-handles-surrogate-edge-cases
   (testing "preserves valid emoji surrogate pairs"

@@ -1,6 +1,7 @@
 (ns llx.ai.utils.overflow-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.utils.overflow :as sut]))
 
 (deftest context-overflow-detection

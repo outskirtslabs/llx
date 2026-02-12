@@ -1,15 +1,14 @@
 (ns llx.ai.adapters.openai-completions-test
   (:require
-   [babashka.json :as json]
-   [clojure.edn :as edn]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+      [clojure.string :as str]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.openai-completions :as sut]
    [llx.ai.live.models :as live-models]
    [llx.ai.impl.utils.unicode :as unicode]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def openai-model
   {:id             "gpt-4o-mini"
@@ -49,9 +48,7 @@
 
 (defn- fixture
   [name]
-  (-> (str "test/llx/ai/fixtures/openai_completions/" name ".edn")
-      slurp
-      edn/read-string))
+  (util/read-edn-file (str "test/llx/ai/fixtures/openai_completions/" name ".edn")))
 
 (defn- stub-env
   ([]
@@ -59,12 +56,10 @@
   ([overrides]
    (merge
     {:http/request             (fn [_] {:status 200 :body "{}"})
-     :json/encode              json/write-str
-     :json/decode              (fn [s _opts] (json/read-str s {:key-fn keyword}))
+     :json/encode              util/json-write
+     :json/decode              (fn [s _opts] (util/json-read s {:key-fn keyword}))
      :json/decode-safe         (fn [s _opts]
-                                 (try
-                                   (json/read-str s {:key-fn keyword})
-                                   (catch Exception _ nil)))
+                                 (util/json-read-safe s {:key-fn keyword}))
      :clock/now-ms             (fn [] 1730000000000)
      :id/new                   (fn [] "generated-id")
      :unicode/sanitize-payload unicode/sanitize-payload}
@@ -79,7 +74,7 @@
                              :description  "Ping tool"
                              :input-schema [:map [:ok :boolean]]}]}
         request (sut/build-request (stub-env) model context {:api-key "k" :max-output-tokens 256 :tool-choice "ping"} false)
-        payload (json/read-str (:body request) {:key-fn keyword})]
+        payload (util/json-read (:body request) {:key-fn keyword})]
     (is (= 256 (:max_tokens payload)))
     (is (nil? (:max_completion_tokens payload)))
     (is (= {:type "function" :function {:name "ping"}}
@@ -94,32 +89,33 @@
                                               {:api-key "k" :tool-choice tool-choice}
                                               false)
                            :body
-                           (json/read-str {:key-fn keyword})))]
+                           (util/json-read {:key-fn keyword})))]
     (is (= "auto" (:tool_choice (mk-payload "auto"))))
     (is (= "none" (:tool_choice (mk-payload "none"))))
     (is (= "required" (:tool_choice (mk-payload "required"))))))
 
 (deftest build-request-emits-provider-payload-trove-signal
-  (util/with-captured-logs [logs*]
-    (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-          request (sut/build-request (stub-env) openai-model context {:api-key "k"} false)
-          payload (json/read-str (:body request) {:key-fn keyword})
-          event   (util/first-event logs* :llx.obs/provider-payload)]
-      (is (util/submap?
-           {:id    :llx.obs/provider-payload
-            :level :trace
-            :data  {:provider :openai
-                    :api      :openai-completions
-                    :model-id "gpt-4o-mini"
-                    :stream?  false
-                    :url      "https://api.openai.com/v1/chat/completions"
-                    :payload  payload}}
-           (util/strip-generated event [:call-id]))))))
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+           request (sut/build-request (stub-env) openai-model context {:api-key "k"} false)
+           payload (util/json-read (:body request) {:key-fn keyword})
+           event   (util/first-event logs* :llx.obs/provider-payload)]
+       (is (util/submap?
+            {:id    :llx.obs/provider-payload
+             :level :trace
+             :data  {:provider :openai
+                     :api      :openai-completions
+                     :model-id "gpt-4o-mini"
+                     :stream?  false
+                     :url      "https://api.openai.com/v1/chat/completions"
+                     :payload  payload}}
+            (util/strip-generated event [:call-id])))))))
 
 (deftest build-request-batches-tool-result-images-for-openai-completions
   (let [context   (fixture "mistral_request_context")
         request   (sut/build-request (stub-env) mistral-model context {:api-key "mistral-key"} false)
-        payload   (json/read-str (:body request) {:key-fn keyword})
+        payload   (util/json-read (:body request) {:key-fn keyword})
         messages  (:messages payload)
         roles     (mapv :role messages)
         tool-1    (nth messages 2)
@@ -140,7 +136,7 @@
         chunks    (fixture "mistral_stream_events")
         reduced   (reduce (fn [{:keys [state events]} chunk]
                             (let [{next-state :state next-events :events}
-                                  (sut/decode-event env state (json/write-str chunk))]
+                                  (sut/decode-event env state (util/json-write chunk))]
                               {:state  next-state
                                :events (into events next-events)}))
                           {:state  {:model mistral-model}
@@ -236,7 +232,7 @@
                                                 :input-schema [:map [:ok :boolean]]}]}
                                    {:max-output-tokens 128}
                                    true)
-        body    (json/read-str (:body req) {:key-fn keyword})
+        body    (util/json-read (:body req) {:key-fn keyword})
         tool-fn (get-in body [:tools 0 :function])]
     (is (= nil (get-in req [:headers "Authorization"])))
     (is (nil? (:store body)))
@@ -267,7 +263,7 @@
 
 (deftest build-request-missing-api-key-message-includes-env-var-name
   (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
+       #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
        #"Set MISTRAL_API_KEY or pass :api-key"
        (sut/build-request (stub-env) mistral-model
                           {:messages [{:role :user :content "ping" :timestamp 1}]}
@@ -290,7 +286,7 @@
         request (sut/build-request (stub-env) reasoning-model context
                                    {:reasoning {:level :medium}}
                                    false)
-        payload (json/read-str (:body request) {:key-fn keyword})]
+        payload (util/json-read (:body request) {:key-fn keyword})]
     (is (= "medium" (:reasoning_effort payload)))))
 
 (deftest build-request-omits-reasoning-effort-when-model-lacks-reasoning
@@ -298,21 +294,21 @@
         request (sut/build-request (stub-env) openai-compatible-model context
                                    {:reasoning {:level :medium}}
                                    false)
-        payload (json/read-str (:body request) {:key-fn keyword})]
+        payload (util/json-read (:body request) {:key-fn keyword})]
     (is (nil? (:reasoning_effort payload)))))
 
 (deftest decode-event-emits-thinking-events-for-reasoning-content
   (let [env                    (stub-env)
         state                  (sut/init-stream-state env reasoning-model)
         chunk                  {:choices [{:delta {:reasoning_content "thinking..."}}]}
-        {:keys [state events]} (sut/decode-event env state (json/write-str chunk))]
+        {:keys [state events]} (sut/decode-event env state (util/json-write chunk))]
     (is (= [:thinking-start :thinking-delta] (mapv :type events)))
     (is (= "thinking..." (:thinking (second events))))
     (is (= "thinking..." (get-in state [:assistant-message :content 0 :thinking])))))
 
 (deftest response->assistant-message-calculates-usage-costs
   (let [response {:status 200
-                  :body   (json/write-str
+                  :body   (util/json-write
                            {:choices [{:finish_reason "stop"
                                        :message       {:role "assistant" :content "ok"}}]
                             :usage   {:prompt_tokens             120
@@ -332,14 +328,14 @@
                          :completion_tokens         20
                          :completion_tokens_details {:reasoning_tokens 10}
                          :total_tokens              120}}
-        out   (sut/decode-event (stub-env) state (json/write-str chunk))]
+        out   (sut/decode-event (stub-env) state (util/json-write chunk))]
     (is (= {:input 0.06 :output 0.06 :cache-read 0.09 :cache-write 0.0 :total 0.21}
            (get-in out [:state :assistant-message :usage :cost])))))
 
 (deftest decode-event-tracks-thinking-signature
   (let [state           (sut/init-stream-state (stub-env) reasoning-model)
         chunk           {:choices [{:delta {:reasoning_content "thinking..."}}]}
-        {:keys [state]} (sut/decode-event (stub-env) state (json/write-str chunk))]
+        {:keys [state]} (sut/decode-event (stub-env) state (util/json-write chunk))]
     (is (= {:type :thinking :thinking "thinking..." :signature "reasoning_content"}
            (get-in state [:assistant-message :content 0])))))
 
@@ -353,11 +349,11 @@
                                             :reasoning_details [{:type "reasoning.encrypted"
                                                                  :id   "detail_id_1"
                                                                  :data "encrypted-data"}]}}]}
-        {:keys [state]} (sut/decode-event (stub-env) state (json/write-str chunk))
+        {:keys [state]} (sut/decode-event (stub-env) state (util/json-write chunk))
         tool-block      (first (filter #(= :tool-call (:type %))
                                        (get-in state [:assistant-message :content])))
         parsed          (when (:signature tool-block)
-                          (json/read-str (:signature tool-block) {:key-fn keyword}))]
+                          (util/json-read (:signature tool-block) {:key-fn keyword}))]
     (is (= {:type "reasoning.encrypted" :id "detail_id_1" :data "encrypted-data"}
            parsed))))
 
@@ -382,7 +378,7 @@
         message {:role        :assistant
                  :content     [{:type      :tool-call              :id "tc_1" :name "search"
                                 :arguments {:q "foo"}
-                                :signature (json/write-str detail)}]
+                                :signature (util/json-write detail)}]
                  :api         :openai-completions
                  :provider    :openai
                  :model       "gpt-4o-mini"
@@ -406,7 +402,7 @@
         request   (sut/build-request (stub-env) zai-model
                                      {:messages [{:role :user :content "think" :timestamp 1}]}
                                      {:reasoning {:level :medium}} false)
-        payload   (json/read-str (:body request) {:key-fn keyword})]
+        payload   (util/json-read (:body request) {:key-fn keyword})]
     (is (= {:thinking {:type "enabled"}}
            (select-keys payload [:thinking :reasoning_effort])))))
 
@@ -417,7 +413,7 @@
         request   (sut/build-request (stub-env) zai-model
                                      {:messages [{:role :user :content "chat" :timestamp 1}]}
                                      {} false)
-        payload   (json/read-str (:body request) {:key-fn keyword})]
+        payload   (util/json-read (:body request) {:key-fn keyword})]
     (is (= {:thinking {:type "disabled"}}
            (select-keys payload [:thinking :reasoning_effort])))))
 
@@ -427,7 +423,7 @@
         request    (sut/build-request (stub-env) qwen-model
                                       {:messages [{:role :user :content "think" :timestamp 1}]}
                                       {:reasoning {:level :high}} false)
-        payload    (json/read-str (:body request) {:key-fn keyword})]
+        payload    (util/json-read (:body request) {:key-fn keyword})]
     (is (= {:enable_thinking true}
            (select-keys payload [:enable_thinking :reasoning_effort])))))
 
@@ -436,8 +432,8 @@
         state0                          (sut/init-stream-state env reasoning-model)
         chunk1                          {:choices [{:delta {:reasoning_content "reason"}}]}
         chunk2                          {:choices [{:delta {:content "answer"}}]}
-        {state1 :state events1 :events} (sut/decode-event env state0 (json/write-str chunk1))
-        {state2 :state events2 :events} (sut/decode-event env state1 (json/write-str chunk2))
+        {state1 :state events1 :events} (sut/decode-event env state0 (util/json-write chunk1))
+        {state2 :state events2 :events} (sut/decode-event env state1 (util/json-write chunk2))
         finalized                       (sut/finalize env state2)]
     (is (= [:thinking-start :thinking-delta] (mapv :type events1)))
     (is (= [:thinking-end :text-start :text-delta] (mapv :type events2)))
@@ -447,29 +443,34 @@
     (is (= :text (get-in finalized [:assistant-message :content 1 :type])))
     (is (= "answer" (get-in finalized [:assistant-message :content 1 :text])))))
 
+(defn- string-from-code-units
+  [units]
+  #?(:clj (String. (char-array (map char units)))
+     :cljs (apply str (map (fn [u] (.fromCharCode js/String u)) units))))
+
 (defn- string-with-unpaired-high
   []
-  (str "Hello " (String. (char-array [(char 0xD83D)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D]) " World"))
 
 (defn- string-with-unpaired-low
   []
-  (str "Hello " (String. (char-array [(char 0xDE48)])) " World"))
+  (str "Hello " (string-from-code-units [0xDE48]) " World"))
 
 (defn- valid-emoji-string
   []
-  (str "Hello " (String. (char-array [(char 0xD83D) (char 0xDE48)])) " World"))
+  (str "Hello " (string-from-code-units [0xD83D 0xDE48]) " World"))
 
 (deftest build-request-sanitizes-unpaired-surrogates-in-user-text
   (let [env     (stub-env)
         context {:system-prompt (string-with-unpaired-high)
                  :messages      [{:role :user :content (string-with-unpaired-low) :timestamp 1}]}
         request (sut/build-request env openai-model context {:api-key "x"} false)
-        payload (json/read-str (:body request) {:key-fn keyword})
+        payload (util/json-read (:body request) {:key-fn keyword})
         sys-msg (first (:messages payload))
         usr-msg (second (:messages payload))]
-    (is (not (str/includes? (:content sys-msg) (String. (char-array [(char 0xD83D)]))))
+    (is (not (str/includes? (:content sys-msg) (string-from-code-units [0xD83D])))
         "system prompt should not contain unpaired high surrogate")
-    (is (not (str/includes? (:content usr-msg) (String. (char-array [(char 0xDE48)]))))
+    (is (not (str/includes? (:content usr-msg) (string-from-code-units [0xDE48])))
         "user text should not contain unpaired low surrogate")))
 
 (deftest build-request-preserves-valid-emoji-surrogate-pairs
@@ -477,9 +478,9 @@
         emoji   (valid-emoji-string)
         context {:messages [{:role :user :content emoji :timestamp 1}]}
         request (sut/build-request env openai-model context {:api-key "x"} false)
-        payload (json/read-str (:body request) {:key-fn keyword})
+        payload (util/json-read (:body request) {:key-fn keyword})
         usr-msg (first (:messages payload))]
-    (is (str/includes? (:content usr-msg) (String. (char-array [(char 0xD83D) (char 0xDE48)])))
+    (is (str/includes? (:content usr-msg) (valid-emoji-string))
         "valid emoji surrogate pair should be preserved")))
 
 (deftest build-request-sanitizes-unpaired-surrogates-in-tool-result-text
@@ -501,7 +502,7 @@
                               :is-error?    false
                               :timestamp    3}]}
         request  (sut/build-request env openai-model context {:api-key "x"} false)
-        payload  (json/read-str (:body request) {:key-fn keyword})
+        payload  (util/json-read (:body request) {:key-fn keyword})
         tool-msg (nth (:messages payload) 2)]
-    (is (not (str/includes? (:content tool-msg) (String. (char-array [(char 0xD83D)]))))
+    (is (not (str/includes? (:content tool-msg) (string-from-code-units [0xD83D])))
         "tool result text should not contain unpaired high surrogate")))

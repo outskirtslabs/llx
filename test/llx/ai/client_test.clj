@@ -241,29 +241,30 @@
          :payload (select-keys payload [:model :messages :stream :max_completion_tokens :temperature])}))))
 
 (deftest complete-emits-lifecycle-trove-signals
-  (util/with-captured-logs [logs*]
-    (let [env     (stub-env (fn [_request]
-                              {:status 200
-                               :body   (json/write-str
-                                        {:choices [{:finish_reason "stop"
-                                                    :message       {:role "assistant" :content "ok"}}]
-                                         :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
-          context {:messages [{:role :user :content "hi" :timestamp 1}]}
-          _       (await/await! (sut/complete* env base-model context {:api-key "x"}))
-          start   (util/first-event logs* :llx.obs/call-start)
-          done    (util/first-event logs* :llx.obs/call-finished)]
-      (is (util/submap?
-           {:id    :llx.obs/call-start
-            :level :info
-            :data  {:operation :complete
-                    :model-id  "gpt-4o-mini"}}
-           (util/strip-generated start [:call-id :provider :api :message-count :has-tools? :has-system-prompt?])))
-      (is (util/submap?
-           {:id    :llx.obs/call-finished
-            :level :info
-            :data  {:operation   :complete
-                    :stop-reason :stop}}
-           (util/strip-generated done [:call-id :provider :api :model-id :usage :content-block-count]))))))
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [env     (stub-env (fn [_request]
+                               {:status 200
+                                :body   (json/write-str
+                                         {:choices [{:finish_reason "stop"
+                                                     :message       {:role "assistant" :content "ok"}}]
+                                          :usage   {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}})}))
+           context {:messages [{:role :user :content "hi" :timestamp 1}]}
+           _       (await/await! (sut/complete* env base-model context {:api-key "x"}))
+           start   (util/first-event logs* :llx.obs/call-start)
+           done    (util/first-event logs* :llx.obs/call-finished)]
+       (is (util/submap?
+            {:id    :llx.obs/call-start
+             :level :info
+             :data  {:operation :complete
+                     :model-id  "gpt-4o-mini"}}
+            (util/strip-generated start [:call-id :provider :api :message-count :has-tools? :has-system-prompt?])))
+       (is (util/submap?
+            {:id    :llx.obs/call-finished
+             :level :info
+             :data  {:operation   :complete
+                     :stop-reason :stop}}
+            (util/strip-generated done [:call-id :provider :api :model-id :usage :content-block-count])))))))
 
 (deftest complete-openai-completions-tool-call-response
   (let [env     (stub-env
@@ -306,27 +307,28 @@
            (ex-data ex)))))
 
 (deftest complete-emits-error-lifecycle-trove-signals
-  (util/with-captured-logs [logs*]
-    (let [env     (stub-env (fn [_request]
-                              {:status 401
-                               :body   (json/write-str {:error {:message "bad key"}})}))
-          context {:messages [{:role :user :content "hi" :timestamp 1}]}
-          _       (try
-                    (await/await! (sut/complete* env base-model context {:api-key "bad"}))
-                    (catch clojure.lang.ExceptionInfo _ nil))
-          status  (util/first-event logs* :llx.obs/http-status-error)
-          failed  (util/first-event logs* :llx.obs/call-error)]
-      (is (util/submap?
-           {:id    :llx.obs/http-status-error
-            :level :info
-            :data  {:status 401}}
-           (util/strip-generated status [:call-id :operation :provider :api :model-id :request-id :provider-code :retry-after :error-type])))
-      (is (util/submap?
-           {:id    :llx.obs/call-error
-            :level :error
-            :data  {:operation  :complete
-                    :error-type :llx/authentication-error}}
-           (util/strip-generated failed [:call-id :provider :api :model-id :error-message :recoverable? :request-id :provider-code]))))))
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [env     (stub-env (fn [_request]
+                               {:status 401
+                                :body   (json/write-str {:error {:message "bad key"}})}))
+           context {:messages [{:role :user :content "hi" :timestamp 1}]}
+           _       (try
+                     (await/await! (sut/complete* env base-model context {:api-key "bad"}))
+                     (catch clojure.lang.ExceptionInfo _ nil))
+           status  (util/first-event logs* :llx.obs/http-status-error)
+           failed  (util/first-event logs* :llx.obs/call-error)]
+       (is (util/submap?
+            {:id    :llx.obs/http-status-error
+             :level :info
+             :data  {:status 401}}
+            (util/strip-generated status [:call-id :operation :provider :api :model-id :request-id :provider-code :retry-after :error-type])))
+       (is (util/submap?
+            {:id    :llx.obs/call-error
+             :level :error
+             :data  {:operation  :complete
+                     :error-type :llx/authentication-error}}
+            (util/strip-generated failed [:call-id :provider :api :model-id :error-message :recoverable? :request-id :provider-code])))))))
 
 (deftest complete-openai-compatible-without-api-key
   (let [seen-request (atom nil)

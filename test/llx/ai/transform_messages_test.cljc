@@ -1,12 +1,13 @@
 (ns llx.ai.transform-messages-test
   (:require
-   [clojure.edn :as edn]
-   [clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is testing]]]
+       :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
+   [llx.ai.test-util :as util]
    [llx.ai.impl.transform-messages :as sut]))
 
-(set! *warn-on-reflection* true)
+#?(:clj (set! *warn-on-reflection* true))
 
 (def same-openai-model
   {:provider :openai
@@ -25,9 +26,7 @@
 
 (defn- fixture
   [name]
-  (-> (str "test/llx/ai/fixtures/handoff/" name ".edn")
-      slurp
-      edn/read-string))
+  (util/read-edn-file (str "test/llx/ai/fixtures/handoff/" name ".edn")))
 
 (deftest same-model-replay-preserves-thinking-and-signatures
   (let [messages [{:role        :assistant
@@ -229,13 +228,13 @@
       (is (= [:user :user] (mapv :role out))))))
 
 (deftest synthetic-tool-result-uses-real-time-when-clock-missing
-  (let [before-ms (System/currentTimeMillis)
+  (let [before-ms (util/now-ms)
         out       (sut/for-target-model
                    (fixture "orphan_tool_call")
                    anthropic-model
                    {})
         inserted  (nth out 2)
-        after-ms  (System/currentTimeMillis)]
+        after-ms  (util/now-ms)]
     (is (= :tool-result (:role inserted)))
     (is (<= before-ms (:timestamp inserted) after-ms))))
 
