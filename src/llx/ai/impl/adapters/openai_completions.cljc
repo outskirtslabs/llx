@@ -407,12 +407,6 @@
        :stop-reason (map-stop-reason (:finish_reason choice))
        :timestamp   ((:clock/now-ms env))})))
 
-(defn complete*
-  [env model context opts]
-  (let [request  (build-request env model context opts)
-        response ((:http/request env) request)]
-    (response->assistant-message env model response)))
-
 (defn init-stream-state
   [env model]
   {:model             model
@@ -678,9 +672,9 @@
 (>defn handle-open-stream-response
        [env model response]
        [:llx/env :llx/model :llx/http-response-map => :llx/http-response-map]
-       (let [response      (schema/assert-valid! :llx/http-response-map response)
-             status        (long (or (:status response) 0))
-             provider      (name (or (:provider model) "unknown"))]
+       (let [response (schema/assert-valid! :llx/http-response-map response)
+             status   (long (or (:status response) 0))
+             provider (name (or (:provider model) "unknown"))]
          (when (or (< status 200) (>= status 300))
            (let [body-string   (cond
                                  (string? (:body response)) (:body response)
