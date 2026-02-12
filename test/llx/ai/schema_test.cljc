@@ -2,7 +2,6 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
-   [llx.ai.impl.schema.options :as schema-options]
    [llx.ai.impl.schema :as sut]
    [promesa.exec.csp :as sp]))
 
@@ -183,8 +182,8 @@
   (is (sut/valid? :llx/provider-request-options {:provider-flag true})))
 
 (deftest schema-registry-rebuilds-when-component-schemas-change
-  (with-redefs [schema-options/schemas
-                (assoc schema-options/schemas
+  (with-redefs [sut/schemas
+                (assoc sut/schemas
                        :llx/unified-request-options
                        [:map {:closed true}
                         [:foo :string]])]
@@ -222,23 +221,23 @@
     (is (not (sut/valid? :llx/env (dissoc valid-env :http/request))))))
 
 (deftest runtime-boundary-schemas
-  (let [valid-stream-state     {:model valid-model}
-        valid-event-transition {:state  valid-stream-state
-                                :events [{:type :text-delta :text "chunk"}]}
-        valid-finalize-result  {:assistant-message valid-assistant
-                                :events            [{:type :text-end}]}
-        valid-http-response    {:status  200
-                                :headers {"content-type" "application/json"}
-                                :body    {:ok true}}
-        valid-start-source-input {:adapter    valid-adapter
-                                  :env        valid-env
-                                  :model      valid-model
-                                  :request    {:method :post :url "https://example.invalid"}
-                                  :response   valid-http-response
-                                  :payload-ch (sp/chan)
-                                  :control-ch (sp/chan)
-                                  :cancelled? (fn [] false)}
-        valid-start-source-result {:stop-fn (fn [])}
+  (let [valid-stream-state          {:model valid-model}
+        valid-event-transition      {:state  valid-stream-state
+                                     :events [{:type :text-delta :text "chunk"}]}
+        valid-finalize-result       {:assistant-message valid-assistant
+                                     :events            [{:type :text-end}]}
+        valid-http-response         {:status  200
+                                     :headers {"content-type" "application/json"}
+                                     :body    {:ok true}}
+        valid-start-source-input    {:adapter    valid-adapter
+                                     :env        valid-env
+                                     :model      valid-model
+                                     :request    {:method :post :url "https://example.invalid"}
+                                     :response   valid-http-response
+                                     :payload-ch (sp/chan)
+                                     :control-ch (sp/chan)
+                                     :cancelled? (fn [] false)}
+        valid-start-source-result   {:stop-fn (fn [])}
         valid-run-stream-base-input {:adapter valid-adapter
                                      :env     valid-env
                                      :model   valid-model

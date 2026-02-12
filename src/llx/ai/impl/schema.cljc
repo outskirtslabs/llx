@@ -1,25 +1,434 @@
 (ns llx.ai.impl.schema
   (:require
+   [clojure.string :as str]
    [com.fulcrologic.guardrails.malli.registry :as gr.reg]
    [malli.core :as m]
    [malli.error :as me]
    [malli.json-schema :as mjs]
-   [llx.ai.impl.schema.config :as config]
-   [llx.ai.impl.schema.core :as core]
-   [llx.ai.impl.schema.event :as event]
-   [llx.ai.impl.schema.message :as message]
-   [llx.ai.impl.schema.model :as model]
-   [llx.ai.impl.schema.options :as options]
+   [promesa.core :as p]
    [llx.ai.schema.runtime :as runtime]))
+
+(defn non-blank-string?
+  [s]
+  (and (string? s) (not (str/blank? s))))
+
+(defn non-negative-int?
+  [n]
+  (and (int? n) (<= 0 n)))
+
+(defn non-negative-number?
+  [n]
+  (and (number? n) (<= 0 n)))
+
+(defn deferred?
+  [x]
+  (p/deferred? x))
+
+(defn schema-form?
+  [x]
+  (or (m/schema? x)
+      (keyword? x)
+      (vector? x)
+      (map? x)
+      (set? x)))
+
+(def schemas
+  {:llx/id-string
+   [:and :string [:fn non-blank-string?]]
+
+   :llx/non-neg-int
+   [:fn non-negative-int?]
+
+   :llx/non-neg-number
+   [:fn non-negative-number?]
+
+   :llx/provider
+   [:enum :openai :anthropic :google :mistral :openai-compatible]
+
+   :llx/api
+   [:enum :openai-responses :openai-completions :anthropic-messages :google-generative-ai]
+
+   :llx/role
+   [:enum :user :assistant :tool-result]
+
+   :llx/stop-reason
+   [:enum :stop :length :tool-use :error :aborted]
+
+   :llx/reasoning-level
+   [:enum :minimal :low :medium :high :xhigh]
+
+   :llx/cache-control
+   [:enum :none :short :long]
+
+   :llx/timestamp-ms
+   :llx/non-neg-int
+
+   :llx/fn
+   [:fn ifn?]
+
+   :llx/deferred
+   [:fn deferred?]
+
+   :llx/metadata-key
+   [:or :keyword :string]
+
+   :llx/metadata-map
+   [:map-of :llx/metadata-key :any]
+
+   :llx/cost-table
+   [:map {:closed true}
+    [:input :llx/non-neg-number]
+    [:output :llx/non-neg-number]
+    [:cache-read :llx/non-neg-number]
+    [:cache-write :llx/non-neg-number]]
+
+   :llx/model-capabilities
+   [:map {:closed true}
+    [:reasoning? :boolean]
+    [:input [:set {:min 1} [:enum :text :image]]]
+    [:supports-xhigh? {:optional true} :boolean]]
+
+   :llx/model-compat
+   [:map {:closed true}
+    [:store? {:optional true} :boolean]
+    [:supports-developer-role? {:optional true} :boolean]
+    [:supports-strict-tools? {:optional true} :boolean]
+    [:supports-usage-stream? {:optional true} :boolean]
+    [:requires-tool-result-name? {:optional true} :boolean]
+    [:requires-assistant-after-tool-result? {:optional true} :boolean]
+    [:requires-thinking-as-text? {:optional true} :boolean]
+    [:token-field {:optional true} [:enum :max_tokens :max_completion_tokens]]
+    [:tool-result-role {:optional true} [:enum :tool :function]]
+    [:thinking-format {:optional true} [:enum :reasoning_content :reasoning :text :openai :zai :qwen]]
+    [:supports-reasoning-effort? {:optional true} :boolean]
+    [:tool-id-format {:optional true} [:enum :any :mistral-9-alnum]]]
+
+   :llx/model
+   [:map {:closed true}
+    [:id :llx/id-string]
+    [:name :llx/id-string]
+    [:provider :llx/provider]
+    [:api :llx/api]
+    [:base-url :llx/id-string]
+    [:context-window :llx/non-neg-int]
+    [:max-tokens :llx/non-neg-int]
+    [:cost :llx/cost-table]
+    [:capabilities :llx/model-capabilities]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:compat {:optional true} :llx/model-compat]]
+
+   :llx/content-text
+   [:map {:closed true}
+    [:type [:= :text]]
+    [:text :string]]
+
+   :llx/content-thinking
+   [:map {:closed true}
+    [:type [:= :thinking]]
+    [:thinking :string]
+    [:signature {:optional true} :string]]
+
+   :llx/content-image
+   [:map {:closed true}
+    [:type [:= :image]]
+    [:data :string]
+    [:mime-type :string]]
+
+   :llx/content-tool-call
+   [:map {:closed true}
+    [:type [:= :tool-call]]
+    [:id :llx/id-string]
+    [:name :llx/id-string]
+    [:arguments :map]
+    [:signature {:optional true} :string]]
+
+   :llx/user-content-block
+   [:or :llx/content-text :llx/content-image]
+
+   :llx/assistant-content-block
+   [:or :llx/content-text :llx/content-thinking :llx/content-tool-call]
+
+   :llx/tool-result-content-block
+   [:or :llx/content-text :llx/content-image]
+
+   :llx/usage-cost
+   [:map {:closed true}
+    [:input :llx/non-neg-number]
+    [:output :llx/non-neg-number]
+    [:cache-read :llx/non-neg-number]
+    [:cache-write :llx/non-neg-number]
+    [:total :llx/non-neg-number]]
+
+   :llx/usage
+   [:map {:closed true}
+    [:input :llx/non-neg-int]
+    [:output :llx/non-neg-int]
+    [:cache-read :llx/non-neg-int]
+    [:cache-write :llx/non-neg-int]
+    [:total-tokens :llx/non-neg-int]
+    [:cost :llx/usage-cost]]
+
+   :llx/message-user
+   [:map {:closed true}
+    [:role [:= :user]]
+    [:content [:or :string [:vector :llx/user-content-block]]]
+    [:timestamp :llx/timestamp-ms]]
+
+   :llx/message-assistant
+   [:map {:closed true}
+    [:role [:= :assistant]]
+    [:content [:vector :llx/assistant-content-block]]
+    [:api :llx/api]
+    [:provider :llx/provider]
+    [:model :llx/id-string]
+    [:usage :llx/usage]
+    [:stop-reason :llx/stop-reason]
+    [:error-message {:optional true} :string]
+    [:timestamp :llx/timestamp-ms]]
+
+   :llx/message-tool-result
+   [:map {:closed true}
+    [:role [:= :tool-result]]
+    [:tool-call-id :llx/id-string]
+    [:tool-name :llx/id-string]
+    [:content [:vector :llx/tool-result-content-block]]
+    [:is-error? :boolean]
+    [:timestamp :llx/timestamp-ms]]
+
+   :llx/message
+   [:or :llx/message-user :llx/message-assistant :llx/message-tool-result]
+
+   :llx/context
+   [:vector :llx/message]
+
+   :llx/context-map
+   [:map {:closed true}
+    [:messages :llx/context]
+    [:system-prompt {:optional true} :string]
+    [:tools {:optional true} [:vector :llx/tool]]]
+
+   :llx/event-start
+   [:map {:closed true}
+    [:type [:= :start]]
+    [:meta {:optional true} :map]]
+
+   :llx/event-text-start
+   [:map {:closed true}
+    [:type [:= :text-start]]]
+
+   :llx/event-text-delta
+   [:map {:closed true}
+    [:type [:= :text-delta]]
+    [:text :string]]
+
+   :llx/event-text-end
+   [:map {:closed true}
+    [:type [:= :text-end]]]
+
+   :llx/event-thinking-start
+   [:map {:closed true}
+    [:type [:= :thinking-start]]]
+
+   :llx/event-thinking-delta
+   [:map {:closed true}
+    [:type [:= :thinking-delta]]
+    [:thinking :string]]
+
+   :llx/event-thinking-end
+   [:map {:closed true}
+    [:type [:= :thinking-end]]]
+
+   :llx/event-toolcall-start
+   [:map {:closed true}
+    [:type [:= :toolcall-start]]
+    [:id :llx/id-string]
+    [:name :llx/id-string]]
+
+   :llx/event-toolcall-delta
+   [:map {:closed true}
+    [:type [:= :toolcall-delta]]
+    [:id :llx/id-string]
+    [:name :llx/id-string]
+    [:arguments :map]]
+
+   :llx/event-toolcall-end
+   [:map {:closed true}
+    [:type [:= :toolcall-end]]
+    [:id :llx/id-string]
+    [:name :llx/id-string]
+    [:arguments :map]]
+
+   :llx/event-done
+   [:map {:closed true}
+    [:type [:= :done]]
+    [:assistant-message :llx/message-assistant]]
+
+   :llx/event-error
+   [:map {:closed true}
+    [:type [:= :error]]
+    [:assistant-message :llx/message-assistant]]
+
+   :llx/event
+   [:or
+    :llx/event-start
+    :llx/event-text-start
+    :llx/event-text-delta
+    :llx/event-text-end
+    :llx/event-thinking-start
+    :llx/event-thinking-delta
+    :llx/event-thinking-end
+    :llx/event-toolcall-start
+    :llx/event-toolcall-delta
+    :llx/event-toolcall-end
+    :llx/event-done
+    :llx/event-error]
+
+   :llx/tool
+   [:map {:closed true}
+    [:name :llx/id-string]
+    [:description :llx/id-string]
+    [:input-schema [:fn schema-form?]]]
+
+   :llx/unified-request-options
+   [:map {:closed true}
+    [:max-tokens {:optional true} :llx/non-neg-int]
+    [:reasoning {:optional true} :llx/reasoning-level]
+    [:reasoning-effort {:optional true} :llx/reasoning-level]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]]
+
+   :llx/provider-reasoning-options
+   [:map {:closed false}
+    [:level {:optional true} :llx/reasoning-level]
+    [:effort {:optional true} :llx/reasoning-level]
+    [:summary {:optional true} [:or [:enum :auto :detailed :concise :none] :nil]]]
+
+   :llx/provider-request-options
+   [:map {:closed false}
+    [:tools {:optional true} [:vector :llx/tool]]
+    [:tool-choice {:optional true} :any]
+    [:reasoning {:optional true} :llx/provider-reasoning-options]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
+   :llx/openai-completions-provider-options
+   [:map {:closed false}
+    [:tools {:optional true} [:vector :llx/tool]]
+    [:tool-choice {:optional true} [:or [:enum :auto :none :required] :llx/id-string]]
+    [:reasoning {:optional true}
+     [:map {:closed true}
+      [:level {:optional true} :llx/reasoning-level]]]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
+   :llx/openai-responses-provider-options
+   [:map {:closed false}
+    [:tools {:optional true} [:vector :llx/tool]]
+    [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
+    [:reasoning {:optional true}
+     [:map {:closed true}
+      [:effort {:optional true} :llx/reasoning-level]
+      [:summary {:optional true} [:or [:enum :auto :detailed :concise :none] :nil]]]]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
+   :llx/anthropic-provider-options
+   [:map {:closed false}
+    [:tools {:optional true} [:vector :llx/tool]]
+    [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
+    [:reasoning {:optional true}
+     [:map {:closed true}
+      [:level {:optional true} :llx/reasoning-level]]]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
+   :llx/google-provider-options
+   [:map {:closed false}
+    [:tools {:optional true} [:vector :llx/tool]]
+    [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
+    [:reasoning {:optional true}
+     [:map {:closed true}
+      [:level {:optional true} :llx/reasoning-level]
+      [:effort {:optional true} :llx/reasoning-level]]]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
+   :llx/provider-config
+   [:map {:closed true}
+    [:api-key :llx/id-string]
+    [:base-url {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:organization {:optional true} :llx/id-string]
+    [:project-id {:optional true} :llx/id-string]
+    [:location {:optional true} :llx/id-string]]
+
+   :llx/providers-config
+   [:map {:closed true}
+    [:openai {:optional true} :llx/provider-config]
+    [:anthropic {:optional true} :llx/provider-config]
+    [:google {:optional true} :llx/provider-config]
+    [:mistral {:optional true} :llx/provider-config]
+    [:openai-compatible {:optional true} :llx/provider-config]]
+
+   :llx/library-config
+   [:map {:closed true}
+    [:providers :llx/providers-config]
+    [:models {:optional true} [:vector :llx/model]]
+    [:default-provider {:optional true} :llx/provider]]})
 
 (defn custom-schemas
   []
-  (merge core/schemas
-         model/schemas
-         message/schemas
-         event/schemas
-         options/schemas
-         config/schemas
+  (merge schemas
          runtime/schemas))
 
 (defn registry

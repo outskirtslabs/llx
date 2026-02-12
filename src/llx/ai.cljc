@@ -4,6 +4,7 @@
    #?(:clj [llx.ai.impl.client.jvm :as impl.jvm])
    #?(:cljs [llx.ai.impl.client.node :as impl.node])
    [llx.ai.impl.models :as impl.models]
+   [llx.ai.impl.schema :as impl.schema]
    [llx.ai.impl.utils.overflow :as impl.overflow]
    [llx.ai.impl.utils.tool-validation :as impl.tool-validation]
    [llx.ai.impl.utils.unicode :as impl.unicode]))
@@ -196,3 +197,8 @@
   "Removes unpaired surrogate code units while preserving valid Unicode pairs."
   [text]
   (impl.unicode/sanitize-surrogates text))
+
+(defn schema-regsitry
+  "Returns the full LLX schema registry map."
+  []
+  (impl.schema/registry))

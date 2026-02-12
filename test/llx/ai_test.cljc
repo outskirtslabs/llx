@@ -6,6 +6,7 @@
    [llx.ai.impl.client :as impl.client]
    #?@(:clj [[llx.ai.impl.client.jvm :as impl.jvm]]
        :cljs [[llx.ai.impl.client.node :as impl.node]])
+   [llx.ai.impl.schema :as impl.schema]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -50,3 +51,8 @@
               [:complete env model context unified-opts]
               [:stream env model context unified-opts]]
              @seen*)))))
+
+(deftest schema-regsitry-delegates-to-impl-registry
+  (let [sentinel {:schema :registry}]
+    (with-redefs [impl.schema/registry (fn [] sentinel)]
+      (is (identical? sentinel (ai/schema-regsitry))))))
