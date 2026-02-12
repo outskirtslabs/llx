@@ -47,7 +47,7 @@
                     :api         (:api model)
                     :provider    (:provider model)
                     :model       (:id model)
-                    :usage       {:input 1 :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                    :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
                                   :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
                     :stop-reason :tool-use
                     :timestamp   (util/now-ms)}
@@ -75,7 +75,7 @@
                     :api         (:api model)
                     :provider    (:provider model)
                     :model       (:id model)
-                    :usage       {:input 1 :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
+                    :usage       {:input 1                                                                    :output 1 :cache-read 0 :cache-write 0 :total-tokens 2
                                   :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
                     :stop-reason :tool-use
                     :timestamp   (util/now-ms)}
@@ -121,50 +121,42 @@
           _ (test-tool-result-text-and-image!* model opts)]
     true))
 
-(deftest live-image-tool-result-openai-completions
+(deftest ^:llx/openai live-image-tool-result-openai-completions
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    (if-not api-key
-      (is true "Skipping image tool-result OpenAI Completions: OPENAI_API_KEY not set")
-      #?(:clj
-         (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
-         :cljs
-         (async done
-                (-> (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+    #?(:clj
+       (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
+       :cljs
+       (async done
+              (-> (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
-(deftest live-image-tool-result-openai-responses
+(deftest ^:llx/openai live-image-tool-result-openai-responses
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    (if-not api-key
-      (is true "Skipping image tool-result OpenAI Responses: OPENAI_API_KEY not set")
-      #?(:clj
-         (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
-         :cljs
-         (async done
-                (-> (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+    #?(:clj
+       (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
+       :cljs
+       (async done
+              (-> (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
-(deftest live-image-tool-result-anthropic
+(deftest ^:llx/anthropic live-image-tool-result-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (if-not api-key
-      (is true "Skipping image tool-result Anthropic: ANTHROPIC_API_KEY not set")
-      #?(:clj
-         (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
-         :cljs
-         (async done
-                (-> (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+    #?(:clj
+       (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
+       :cljs
+       (async done
+              (-> (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
-(deftest live-image-tool-result-google
+(deftest ^:llx/google live-image-tool-result-google
   (let [api-key (live-env/get-env "GEMINI_API_KEY")]
-    (if-not api-key
-      (is true "Skipping image tool-result Google: GEMINI_API_KEY not set")
-      #?(:clj
-         (run-live! (run-image-suite!* models/google {:api-key api-key}))
-         :cljs
-         (async done
-                (-> (run-live! (run-image-suite!* models/google {:api-key api-key}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+    #?(:clj
+       (run-live! (run-image-suite!* models/google {:api-key api-key}))
+       :cljs
+       (async done
+              (-> (run-live! (run-image-suite!* models/google {:api-key api-key}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))

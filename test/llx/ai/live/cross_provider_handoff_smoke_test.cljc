@@ -1,6 +1,6 @@
 (ns llx.ai.live.cross-provider-handoff-smoke-test
   (:require
-   #?@(:clj [[clojure.test :refer [deftest is testing]]
+   #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.test-util :as util]]
        :cljs [[cljs.test :refer [deftest is async]]
               [llx.ai.live.support :as support]])
@@ -30,181 +30,209 @@
       (is (#{:stop :length :tool-use} (:stop-reason step-2)))
       true)))
 
-(deftest live-cross-provider-handoff
-  #?(:clj
-     (do
-       (testing "OpenAI -> Anthropic"
-         (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-               anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-           (if-not (and openai-key anthropic-key)
-             (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/openai-completions {:api-key openai-key :max-output-tokens 96}
-               "Give one short sentence about Clojure."
-               models/anthropic {:api-key anthropic-key :max-output-tokens 128})))))
+(defn- run-live!
+  [deferred]
+  #?(:clj (do
+            (util/await! deferred)
+            true)
+     :cljs deferred))
 
-       (testing "Anthropic -> OpenAI"
-         (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-               anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-           (if-not (and openai-key anthropic-key)
-             (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-               "Give one short sentence about Lisp history."
-               models/openai-completions {:api-key openai-key :max-output-tokens 128})))))
+#?(:cljs
+   (defn- run-async!
+     [done deferred]
+     (-> deferred
+         (p/then (fn [_] (done)))
+         (p/catch (partial support/fail-and-done! done)))))
 
-       (testing "OpenAI Responses -> Anthropic"
-         (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-               anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-           (if-not (and openai-key anthropic-key)
-             (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/openai-responses {:api-key openai-key
-                                        :max-output-tokens 128
-                                        :reasoning {:effort :high :summary :detailed}}
-               "Give one short sentence about Clojure macros."
-               models/anthropic {:api-key anthropic-key :max-output-tokens 128})))))
+(deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-to-anthropic
+  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/openai-completions {:api-key openai-key :max-output-tokens 96}
+         "Give one short sentence about Clojure."
+         models/anthropic {:api-key anthropic-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/openai-completions {:api-key openai-key :max-output-tokens 96}
+                 "Give one short sentence about Clojure."
+                 models/anthropic {:api-key anthropic-key :max-output-tokens 128})))))))
 
-       (testing "Anthropic -> OpenAI Responses"
-         (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-               anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
-           (if-not (and openai-key anthropic-key)
-             (is true "Skipping: OPENAI_API_KEY and ANTHROPIC_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-               "Give one short sentence about Lisp history."
-               models/openai-responses {:api-key openai-key
-                                        :max-output-tokens 128
-                                        :reasoning {:effort :high :summary :detailed}})))))
+(deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai
+  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+         "Give one short sentence about Lisp history."
+         models/openai-completions {:api-key openai-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+                 "Give one short sentence about Lisp history."
+                 models/openai-completions {:api-key openai-key :max-output-tokens 128})))))))
 
-       (testing "OpenAI Responses -> OpenAI Completions"
-         (let [openai-key (live-env/get-env "OPENAI_API_KEY")]
-           (if-not openai-key
-             (is true "Skipping: OPENAI_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/openai-responses {:api-key openai-key
-                                        :max-output-tokens 128
-                                        :reasoning {:effort :high :summary :detailed}}
-               "Give one short sentence about Clojure protocols."
-               models/openai-completions {:api-key openai-key :max-output-tokens 128})))))
+(deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-responses-to-anthropic
+  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/openai-responses {:api-key           openai-key
+                                  :max-output-tokens 128
+                                  :reasoning         {:effort :high :summary :detailed}}
+         "Give one short sentence about Clojure macros."
+         models/anthropic {:api-key anthropic-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/openai-responses {:api-key           openai-key
+                                          :max-output-tokens 128
+                                          :reasoning         {:effort :high :summary :detailed}}
+                 "Give one short sentence about Clojure macros."
+                 models/anthropic {:api-key anthropic-key :max-output-tokens 128})))))))
 
-       (testing "Anthropic -> Google"
-         (let [anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")
-               google-key    (live-env/get-env "GEMINI_API_KEY")]
-           (if-not (and anthropic-key google-key)
-             (is true "Skipping: ANTHROPIC_API_KEY and GEMINI_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-               "Give one short sentence about Clojure macros."
-               models/google {:api-key google-key
-                              :max-output-tokens 128
-                              :reasoning {:level :high :effort :high}})))))
+(deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai-responses
+  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
+        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+         "Give one short sentence about Lisp history."
+         models/openai-responses {:api-key           openai-key
+                                  :max-output-tokens 128
+                                  :reasoning         {:effort :high :summary :detailed}}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+                 "Give one short sentence about Lisp history."
+                 models/openai-responses {:api-key           openai-key
+                                          :max-output-tokens 128
+                                          :reasoning         {:effort :high :summary :detailed}})))))))
 
-       (testing "Google -> OpenAI Completions"
-         (let [openai-key (live-env/get-env "OPENAI_API_KEY")
-               google-key (live-env/get-env "GEMINI_API_KEY")]
-           (if-not (and openai-key google-key)
-             (is true "Skipping: GEMINI_API_KEY and OPENAI_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/google {:api-key google-key
-                              :max-output-tokens 96
-                              :reasoning {:level :high :effort :high}}
-               "Give one short sentence about Clojure protocols."
-               models/openai-completions {:api-key openai-key :max-output-tokens 128})))))
+(deftest ^:llx/openai live-handoff-openai-responses-to-openai-completions
+  (let [openai-key (live-env/get-env "OPENAI_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/openai-responses {:api-key           openai-key
+                                  :max-output-tokens 128
+                                  :reasoning         {:effort :high :summary :detailed}}
+         "Give one short sentence about Clojure protocols."
+         models/openai-completions {:api-key openai-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/openai-responses {:api-key           openai-key
+                                          :max-output-tokens 128
+                                          :reasoning         {:effort :high :summary :detailed}}
+                 "Give one short sentence about Clojure protocols."
+                 models/openai-completions {:api-key openai-key :max-output-tokens 128})))))))
 
-       (testing "Google -> Mistral"
-         (let [google-key  (live-env/get-env "GEMINI_API_KEY")
-               mistral-key (live-env/get-env "MISTRAL_API_KEY")]
-           (if-not (and google-key mistral-key)
-             (is true "Skipping: GEMINI_API_KEY and MISTRAL_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/google {:api-key google-key
-                              :max-output-tokens 96
-                              :reasoning {:level :high :effort :high}}
-               "Give one short sentence about Clojure protocols."
-               models/mistral {:api-key mistral-key :max-output-tokens 128})))))
+(deftest ^{:llx/anthropic true :llx/google true} live-handoff-anthropic-to-google
+  (let [anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")
+        google-key    (live-env/get-env "GEMINI_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+         "Give one short sentence about Clojure macros."
+         models/google {:api-key           google-key
+                        :max-output-tokens 128
+                        :reasoning         {:level :high :effort :high}}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/anthropic {:api-key anthropic-key :max-output-tokens 96}
+                 "Give one short sentence about Clojure macros."
+                 models/google {:api-key           google-key
+                                :max-output-tokens 128
+                                :reasoning         {:level :high :effort :high}})))))))
 
-       (testing "Mistral -> OpenAI-compatible"
-         (let [enabled?    (= "1" (live-env/get-env "LLX_LIVE_ENABLE_OLLAMA"))
-               mistral-key (live-env/get-env "MISTRAL_API_KEY")]
-           (if-not (and enabled? mistral-key)
-             (is true "Skipping: LLX_LIVE_ENABLE_OLLAMA=1 and MISTRAL_API_KEY required")
-             (util/await!
-              (handoff-check!*
-               models/mistral {:api-key mistral-key :max-output-tokens 96}
-               "Give one short sentence about Clojure macros."
-               models/ollama {:max-output-tokens 128}))))))
+(deftest ^{:llx/google true :llx/openai true} live-handoff-google-to-openai-completions
+  (let [openai-key (live-env/get-env "OPENAI_API_KEY")
+        google-key (live-env/get-env "GEMINI_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/google {:api-key           google-key
+                        :max-output-tokens 96
+                        :reasoning         {:level :high :effort :high}}
+         "Give one short sentence about Clojure protocols."
+         models/openai-completions {:api-key openai-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/google {:api-key           google-key
+                                :max-output-tokens 96
+                                :reasoning         {:level :high :effort :high}}
+                 "Give one short sentence about Clojure protocols."
+                 models/openai-completions {:api-key openai-key :max-output-tokens 128})))))))
 
-     :cljs
-     (async done
-            (-> (p/do
-                  (let [openai-key    (live-env/get-env "OPENAI_API_KEY")
-                        anthropic-key (live-env/get-env "ANTHROPIC_API_KEY")
-                        google-key    (live-env/get-env "GEMINI_API_KEY")
-                        mistral-key   (live-env/get-env "MISTRAL_API_KEY")
-                        ollama?       (= "1" (live-env/get-env "LLX_LIVE_ENABLE_OLLAMA"))]
-                    (if (and openai-key anthropic-key)
-                      (p/let [_ (handoff-check!* models/openai-completions {:api-key openai-key :max-output-tokens 96}
-                                                 "Give one short sentence about Clojure."
-                                                 models/anthropic {:api-key anthropic-key :max-output-tokens 128})
-                              _ (handoff-check!* models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-                                                 "Give one short sentence about Lisp history."
-                                                 models/openai-completions {:api-key openai-key :max-output-tokens 128})
-                              _ (handoff-check!* models/openai-responses {:api-key openai-key
-                                                                           :max-output-tokens 128
-                                                                           :reasoning {:effort :high :summary :detailed}}
-                                                 "Give one short sentence about Clojure macros."
-                                                 models/anthropic {:api-key anthropic-key :max-output-tokens 128})
-                              _ (handoff-check!* models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-                                                 "Give one short sentence about Lisp history."
-                                                 models/openai-responses {:api-key openai-key
-                                                                          :max-output-tokens 128
-                                                                          :reasoning {:effort :high :summary :detailed}})
-                              _ (handoff-check!* models/openai-responses {:api-key openai-key
-                                                                           :max-output-tokens 128
-                                                                           :reasoning {:effort :high :summary :detailed}}
-                                                 "Give one short sentence about Clojure protocols."
-                                                 models/openai-completions {:api-key openai-key :max-output-tokens 128})]
-                        true)
-                      (is true "Skipping OpenAI/Anthropic handoff cases: OPENAI_API_KEY and ANTHROPIC_API_KEY required"))
+(deftest ^{:llx/google true :llx/mistral true} live-handoff-google-to-mistral
+  (let [google-key  (live-env/get-env "GEMINI_API_KEY")
+        mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/google {:api-key           google-key
+                        :max-output-tokens 96
+                        :reasoning         {:level :high :effort :high}}
+         "Give one short sentence about Clojure protocols."
+         models/mistral {:api-key mistral-key :max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/google {:api-key           google-key
+                                :max-output-tokens 96
+                                :reasoning         {:level :high :effort :high}}
+                 "Give one short sentence about Clojure protocols."
+                 models/mistral {:api-key mistral-key :max-output-tokens 128})))))))
 
-                    (if (and anthropic-key google-key)
-                      (handoff-check!* models/anthropic {:api-key anthropic-key :max-output-tokens 96}
-                                      "Give one short sentence about Clojure macros."
-                                      models/google {:api-key google-key
-                                                     :max-output-tokens 128
-                                                     :reasoning {:level :high :effort :high}})
-                      (is true "Skipping Anthropic/Google handoff case: ANTHROPIC_API_KEY and GEMINI_API_KEY required"))
-
-                    (if (and openai-key google-key)
-                      (handoff-check!* models/google {:api-key google-key
-                                                      :max-output-tokens 96
-                                                      :reasoning {:level :high :effort :high}}
-                                      "Give one short sentence about Clojure protocols."
-                                      models/openai-completions {:api-key openai-key :max-output-tokens 128})
-                      (is true "Skipping Google/OpenAI handoff case: GEMINI_API_KEY and OPENAI_API_KEY required"))
-
-                    (if (and google-key mistral-key)
-                      (handoff-check!* models/google {:api-key google-key
-                                                      :max-output-tokens 96
-                                                      :reasoning {:level :high :effort :high}}
-                                      "Give one short sentence about Clojure protocols."
-                                      models/mistral {:api-key mistral-key :max-output-tokens 128})
-                      (is true "Skipping Google/Mistral handoff case: GEMINI_API_KEY and MISTRAL_API_KEY required"))
-
-                    (if (and ollama? mistral-key)
-                      (handoff-check!* models/mistral {:api-key mistral-key :max-output-tokens 96}
-                                      "Give one short sentence about Clojure macros."
-                                      models/ollama {:max-output-tokens 128})
-                      (is true "Skipping Mistral/Ollama handoff case: LLX_LIVE_ENABLE_OLLAMA=1 and MISTRAL_API_KEY required"))
-                    true))
-                (p/then (fn [_] (done)))
-                (p/catch (partial support/fail-and-done! done))))))
+(deftest ^{:llx/mistral true :llx/ollama true} live-handoff-mistral-to-ollama
+  (let [mistral-key (live-env/get-env "MISTRAL_API_KEY")]
+    #?(:clj
+       (run-live!
+        (handoff-check!*
+         models/mistral {:api-key mistral-key :max-output-tokens 96}
+         "Give one short sentence about Clojure macros."
+         models/ollama {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (run-async!
+               done
+               (run-live!
+                (handoff-check!*
+                 models/mistral {:api-key mistral-key :max-output-tokens 96}
+                 "Give one short sentence about Clojure macros."
+                 models/ollama {:max-output-tokens 128})))))))

@@ -19,8 +19,22 @@
 
          test:jvm-live
          {:doc  "Run all tests or specific test suites"
-          :task (apply clojure "-M:dev:kaocha"
-                       (if (seq *command-line-args*) *command-line-args* [":live"]))}
+          :task (let [present-or-nonempty?
+                      (fn [env-var]
+                        (let [value (System/getenv env-var)]
+                          (and (some? value) (or (= env-var "OLLAMA_API_KEY")
+                                                 (seq value)))))
+                      services                                                {"OLLAMA_API_KEY"    :llx/ollama
+                                                                               "OPENAI_API_KEY"    :llx/openai
+                                                                               "ANTHROPIC_API_KEY" :llx/anthropic
+                                                                               "GEMINI_API_KEY"    :llx/google
+                                                                               "MISTRAL_API_KEY"   :llx/mistral}
+                      disabled                                                (->> services
+                                                                                   (remove (fn [[env-var _]]
+                                                                                             (present-or-nonempty? env-var)))
+                                                                                   (mapcat (fn [[_ kw]] ["--skip-meta" (str kw)])))
+                      suites                                                  (if (seq *command-line-args*) *command-line-args* [":live"])]
+                  (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
 
          test:watch-cljs
          {:doc  "Watch CLJS tests with shadow-cljs"

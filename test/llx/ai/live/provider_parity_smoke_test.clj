@@ -184,15 +184,15 @@
   (if-not (contains? (get-in model [:capabilities :input]) :image)
     (is true (str "Skipping image test - model " (:id model) " doesn't support images"))
     (let [result (await/await! (client/complete* env model
-                                           {:system-prompt "You are a helpful assistant."
-                                            :messages      [{:role      :user
-                                                             :content   [{:type :text
-                                                                          :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
-                                                                         {:type      :image
-                                                                          :data      test-image-base64
-                                                                          :mime-type "image/png"}]
-                                                             :timestamp (System/currentTimeMillis)}]}
-                                           opts))
+                                                 {:system-prompt "You are a helpful assistant."
+                                                  :messages      [{:role      :user
+                                                                   :content   [{:type :text
+                                                                                :text "What do you see in this image? Please describe the shape (circle, rectangle, square, triangle, ...) and color (red, blue, green, ...). You MUST reply in English."}
+                                                                               {:type      :image
+                                                                                :data      test-image-base64
+                                                                                :mime-type "image/png"}]
+                                                                   :timestamp (System/currentTimeMillis)}]}
+                                                 opts))
           text   (str/lower-case (extract-text result))]
       (is (pos? (count (:content result))))
       (is (str/includes? text "green") "response should mention 'green'")
@@ -214,10 +214,10 @@
            turn     0]
       (when (< turn max-turns)
         (let [response     (await/await! (client/complete* env model
-                                                     {:system-prompt "You are a helpful assistant that can use tools to answer questions."
-                                                      :messages      messages
-                                                      :tools         [tool-spec]}
-                                                     opts))
+                                                           {:system-prompt "You are a helpful assistant that can use tools to answer questions."
+                                                            :messages      messages
+                                                            :tools         [tool-spec]}
+                                                           opts))
               messages     (conj messages response)
               tool-results (reduce
                             (fn [results block]
@@ -263,7 +263,7 @@
     (is (str/includes? @all-text "887")
         "accumulated text should contain 887 (453 + 434)")))
 
-(deftest live-parity-google
+(deftest ^:llx/google live-parity-google
   (let [api-key (live-env/get-env "GEMINI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -283,7 +283,7 @@
                                         :max-output-tokens 2048
                                         :reasoning {:level :high})))))
 
-(deftest live-parity-openai-completions
+(deftest ^:llx/openai live-parity-openai-completions
   (let [api-key (live-env/get-env "OPENAI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -295,7 +295,7 @@
     (testing "handle-image"
       (handle-image! models/openai-completions opts))))
 
-(deftest live-parity-openai-responses
+(deftest ^:llx/openai live-parity-openai-responses
   (let [api-key (live-env/get-env "OPENAI_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -315,7 +315,7 @@
                                                   :max-output-tokens 2048
                                                   :reasoning {:effort :high})))))
 
-(deftest live-parity-anthropic
+(deftest ^:llx/anthropic live-parity-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -327,7 +327,7 @@
     (testing "handle-image"
       (handle-image! models/anthropic opts))))
 
-(deftest live-parity-mistral-devstral
+(deftest ^:llx/mistral live-parity-mistral-devstral
   (let [api-key (live-env/get-env "MISTRAL_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -342,7 +342,7 @@
                                          :max-output-tokens 2048
                                          :reasoning {:level :medium})))))
 
-(deftest live-parity-mistral-pixtral
+(deftest ^:llx/mistral live-parity-mistral-pixtral
   (let [api-key (live-env/get-env "MISTRAL_API_KEY")
         opts    {:api-key api-key :max-output-tokens 256}]
     (testing "basic-text-generation"
@@ -354,7 +354,7 @@
     (testing "handle-image"
       (handle-image! models/mistral-pixtral opts))))
 
-(deftest live-parity-ollama
+(deftest ^:llx/ollama live-parity-ollama
   (let [opts {}]
     (testing "basic-text-generation"
       (basic-text-generation! models/ollama opts))

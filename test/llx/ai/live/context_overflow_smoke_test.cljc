@@ -65,7 +65,7 @@
                     :api           (:api model)
                     :provider      (:provider model)
                     :model         (:id model)
-                    :usage         {:input 0 :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
+                    :usage         {:input 0                                                                    :output 0 :cache-read 0 :cache-write 0 :total-tokens 0
                                     :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
                     :error-type    (:type error-data)
                     :retry-after   (:retry-after error-data)
@@ -123,67 +123,57 @@
             true)
      :cljs deferred))
 
-(deftest live-overflow-anthropic
+(deftest ^:llx/anthropic live-overflow-anthropic
   (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]
     (testing "anthropic overflow detection"
-      (if-not api-key
-        (is true "Skipping overflow assertion for anthropic: ANTHROPIC_API_KEY not set")
-        #?(:clj
-           (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
-           :cljs
-           (async done
-                  (-> (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
-                      (p/then (fn [_] (done)))
-                      (p/catch (partial support/fail-and-done! done)))))))))
+      #?(:clj
+         (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
+         :cljs
+         (async done
+                (-> (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
+                    (p/then (fn [_] (done)))
+                    (p/catch (partial support/fail-and-done! done))))))))
 
-(deftest live-overflow-openai-completions
+(deftest ^:llx/openai live-overflow-openai-completions
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
     (testing "openai completions overflow detection"
-      (if-not api-key
-        (is true "Skipping overflow assertion for openai completions: OPENAI_API_KEY not set")
-        #?(:clj
-           (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
-           :cljs
-           (async done
-                  (-> (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
-                      (p/then (fn [_] (done)))
-                      (p/catch (partial support/fail-and-done! done)))))))))
+      #?(:clj
+         (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
+         :cljs
+         (async done
+                (-> (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
+                    (p/then (fn [_] (done)))
+                    (p/catch (partial support/fail-and-done! done))))))))
 
-(deftest live-overflow-openai-responses
+(deftest ^:llx/openai live-overflow-openai-responses
   (let [api-key (live-env/get-env "OPENAI_API_KEY")]
     (testing "openai responses overflow detection"
-      (if-not api-key
-        (is true "Skipping overflow assertion for openai responses: OPENAI_API_KEY not set")
-        #?(:clj
-           (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
-           :cljs
-           (async done
-                  (-> (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
-                      (p/then (fn [_] (done)))
-                      (p/catch (partial support/fail-and-done! done)))))))))
+      #?(:clj
+         (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
+         :cljs
+         (async done
+                (-> (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
+                    (p/then (fn [_] (done)))
+                    (p/catch (partial support/fail-and-done! done))))))))
 
-(deftest live-overflow-google
+(deftest ^:llx/google live-overflow-google
   (let [api-key (live-env/get-env "GEMINI_API_KEY")]
     (testing "google overflow detection"
-      (if-not api-key
-        (is true "Skipping overflow assertion for google: GEMINI_API_KEY not set")
-        #?(:clj
-           (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
-           :cljs
-           (async done
-                  (-> (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
-                      (p/then (fn [_] (done)))
-                      (p/catch (partial support/fail-and-done! done)))))))))
+      #?(:clj
+         (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
+         :cljs
+         (async done
+                (-> (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
+                    (p/then (fn [_] (done)))
+                    (p/catch (partial support/fail-and-done! done))))))))
 
-(deftest live-overflow-mistral
+(deftest ^:llx/mistral live-overflow-mistral
   (let [api-key (live-env/get-env "MISTRAL_API_KEY")]
     (testing "mistral overflow detection"
-      (if-not api-key
-        (is true "Skipping overflow assertion for mistral: MISTRAL_API_KEY not set")
-        #?(:clj
-           (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
-           :cljs
-           (async done
-                  (-> (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
-                      (p/then (fn [_] (done)))
-                      (p/catch (partial support/fail-and-done! done)))))))))
+      #?(:clj
+         (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
+         :cljs
+         (async done
+                (-> (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
+                    (p/then (fn [_] (done)))
+                    (p/catch (partial support/fail-and-done! done))))))))
