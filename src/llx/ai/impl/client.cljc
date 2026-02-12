@@ -224,9 +224,23 @@
     {:lines     (butlast parts)
      :remainder (last parts)}))
 
+(defn- ensure-streaming-error
+  [model ex]
+  (if (errors/llx-error? ex)
+    ex
+    (let [provider      (name (or (:provider model) "unknown"))
+          error-message (or (ex-message ex) (pr-str ex))
+          wrapped       (errors/streaming-error provider error-message)
+          wrapped-data  (ex-data wrapped)
+          original-data (if (map? (ex-data ex)) (ex-data ex) {})]
+      (ex-info (ex-message wrapped)
+               (merge wrapped-data
+                      (dissoc original-data :type :message :recoverable? :provider))))))
+
 (defn runtime-terminal-error-event
   [adapter env model state* stream-ex]
-  (let [[assistant-message normalize-failed?] (try
+  (let [stream-ex                     (ensure-streaming-error model stream-ex)
+        [assistant-message normalize-failed?] (try
                                                 [(schema/assert-valid!
                                                   :llx/message-assistant
                                                   ((:normalize-error adapter) env stream-ex @state*))

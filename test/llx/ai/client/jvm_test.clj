@@ -269,3 +269,39 @@
                       :error-type              :llx/streaming-error :error-message "stream boom"
                       :normalize-error-failed? false}}
               (util/strip-generated event))))))))
+
+(deftest run-stream-wraps-untyped-stream-errors-as-streaming-error
+  (util/with-captured-logs!
+   (fn [logs*]
+     (let [out     (sp/chan)
+           state*  (atom {:model base-model})
+           adapter {:api             :openai-completions
+                    :build-request   (fn [_env _model _context _opts _stream?]
+                                       {:method :post :url "https://example.invalid"})
+                    :open-stream     (fn [_env _model _request]
+                                       (throw (ex-info "stream boom" {})))
+                    :decode-event    (fn [_env state _payload] {:state state :events []})
+                    :finalize        (fn [_env _state]
+                                       {:assistant-message (valid-assistant 1730000000000)
+                                        :events            []})
+                    :normalize-error (make-normalize-error-fn)}]
+       (sut/run-stream! {:adapter      adapter
+                         :env          (assoc (stub-env) :call/id "call_3")
+                         :model        base-model
+                         :request      {:method :post :url "https://example.invalid"}
+                         :out          out
+                         :state*       state*
+                         :request-opts {}})
+       (collect-stream! out 1000)
+       (let [event (util/first-event logs* :llx.obs/stream-event-error)]
+         (is (util/submap?
+              {:id   :llx.obs/stream-event-error
+               :level :error
+               :data {:call-id                 "call_3"
+                      :provider                :openai
+                      :api                     :openai-completions
+                      :model-id                "gpt-4o-mini"
+                      :error-type              :llx/streaming-error
+                      :error-message           "stream boom"
+                      :normalize-error-failed? false}}
+              (util/strip-generated event))))))))
