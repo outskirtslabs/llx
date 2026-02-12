@@ -29,15 +29,9 @@
       (is (#{:stop :length :tool-use} (:stop-reason step-2)))
       true)))
 
-(defn- run-live-async!
-  [deferred done]
-  (-> deferred
-      (p/then (fn [_] (done)))
-      (p/catch (partial util/fail-and-done! done))))
-
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-to-anthropic
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/openai-completions {:max-output-tokens 96}
                 "Give one short sentence about Clojure."
@@ -46,7 +40,7 @@
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/anthropic {:max-output-tokens 96}
                 "Give one short sentence about Lisp history."
@@ -55,7 +49,7 @@
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-responses-to-anthropic
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/openai-responses {:max-output-tokens 128
                                          :reasoning         {:effort :high :summary :detailed}}
@@ -65,7 +59,7 @@
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai-responses
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/anthropic {:max-output-tokens 96}
                 "Give one short sentence about Lisp history."
@@ -75,7 +69,7 @@
 
 (deftest ^:llx/openai live-handoff-openai-responses-to-openai-completions
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/openai-responses {:max-output-tokens 128
                                          :reasoning         {:effort :high :summary :detailed}}
@@ -85,7 +79,7 @@
 
 (deftest ^{:llx/anthropic true :llx/google true} live-handoff-anthropic-to-google
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/anthropic {:max-output-tokens 96}
                 "Give one short sentence about Clojure macros."
@@ -95,7 +89,7 @@
 
 (deftest ^{:llx/google true :llx/openai true} live-handoff-google-to-openai-completions
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/google {:max-output-tokens 96
                                :reasoning         {:level :high :effort :high}}
@@ -105,7 +99,7 @@
 
 (deftest ^{:llx/google true :llx/mistral true} live-handoff-google-to-mistral
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/google {:max-output-tokens 96
                                :reasoning         {:level :high :effort :high}}
@@ -115,7 +109,7 @@
 
 (deftest ^{:llx/mistral true :llx/ollama true} live-handoff-mistral-to-ollama
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (handoff-check!*
                 models/mistral {:max-output-tokens 96}
                 "Give one short sentence about Clojure macros."

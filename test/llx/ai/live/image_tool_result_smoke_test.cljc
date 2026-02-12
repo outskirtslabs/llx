@@ -17,17 +17,11 @@
 (def ^:private test-image-base64
   (util/read-file-base64 "test/llx/ai/fixtures/test-image.png"))
 
-(defn- extract-text
-  [assistant-message]
-  (->> (:content assistant-message)
-       (filter #(= :text (:type %)))
-       (map :text)
-       (str/join "")
-       str/lower-case))
-
 (defn- assert-image-described!
   [assistant-message]
-  (let [text (extract-text assistant-message)]
+  (let [text (-> assistant-message
+                 util/extract-text
+                 str/lower-case)]
     (is (or (str/includes? text "green") (str/includes? text "triangle"))
         (str "expected image description to mention 'green' or 'triangle', got: "
              (subs text 0 (min 200 (count text)))))))
@@ -107,12 +101,6 @@
   (-> (client/complete* env model (text-and-image-context model) opts)
       (p/then assert-image-result*)))
 
-(defn- run-live-async!
-  [deferred done]
-  (-> deferred
-      (p/then (fn [_] (done)))
-      (p/catch (partial util/fail-and-done! done))))
-
 (defn- run-image-suite!*
   [model opts]
   (p/let [_ (test-tool-result-image-only!* model opts)
@@ -121,24 +109,24 @@
 
 (deftest ^:llx/openai live-image-tool-result-openai-completions
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-image-suite!* models/openai-completions {})
                done)))
 
 (deftest ^:llx/openai live-image-tool-result-openai-responses
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-image-suite!* models/openai-responses {})
                done)))
 
 (deftest ^:llx/anthropic live-image-tool-result-anthropic
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-image-suite!* models/anthropic {})
                done)))
 
 (deftest ^:llx/google live-image-tool-result-google
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-image-suite!* models/google {})
                done)))

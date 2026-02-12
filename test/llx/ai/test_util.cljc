@@ -7,6 +7,7 @@
        :cljs [[cljs.reader :as reader]
               [cljs.test :refer [is]]
               ["node:fs" :as fs]])
+   [clojure.string :as str]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
@@ -45,6 +46,13 @@
               (json-read s opts)
               (catch :default _
                 nil)))))
+
+(defn extract-text
+  [assistant-message]
+  (->> (:content assistant-message)
+       (filter #(= :text (:type %)))
+       (map :text)
+       (str/join "")))
 
 (defn now-ms
   []
@@ -277,3 +285,9 @@
   [done err]
   (is nil (str err))
   (done))
+
+(defn run-live-async!
+  [deferred done]
+  (-> deferred
+      (p/then (fn [_] (done)))
+      (p/catch (partial fail-and-done! done))))

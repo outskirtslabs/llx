@@ -26,13 +26,6 @@
 (def ^:private test-image-base64
   (util/read-file-base64 "test/llx/ai/fixtures/test-image.png"))
 
-(defn- extract-text
-  [assistant-message]
-  (->> (:content assistant-message)
-       (filter #(= :text (:type %)))
-       (map :text)
-       (str/join "")))
-
 (defn- extract-thinking
   [assistant-message]
   (->> (:content assistant-message)
@@ -71,7 +64,7 @@
              0))
       (is (> (get-in first-r [:usage :output] 0) 0))
       (is (nil? (:error-message first-r)))
-      (is (str/includes? (extract-text first-r) "Hello test successful"))
+      (is (str/includes? (util/extract-text first-r) "Hello test successful"))
 
       (let [context2 {:system-prompt "You are a helpful assistant. Be concise."
                       :messages      [(first (:messages context))
@@ -87,7 +80,7 @@
                  0))
           (is (> (get-in second-r [:usage :output] 0) 0))
           (is (nil? (:error-message second-r)))
-          (is (str/includes? (extract-text second-r) "Goodbye test successful"))
+          (is (str/includes? (util/extract-text second-r) "Goodbye test successful"))
           true)))))
 
 (defn- handle-tool-call!*
@@ -178,7 +171,7 @@
                                                                     :mime-type "image/png"}]
                                                        :timestamp (util/now-ms)}]}
                                      opts)]
-      (let [text (str/lower-case (extract-text result))]
+      (let [text (str/lower-case (util/extract-text result))]
         (is (pos? (count (:content result))))
         (is (str/includes? text "green") "response should mention 'green'")
         (is (str/includes? text "triangle") "response should mention 'triangle'")
@@ -247,12 +240,6 @@
                       "accumulated text should contain 887 (453 + 434)")
                   true)))))
 
-(defn- run-live-async!
-  [deferred done]
-  (-> deferred
-      (p/then (fn [_] (done)))
-      (p/catch (partial util/fail-and-done! done))))
-
 (defn- run-provider-suite!*
   [{:keys [model opts thinking-opts]}]
   (p/let [_ (testing "basic-text-generation"
@@ -273,7 +260,7 @@
 
 (deftest ^:llx/google live-parity-google
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-suite!* {:model         models/google
                                       :opts          {:max-output-tokens 256}
                                       :thinking-opts {:max-output-tokens 2048
@@ -282,7 +269,7 @@
 
 (deftest ^:llx/openai live-parity-openai-completions
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
                  (p/let [_ (testing "basic-text-generation"
                              (basic-text-generation!* models/openai-completions opts))
@@ -297,7 +284,7 @@
 
 (deftest ^:llx/openai live-parity-openai-responses
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-suite!* {:model         models/openai-responses
                                       :opts          {:max-output-tokens 256}
                                       :thinking-opts {:max-output-tokens 2048
@@ -306,7 +293,7 @@
 
 (deftest ^:llx/anthropic live-parity-anthropic
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
                  (p/let [_ (testing "basic-text-generation"
                              (basic-text-generation!* models/anthropic (assoc opts :reasoning {:level :high})))
@@ -321,7 +308,7 @@
 
 (deftest ^:llx/mistral live-parity-mistral-devstral
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
                  (p/let [_ (testing "basic-text-generation"
                              (basic-text-generation!* models/mistral opts))
@@ -337,7 +324,7 @@
 
 (deftest ^:llx/mistral live-parity-mistral-pixtral
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
                  (p/let [_ (testing "basic-text-generation"
                              (basic-text-generation!* models/mistral-pixtral opts))
@@ -352,7 +339,7 @@
 
 (deftest ^:llx/ollama live-parity-ollama
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-suite!* {:model         models/ollama
                                       :opts          {}
                                       :thinking-opts {:reasoning {:level :medium}}})

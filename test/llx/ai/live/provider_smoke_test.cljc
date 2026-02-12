@@ -44,15 +44,9 @@
                                         opts))]
     true))
 
-(defn- run-live-async!
-  [deferred done]
-  (-> deferred
-      (p/then (fn [_] (done)))
-      (p/catch (partial util/fail-and-done! done))))
-
 (deftest ^:llx/anthropic live-anthropic-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-smoke* {:model           models/anthropic
                                      :opts            {:max-output-tokens 128}
                                      :complete-prompt "reply with exactly: llx anthropic smoke ok"
@@ -61,7 +55,7 @@
 
 (deftest ^:llx/google live-google-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-smoke* {:model           models/google
                                      :opts            {:max-output-tokens 96
                                                        :reasoning         {:level :high :effort :high}}
@@ -71,7 +65,7 @@
 
 (deftest ^:llx/mistral live-mistral-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-smoke* {:model           models/mistral
                                      :opts            {:max-output-tokens 96}
                                      :complete-prompt "reply with exactly: llx mistral smoke ok"
@@ -80,7 +74,7 @@
 
 (deftest ^:llx/ollama live-ollama-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-smoke* {:model           models/ollama
                                      :opts            {:max-output-tokens 64}
                                      :complete-prompt "reply with exactly: llx ollama smoke ok"
@@ -89,7 +83,7 @@
 
 (deftest ^:llx/openai live-openai-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (p/let [out (client/complete* env models/openai-completions
                                              {:messages [{:role      :user
                                                           :content   "reply with exactly: llx smoke ok"
@@ -101,7 +95,7 @@
 
 (deftest ^:llx/openai live-openai-responses-smoke
   (util/async done
-              (run-live-async!
+              (util/run-live-async!
                (run-provider-smoke* {:model           models/openai-responses
                                      :opts            {:max-output-tokens 96
                                                        :reasoning         {:effort :high :summary :detailed}}

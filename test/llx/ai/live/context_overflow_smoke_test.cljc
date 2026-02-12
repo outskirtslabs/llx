@@ -116,43 +116,37 @@
                              " elapsed-ms=" (- (util/now-ms) started-at)))
                   true)))))
 
-(defn- run-live-async!
-  [deferred done]
-  (-> deferred
-      (p/then (fn [_] (done)))
-      (p/catch (partial util/fail-and-done! done))))
-
 (deftest ^:llx/anthropic live-overflow-anthropic
   (testing "anthropic overflow detection"
     (util/async done
-                (run-live-async!
+                (util/run-live-async!
                  (test-context-overflow!* models/anthropic {:max-output-tokens 128})
                  done))))
 
 (deftest ^:llx/openai live-overflow-openai-completions
   (testing "openai completions overflow detection"
     (util/async done
-                (run-live-async!
+                (util/run-live-async!
                  (test-context-overflow!* models/openai-completions {:max-output-tokens 128})
                  done))))
 
 (deftest ^:llx/openai live-overflow-openai-responses
   (testing "openai responses overflow detection"
     (util/async done
-                (run-live-async!
+                (util/run-live-async!
                  (test-context-overflow!* models/openai-responses {:max-output-tokens 128})
                  done))))
 
 (deftest ^:llx/google live-overflow-google
   (testing "google overflow detection"
     (util/async done
-                (run-live-async!
+                (util/run-live-async!
                  (test-context-overflow!* models/google {:max-output-tokens 128})
                  done))))
 
 (deftest ^:llx/mistral live-overflow-mistral
   (testing "mistral overflow detection"
     (util/async done
-                (run-live-async!
+                (util/run-live-async!
                  (test-context-overflow!* models/mistral {:max-output-tokens 128})
                  done))))
