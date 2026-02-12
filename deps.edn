@@ -1,5 +1,5 @@
 {:paths   ["src"]
- :deps    {metosin/malli              {:mvn/version "0.17.0"}
+ :deps    {metosin/malli              {:mvn/version "0.20.0"}
            com.taoensso/trove         {:mvn/version "1.1.0"}
            funcool/promesa            {:mvn/version "12.0.0-RC2"}
            com.fulcrologic/guardrails {:mvn/version "1.2.16"}
@@ -22,13 +22,12 @@
             :extra-deps  {dev.weavejester/hashp                    {:mvn/version "0.5.1"}
                           org.slf4j/slf4j-nop                      {:mvn/version "2.0.17"}
                           io.github.tonsky/clj-reload              {:mvn/version "1.0.0"}
-                          com.cnuernber/charred                    {:mvn/version "1.037"}
-                          djblue/portal                            {:mvn/version "0.62.1"}
+                          com.cnuernber/charred                    {:mvn/version "1.038"}
+                          djblue/portal                            {:mvn/version "0.62.2"}
                           criterium/criterium                      {:mvn/version "0.4.6"}
                           thheller/shadow-cljs                     {:mvn/version "RELEASE"}
-                          com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}
-                          lambdaisland/kaocha                      {:local/root                  "/home/ramblurr/src/github.com/lambdaisland/kaocha"
-                                                                    #_#_:mvn/version "1.91.1392"}
+                          com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.7.0"}
+                          lambdaisland/kaocha                      {:mvn/version "1.91.1392"}
                           lambdaisland/kaocha-cljs2                {:mvn/version "0.2.72"}
                           kaocha-retry/kaocha-retry                {:mvn/version "0.4.0"}}}
 
@@ -38,8 +37,8 @@
                         "-XX:CompileCommand=blackhole,criterium.blackhole.Blackhole::consume"]}
 
            :build
-           {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.11"
-                                                        :git/sha "c6c670a"}
+           {:deps       {io.github.clojure/tools.build {:git/tag "v0.10.12"
+                                                        :git/sha "97c5562"}
                          slipset/deps-deploy           {:mvn/version "0.2.2"}}
             :ns-default build}
            :neil
