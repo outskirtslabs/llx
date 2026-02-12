@@ -2,34 +2,13 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [llx.ai.impl.adapters.common :as adapter-common]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.models :as models]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.core :as p]
    [taoensso.trove :as trove]))
-
-(defn- trim-trailing-slash
-  [s]
-  (if (and (string? s)
-           (pos? (count s))
-           (= \/ (nth s (dec (count s)))))
-    (subs s 0 (dec (count s)))
-    s))
-
-(defn- parse-json-safe
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword}) {})
-    {}))
-
-(defn- parse-json-lenient
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword})
-        ((:json/decode env) s {:key-fn keyword})
-        {})
-    ((:json/decode env) s {:key-fn keyword})))
 
 (defn- map-stop-reason
   [finish-reason]
@@ -60,19 +39,6 @@
      :cache-write  0
      :total-tokens total
      :cost         (models/calculate-cost model usage*)}))
-
-(defn- empty-usage
-  []
-  {:input        0
-   :output       0
-   :cache-read   0
-   :cache-write  0
-   :total-tokens 0
-   :cost         {:input       0.0
-                  :output      0.0
-                  :cache-read  0.0
-                  :cache-write 0.0
-                  :total       0.0}})
 
 (defn- convert-image-block
   [block]
@@ -164,7 +130,7 @@
                                               (filter #(= :tool-call (:type %)))
                                               (keep (fn [tc]
                                                       (when (:signature tc)
-                                                        (parse-json-safe env (:signature tc)))))
+                                                        (adapter-common/parse-json-safe env (:signature tc)))))
                                               vec)
                        first-sig         (when (seq thinking-blocks)
                                            (:signature (first thinking-blocks)))
@@ -326,7 +292,7 @@
                                  (:tool-choice opts) (assoc :tool_choice (tool-choice->wire (:tool-choice opts))))
               sanitized        ((:unicode/sanitize-payload env) payload)
               body             ((:json/encode env) sanitized)
-              base-url         (trim-trailing-slash (:base-url model))
+              base-url         (adapter-common/trim-trailing-slash (:base-url model))
               headers          (cond-> {"Content-Type" "application/json"}
                                  (seq api-key) (assoc "Authorization" (str "Bearer " api-key))
                                  (:headers model) (merge (:headers model))
@@ -357,7 +323,7 @@
               {:type      :tool-call
                :id        (or (:id tc) "")
                :name      (get-in tc [:function :name] "")
-               :arguments (parse-json-lenient env (or (get-in tc [:function :arguments]) "{}"))})
+               :arguments (adapter-common/parse-json-lenient env (or (get-in tc [:function :arguments]) "{}"))})
             tool-calls)
 
       (string? text-content)
@@ -415,7 +381,7 @@
                        :api         (:api model)
                        :provider    (:provider model)
                        :model       (:id model)
-                       :usage       (empty-usage)
+                       :usage       (adapter-common/empty-usage)
                        :stop-reason :stop
                        :timestamp   ((:clock/now-ms env))}
    :current-block     nil
@@ -536,7 +502,7 @@
         {state1 :state ensure-events :events} (ensure-active-toolcall-block state tool-index id name)
         args-delta                            (or (get-in tool-call [:function :arguments]) "")
         partial-args                          (str (:partial-args prior-tool) args-delta)
-        parsed-args                           (parse-json-safe env partial-args)
+        parsed-args                           (adapter-common/parse-json-safe env partial-args)
         index                                 (get-in state1 [:current-block :index])]
     {:state  (-> state1
                  (assoc-in [:assistant-message :content index :id] id)
@@ -554,7 +520,7 @@
   [env raw-chunk]
   (cond
     (map? raw-chunk) raw-chunk
-    (string? raw-chunk) (parse-json-safe env raw-chunk)
+    (string? raw-chunk) (adapter-common/parse-json-safe env raw-chunk)
     :else {}))
 
 (defn- apply-chunk-metadata
@@ -653,7 +619,7 @@
                                     :api         (:api model)
                                     :provider    (:provider model)
                                     :model       (:id model)
-                                    :usage       (empty-usage)
+                                    :usage       (adapter-common/empty-usage)
                                     :stop-reason :error
                                     :timestamp   ((:clock/now-ms env))})
              aborted?          (or (:aborted? (ex-data ex))
@@ -682,7 +648,7 @@
                                  :else (if-let [read-body-string (:http/read-body-string env)]
                                          (read-body-string (:body response))
                                          ""))
-                 body          (parse-json-safe env body-string)
+                 body          (adapter-common/parse-json-safe env body-string)
                  headers       (:headers response)
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :type])

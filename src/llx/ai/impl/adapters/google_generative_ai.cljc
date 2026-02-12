@@ -2,46 +2,12 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [llx.ai.impl.adapters.common :as adapter-common]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.models :as models]
    [llx.ai.impl.schema :as schema]
    [promesa.core :as p]
    [taoensso.trove :as trove]))
-
-(defn- trim-trailing-slash
-  [s]
-  (if (and (string? s)
-           (pos? (count s))
-           (= \/ (nth s (dec (count s)))))
-    (subs s 0 (dec (count s)))
-    s))
-
-(defn- parse-json-safe
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword}) {})
-    {}))
-
-(defn- parse-json-lenient
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword})
-        ((:json/decode env) s {:key-fn keyword})
-        {})
-    ((:json/decode env) s {:key-fn keyword})))
-
-(defn- empty-usage
-  []
-  {:input        0
-   :output       0
-   :cache-read   0
-   :cache-write  0
-   :total-tokens 0
-   :cost         {:input       0.0
-                  :output      0.0
-                  :cache-read  0.0
-                  :cache-write 0.0
-                  :total       0.0}})
 
 (defn- usage->canonical
   [model usage]
@@ -366,7 +332,7 @@
 
                                 (contains? config :toolConfig)
                                 (assoc :toolConfig (:toolConfig config)))
-              base            (trim-trailing-slash (:base-url model))
+              base            (adapter-common/trim-trailing-slash (:base-url model))
               suffix          (if stream?
                                 (str "/models/" (:id model) ":streamGenerateContent?alt=sse")
                                 (str "/models/" (:id model) ":generateContent"))]
@@ -397,7 +363,7 @@
                        :api         (:api model)
                        :provider    (:provider model)
                        :model       (:id model)
-                       :usage       (empty-usage)
+                       :usage       (adapter-common/empty-usage)
                        :stop-reason :stop
                        :timestamp   ((:clock/now-ms env))}
    :current-block     nil})
@@ -513,7 +479,7 @@
                      (init-stream-state env (:model state)))
              chunk (cond
                      (map? raw-chunk) raw-chunk
-                     (string? raw-chunk) (parse-json-lenient env raw-chunk)
+                     (string? raw-chunk) (adapter-common/parse-json-lenient env raw-chunk)
                      :else {})]
          (if-not (seq chunk)
            {:state state :events []}
@@ -608,7 +574,7 @@
                                     :api         (:api model)
                                     :provider    (:provider model)
                                     :model       (:id model)
-                                    :usage       (empty-usage)
+                                    :usage       (adapter-common/empty-usage)
                                     :stop-reason :error
                                     :timestamp   ((:clock/now-ms env))})
              aborted?          (or (:aborted? (ex-data ex))
@@ -637,7 +603,7 @@
                                  :else (if-let [read-body-string (:http/read-body-string env)]
                                          (read-body-string (:body response))
                                          ""))
-                 body          (parse-json-safe env body-string)
+                 body          (adapter-common/parse-json-safe env body-string)
                  headers       (:headers response)
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :status])

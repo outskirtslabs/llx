@@ -2,46 +2,12 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [llx.ai.impl.adapters.common :as adapter-common]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
    [promesa.core :as p]
    [taoensso.trove :as trove]))
-
-(defn- trim-trailing-slash
-  [s]
-  (if (and (string? s)
-           (pos? (count s))
-           (= \/ (nth s (dec (count s)))))
-    (subs s 0 (dec (count s)))
-    s))
-
-(defn- parse-json-safe
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword}) {})
-    {}))
-
-(defn- parse-json-lenient
-  [env s]
-  (if-let [decode-safe-fn (:json/decode-safe env)]
-    (or (decode-safe-fn s {:key-fn keyword})
-        ((:json/decode env) s {:key-fn keyword})
-        {})
-    ((:json/decode env) s {:key-fn keyword})))
-
-(defn- empty-usage
-  []
-  {:input        0
-   :output       0
-   :cache-read   0
-   :cache-write  0
-   :total-tokens 0
-   :cost         {:input       0.0
-                  :output      0.0
-                  :cache-read  0.0
-                  :cache-write 0.0
-                  :total       0.0}})
 
 (defn- service-tier-multiplier
   [service-tier]
@@ -161,7 +127,7 @@
             (case (:type block)
               :thinking
               (if-let [sig (:signature block)]
-                (let [reasoning-item (parse-json-safe env sig)]
+                (let [reasoning-item (adapter-common/parse-json-safe env sig)]
                   (if (and (= "reasoning" (:type reasoning-item))
                            (:encrypted_content reasoning-item))
                     [reasoning-item]
@@ -309,10 +275,10 @@
                                :api      (:api model)
                                :model-id (:id model)
                                :stream?  stream?
-                               :url      (str (trim-trailing-slash (:base-url model)) "/responses")
+                               :url      (str (adapter-common/trim-trailing-slash (:base-url model)) "/responses")
                                :payload  sanitized}})
           {:method  :post
-           :url     (str (trim-trailing-slash (:base-url model)) "/responses")
+           :url     (str (adapter-common/trim-trailing-slash (:base-url model)) "/responses")
            :headers headers
            :body    body
            :as      (if stream? :stream :string)
@@ -329,7 +295,7 @@
                            :api         (:api model)
                            :provider    (:provider model)
                            :model       (:id model)
-                           :usage       (empty-usage)
+                           :usage       (adapter-common/empty-usage)
                            :stop-reason :stop
                            :timestamp   ((:clock/now-ms env))}
        :current-block     nil
@@ -348,7 +314,7 @@
        (let [state (ensure-stream-state env state)
              chunk (cond
                      (map? raw-chunk) raw-chunk
-                     (string? raw-chunk) (parse-json-lenient env raw-chunk)
+                     (string? raw-chunk) (adapter-common/parse-json-lenient env raw-chunk)
                      :else {})]
          (case (:type chunk)
            "response.output_item.added"
@@ -452,7 +418,7 @@
            (if (= :tool-call (get-in state [:current-block :kind]))
              (let [delta        (:delta chunk "")
                    partial-json (str (get-in state [:current-block :partial-json] "") delta)
-                   args         (parse-json-safe env partial-json)
+                   args         (adapter-common/parse-json-safe env partial-json)
                    idx          (get-in state [:current-block :index])
                    id           (get-in state [:current-block :id])
                    name         (get-in state [:current-block :name])
@@ -466,7 +432,7 @@
            "response.function_call_arguments.done"
            (if (= :tool-call (get-in state [:current-block :kind]))
              (let [partial-json (:arguments chunk "")
-                   args         (parse-json-lenient env partial-json)
+                   args         (adapter-common/parse-json-lenient env partial-json)
                    idx          (get-in state [:current-block :index])
                    next-state   (-> state
                                     (assoc-in [:current-block :partial-json] partial-json)
@@ -517,7 +483,7 @@
                                       (str (:call_id item) "|" (:id item)))
                        name       (or (get-in state [:current-block :name]) (:name item))
                        args-json  (or (get-in state [:current-block :partial-json]) (:arguments item) "{}")
-                       args       (parse-json-lenient env args-json)
+                       args       (adapter-common/parse-json-lenient env args-json)
                        next-state (-> state
                                       (assoc-in [:assistant-message :content idx :id] id)
                                       (assoc-in [:assistant-message :content idx :name] name)
@@ -581,7 +547,7 @@
     [{:type      :tool-call
       :id        (str (:call_id item) "|" (:id item))
       :name      (:name item)
-      :arguments (parse-json-lenient env (or (:arguments item) "{}"))}]
+      :arguments (adapter-common/parse-json-lenient env (or (:arguments item) "{}"))}]
 
     []))
 
@@ -635,7 +601,7 @@
                                     :api         (:api model)
                                     :provider    (:provider model)
                                     :model       (:id model)
-                                    :usage       (empty-usage)
+                                    :usage       (adapter-common/empty-usage)
                                     :stop-reason :error
                                     :timestamp   ((:clock/now-ms env))})
              aborted?          (or (:aborted? (ex-data ex))
@@ -664,7 +630,7 @@
                                  :else (if-let [read-body-string (:http/read-body-string env)]
                                          (read-body-string (:body response))
                                          ""))
-                 body          (parse-json-safe env body-string)
+                 body          (adapter-common/parse-json-safe env body-string)
                  headers       (:headers response)
                  message       (or (get-in body [:error :message]) body-string)
                  provider-code (get-in body [:error :type])
