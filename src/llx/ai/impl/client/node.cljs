@@ -179,10 +179,7 @@
                                   (when @request-started?*
                                     (abort-request!)))
              open-stream!       (fn []
-                                  (let [max-retries (get request-opts :max-retries 2)
-                                        sleep-fn    (or (:thread/sleep env)
-                                                        (fn [ms]
-                                                          (p/delay (long (max 0 (or ms 0))) nil)))]
+                                  (let [max-retries (get request-opts :max-retries 2)]
                                     (-> (errors/retry-loop-async
                                          (fn []
                                            (reset! request-started?* true)
@@ -191,7 +188,7 @@
                                                (abort-request!))
                                              response-d))
                                          max-retries
-                                         sleep-fn
+                                         p/delay
                                          {:call-id  (:call/id env)
                                           :provider (:provider model)})
                                         (p/then (fn [response]
@@ -239,8 +236,4 @@
                                      env     (when process (.-env process))]
                                  (when env
                                    (aget env (name k)))))
-   :thread/sleep             (fn [ms]
-                               (p/create (fn [resolve _reject]
-                                           (js/setTimeout (fn [] (resolve nil))
-                                                          (long (max 0 (or ms 0)))))))
    :unicode/sanitize-payload unicode/sanitize-payload})

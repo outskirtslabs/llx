@@ -119,16 +119,16 @@
          {:doc     "Run CI checks: test, format check, and lint"
           :depends [test fmt:check lint]}
 
-         jar
-         {:override-builtin true
-          :depends          [clean]
-          :doc              "Build an jar"
-          :task             (shell "clojure -T:build jar")}
+         ;; jar
+         ;; {:override-builtin true
+         ;;  :depends          [clean]
+         ;;  :doc              "Build an jar"
+         ;;  :task             (shell "clojure -T:build jar")}
 
-         clean
-         {:override-builtin true
-          :doc              "Clean build artifacts"
-          :task             (shell "clojure -T:build clean")}
+         ;; clean
+         ;; {:override-builtin true
+         ;;  :doc              "Clean build artifacts"
+         ;;  :task             (shell "clojure -T:build clean")}
 
          distclean
          {:doc  "Remove all generated build/cache artifacts (target, .cpcache, .shadow-cljs, node_modules)"

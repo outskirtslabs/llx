@@ -53,9 +53,7 @@
    :clock/now-ms             (constantly 1730000000000)
    :id/new                   (constantly "id-1")
    :http/read-body-string    (fn [_body] "")
-   :unicode/sanitize-payload identity
-   :thread/sleep             (fn [ms]
-                               (p/delay (long (max 0 (or ms 0))) nil))})
+   :unicode/sanitize-payload identity})
 
 (defn- base-adapter
   []

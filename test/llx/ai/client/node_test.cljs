@@ -190,8 +190,7 @@
     (testing "json/decode-safe returns nil for invalid JSON"
       (is (nil? ((:json/decode-safe env) "{" {}))))
     (testing "runtime-specific hooks are callable"
-      (is (fn? (:http/read-body-string env)))
-      (is (fn? (:thread/sleep env))))
+      (is (fn? (:http/read-body-string env))))
     (testing "promesa is available in cljs test runtime"
       (is (= 42 @(p/resolved 42))))))
 

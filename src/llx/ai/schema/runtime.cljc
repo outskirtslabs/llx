@@ -35,7 +35,6 @@
     [:log/debug {:optional true} :llx/fn]
     [:log/warn {:optional true} :llx/fn]
     [:log/error {:optional true} :llx/fn]
-    [:thread/sleep {:optional true} :llx/fn]
     [:call/id {:optional true} :llx/id-string]
     [:unicode/sanitize-payload :llx/fn]]
 

@@ -268,11 +268,6 @@
                                           :llx/adapter-request-map
                                           ((:build-request adapter) call-env model context request-opts false))
                max-retries               (get request-opts :max-retries 2)
-               sleep-fn                  (or (:thread/sleep env)
-                                             (when (pos? max-retries)
-                                               (throw (ex-info "Retry requested but env is missing :thread/sleep"
-                                                               {:type        :llx/config-error
-                                                                :max-retries max-retries}))))
                do-request                (fn []
                                            (let [response ((:http/request env) request)
                                                  handle   (fn [response]
@@ -291,7 +286,7 @@
                                 :message-count      (count (:messages context))
                                 :has-tools?         (boolean (seq (:tools context)))
                                 :has-system-prompt? (boolean (seq (:system-prompt context)))}})
-           (-> (errors/retry-loop-async do-request max-retries sleep-fn
+           (-> (errors/retry-loop-async do-request max-retries p/delay
                                         {:call-id  (:call/id call-env)
                                          :provider (:provider model)})
                (p/then (fn [response]

@@ -141,5 +141,4 @@
    :clock/now-ms             (fn [] (System/currentTimeMillis))
    :id/new                   (fn [] (str (java.util.UUID/randomUUID)))
    :env/get                  (fn [k] (System/getenv k))
-   :thread/sleep             (fn [ms] (Thread/sleep (long ms)))
    :unicode/sanitize-payload unicode/sanitize-payload})

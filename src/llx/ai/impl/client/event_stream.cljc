@@ -70,10 +70,6 @@
         default-on-timeout
         x))))
 
-(defn- default-sleep
-  [ms]
-  (p/delay (long (max 0 (or ms 0))) nil))
-
 (>defn open-stream-with-retries*
        [{:keys [adapter env model request request-opts]}]
        [[:map
@@ -83,13 +79,12 @@
          [:request :llx/adapter-request-map]
          [:request-opts {:optional true} [:maybe :llx/provider-request-options]]]
         => :llx/deferred]
-       (let [max-retries (get request-opts :max-retries 2)
-             sleep-fn    (or (:thread/sleep env) default-sleep)]
+       (let [max-retries (get request-opts :max-retries 2)]
          (-> (errors/retry-loop-async
               (fn []
                 ((:open-stream adapter) env model request))
               max-retries
-              sleep-fn
+              p/delay
               {:call-id  (:call/id env)
                :provider (:provider model)})
              (p/then (fn [response]
