@@ -1,16 +1,16 @@
 (ns llx.ai.client-test
   (:require
-   [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.impl.client.jvm :as runtime]]
        :cljs [[cljs.test :refer-macros [deftest is]]
               [llx.ai.impl.client.node :as runtime]])
+   #?@(:clj [[llx.ai.test-util :as util]]
+       :cljs [[llx.ai.test-util :as util :include-macros true]])
+   [clojure.string :as str]
    [llx.ai.impl.client :as sut]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.utils.unicode :as unicode]
-   #?@(:clj [[llx.ai.test-util :as util]]
-       :cljs [[llx.ai.test-util :as util :include-macros true]])
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 

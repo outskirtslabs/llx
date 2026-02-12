@@ -1,9 +1,10 @@
 (ns llx.kaocha-hooks
   "Kaocha CLJS helpers for starting and reusing a shadow-cljs node client."
-  (:require [clojure.java.shell :as shell]
-            [kaocha.cljs2.funnel-client :as funnel]
-            [kaocha.type.cljs2 :as cljs2-type]
-            [shadow.cljs.devtools.api :as shadow-api]))
+  (:require
+   [clojure.java.shell :as shell]
+   [kaocha.cljs2.funnel-client :as funnel]
+   [kaocha.type.cljs2 :as cljs2-type]
+   [shadow.cljs.devtools.api :as shadow-api]))
 
 (set! *warn-on-reflection* true)
 
@@ -60,6 +61,6 @@
                           (map :id)
                           set)]
     (start-node-client! suite)
-    (let [clients     (cljs2-type/default-clients-hook suite)
-          fresh       (remove (comp existing-ids :id) clients)]
+    (let [clients (cljs2-type/default-clients-hook suite)
+          fresh   (remove (comp existing-ids :id) clients)]
       (if (seq fresh) fresh clients))))

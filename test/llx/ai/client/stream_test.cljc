@@ -5,7 +5,7 @@
              [llx.ai.impl.schema :as schema]
              [promesa.core :as p]
              [promesa.exec.csp :as sp]]
-       :cljs [[cljs.test :refer [deftest is testing async]]
+       :cljs [[cljs.test :refer [async deftest is testing]]
               [llx.ai.impl.client.event-stream :as stream]
               [llx.ai.impl.schema :as schema]
               [promesa.core :as p]

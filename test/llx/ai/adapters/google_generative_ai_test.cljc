@@ -1,13 +1,13 @@
 (ns llx.ai.adapters.google-generative-ai-test
   (:require
-   [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [async deftest is testing]]
               [promesa.core :as p]])
-   [llx.ai.test-util :as util]
+   [clojure.string :as str]
    [llx.ai.impl.adapters.google-generative-ai :as sut]
+   [llx.ai.impl.utils.unicode :as unicode]
    [llx.ai.live.models :as live-models]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -115,21 +115,21 @@
 
 (deftest build-request-emits-provider-payload-trove-signal
   (util/with-captured-logs!
-   (fn [logs*]
-     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-           request (sut/build-request (stub-env) google-model context {} false)
-           payload (util/json-read (:body request) {:key-fn keyword})
-           event   (util/first-event logs* :llx.obs/provider-payload)]
-       (is (util/submap?
-            {:id    :llx.obs/provider-payload
-             :level :trace
-             :data  {:provider :google
-                     :api      :google-generative-ai
-                     :model-id "gemini-2.5-flash"
-                     :stream?  false
-                     :url      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-                     :payload  payload}}
-            (util/strip-generated event [:call-id])))))))
+    (fn [logs*]
+      (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+            request (sut/build-request (stub-env) google-model context {} false)
+            payload (util/json-read (:body request) {:key-fn keyword})
+            event   (util/first-event logs* :llx.obs/provider-payload)]
+        (is (util/submap?
+             {:id    :llx.obs/provider-payload
+              :level :trace
+              :data  {:provider :google
+                      :api      :google-generative-ai
+                      :model-id "gemini-2.5-flash"
+                      :stream?  false
+                      :url      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                      :payload  payload}}
+             (util/strip-generated event [:call-id])))))))
 
 (deftest build-request-tool-result-image-forwarding-by-model-capability
   (let [context            {:messages [{:role      :user

@@ -2,11 +2,11 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer [deftest is testing]]])
+   #?@(:clj [[llx.ai.test-util :as util]]
+       :cljs [[llx.ai.test-util :as util :include-macros true]])
    [clojure.string :as str]
    [llx.ai :as client]
    [llx.ai.live.models :as models]
-   #?@(:clj [[llx.ai.test-util :as util]]
-       :cljs [[llx.ai.test-util :as util :include-macros true]])
    [promesa.core :as p]))
 
 #?(:clj (set! *warn-on-reflection* true))

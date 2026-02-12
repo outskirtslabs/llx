@@ -2,15 +2,15 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
+   #?@(:clj [[llx.ai.impl.client.jvm :as runtime]])
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
-   [llx.ai.impl.client :as client]
-   #?@(:clj [[llx.ai.impl.client.jvm :as runtime]])
-   [llx.ai.impl.adapters.openai-responses :as openai-responses]
-   [llx.ai.impl.registry :as registry]
-   [llx.ai.test-util :as util]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.adapters.openai-responses :as openai-responses]
+   [llx.ai.impl.client :as client]
+   [llx.ai.impl.registry :as registry]
+   [llx.ai.impl.utils.unicode :as unicode]
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 

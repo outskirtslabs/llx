@@ -2,11 +2,11 @@
   (:require
    [clojure.string :as str]
    [com.fulcrologic.guardrails.malli.registry :as gr.reg]
+   [llx.ai.schema.runtime :as runtime]
    [malli.core :as m]
    [malli.error :as me]
    [malli.json-schema :as mjs]
-   [promesa.core :as p]
-   [llx.ai.schema.runtime :as runtime]))
+   [promesa.core :as p]))
 
 (defn non-blank-string?
   [s]

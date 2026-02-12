@@ -30,7 +30,7 @@
       (is (= 0.0002 (:cache-read cost)))
       (is (= 0.00075 (:cache-write cost)))
       (is (< (#?(:clj Math/abs :cljs js/Math.abs)
-             (- 0.00595 (:total cost)))
+              (- 0.00595 (:total cost)))
              1.0e-12))))
   (testing "supports-xhigh?"
     (is (true? (models/supports-xhigh? {:id  "claude-opus-4.6"

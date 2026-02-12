@@ -1,6 +1,7 @@
 (ns llx.bb.live-env
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]))
 
 (def provider-services
   {"OLLAMA_API_KEY"    :llx/ollama

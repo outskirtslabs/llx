@@ -2,10 +2,10 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is]]]
        :cljs [[cljs.test :refer-macros [deftest is]]])
-   [llx.ai :as ai]
-   [llx.ai.impl.client :as impl.client]
    #?@(:clj [[llx.ai.impl.client.jvm :as impl.jvm]]
        :cljs [[llx.ai.impl.client.node :as impl.node]])
+   [llx.ai :as ai]
+   [llx.ai.impl.client :as impl.client]
    [llx.ai.impl.schema :as impl.schema]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))

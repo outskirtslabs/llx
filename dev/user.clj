@@ -1,6 +1,5 @@
 (ns user
   (:require
-   #_[portal.api :as p]
    [clj-reload.core :as clj-reload]))
 
 ((requiring-resolve 'hashp.install/install!))

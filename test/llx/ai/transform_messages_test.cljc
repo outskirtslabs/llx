@@ -4,8 +4,8 @@
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
-   [llx.ai.test-util :as util]
-   [llx.ai.impl.transform-messages :as sut]))
+   [llx.ai.impl.transform-messages :as sut]
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 

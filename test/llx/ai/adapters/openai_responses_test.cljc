@@ -1,13 +1,13 @@
 (ns llx.ai.adapters.openai-responses-test
   (:require
-      [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
-   [llx.ai.test-util :as util]
+   [clojure.string :as str]
    [llx.ai.impl.adapters.openai-responses :as sut]
-   [llx.ai.live.models :as live-models]
    [llx.ai.impl.transform-messages :as transform-messages]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.utils.unicode :as unicode]
+   [llx.ai.live.models :as live-models]
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -82,21 +82,21 @@
 
 (deftest build-request-emits-provider-payload-trove-signal
   (util/with-captured-logs!
-   (fn [logs*]
-     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-           request (sut/build-request (stub-env) openai-responses-model context {:api-key "k"} false)
-           payload (util/json-read (:body request) {:key-fn keyword})
-           event   (util/first-event logs* :llx.obs/provider-payload)]
-       (is (util/submap?
-            {:id    :llx.obs/provider-payload
-             :level :trace
-             :data  {:provider :openai
-                     :api      :openai-responses
-                     :model-id "gpt-5-mini"
-                     :stream?  false
-                     :url      "https://api.openai.com/v1/responses"
-                     :payload  payload}}
-            (util/strip-generated event [:call-id])))))))
+    (fn [logs*]
+      (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+            request (sut/build-request (stub-env) openai-responses-model context {:api-key "k"} false)
+            payload (util/json-read (:body request) {:key-fn keyword})
+            event   (util/first-event logs* :llx.obs/provider-payload)]
+        (is (util/submap?
+             {:id    :llx.obs/provider-payload
+              :level :trace
+              :data  {:provider :openai
+                      :api      :openai-responses
+                      :model-id "gpt-5-mini"
+                      :stream?  false
+                      :url      "https://api.openai.com/v1/responses"
+                      :payload  payload}}
+             (util/strip-generated event [:call-id])))))))
 
 (deftest normalize-tool-call-id-normalizes-pipe-ids-and-preserves-pairing
   (let [messages  (fixture "pipe_id_prefilled")
@@ -271,9 +271,9 @@
            (:total cost)))))
 
 (deftest decode-event-stream-contract
-  (let [env                                                                  (stub-env)
-        chunks                                                               (fixture "stream_events")
-        init-state                                                           {:model openai-responses-model}
+  (let [env                                                                   (stub-env)
+        chunks                                                                (fixture "stream_events")
+        init-state                                                            {:model openai-responses-model}
         {:keys [state events]}
         (reduce (fn [{:keys [state events]} chunk]
                   (let [{next-state :state next-events :events}
@@ -282,7 +282,7 @@
                      :events (into events next-events)}))
                 {:state init-state :events []}
                 chunks)
-        finalize-result                                                      (sut/finalize env state)]
+        finalize-result                                                       (sut/finalize env state)]
     (is (= [:thinking-start
             :thinking-delta
             :thinking-delta
@@ -312,9 +312,9 @@
         init-state {:model openai-responses-model}
         start-out  (sut/decode-event env init-state
                                      (util/json-write {:type "response.output_item.added"
-                                                      :item {:type    "reasoning"
-                                                             :id      "rs_1"
-                                                             :summary []}}))
+                                                       :item {:type    "reasoning"
+                                                              :id      "rs_1"
+                                                              :summary []}}))
         done-out   (sut/decode-event env (:state start-out)
                                      (util/json-write {:type "response.reasoning_summary_part.done"}))]
     (is (= [:thinking-start] (mapv :type (:events start-out))))

@@ -2,13 +2,13 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer [deftest is testing]]])
-   [llx.ai :as client]
-   [llx.ai.live.env :as live-env]
-   [llx.ai.live.models :as models]
-   [llx.ai.impl.utils.overflow :as overflow]
-   [llx.ai.impl.utils.rate-limit :as rate-limit]
    #?@(:clj [[llx.ai.test-util :as util]]
        :cljs [[llx.ai.test-util :as util :include-macros true]])
+   [llx.ai :as client]
+   [llx.ai.impl.utils.overflow :as overflow]
+   [llx.ai.impl.utils.rate-limit :as rate-limit]
+   [llx.ai.live.env :as live-env]
+   [llx.ai.live.models :as models]
    [promesa.core :as p]))
 
 #?(:clj (set! *warn-on-reflection* true))

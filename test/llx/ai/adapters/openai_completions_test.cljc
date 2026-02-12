@@ -1,12 +1,12 @@
 (ns llx.ai.adapters.openai-completions-test
   (:require
-      [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
-   [llx.ai.test-util :as util]
+   [clojure.string :as str]
    [llx.ai.impl.adapters.openai-completions :as sut]
+   [llx.ai.impl.utils.unicode :as unicode]
    [llx.ai.live.models :as live-models]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -96,21 +96,21 @@
 
 (deftest build-request-emits-provider-payload-trove-signal
   (util/with-captured-logs!
-   (fn [logs*]
-     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-           request (sut/build-request (stub-env) openai-model context {:api-key "k"} false)
-           payload (util/json-read (:body request) {:key-fn keyword})
-           event   (util/first-event logs* :llx.obs/provider-payload)]
-       (is (util/submap?
-            {:id    :llx.obs/provider-payload
-             :level :trace
-             :data  {:provider :openai
-                     :api      :openai-completions
-                     :model-id "gpt-4o-mini"
-                     :stream?  false
-                     :url      "https://api.openai.com/v1/chat/completions"
-                     :payload  payload}}
-            (util/strip-generated event [:call-id])))))))
+    (fn [logs*]
+      (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+            request (sut/build-request (stub-env) openai-model context {:api-key "k"} false)
+            payload (util/json-read (:body request) {:key-fn keyword})
+            event   (util/first-event logs* :llx.obs/provider-payload)]
+        (is (util/submap?
+             {:id    :llx.obs/provider-payload
+              :level :trace
+              :data  {:provider :openai
+                      :api      :openai-completions
+                      :model-id "gpt-4o-mini"
+                      :stream?  false
+                      :url      "https://api.openai.com/v1/chat/completions"
+                      :payload  payload}}
+             (util/strip-generated event [:call-id])))))))
 
 (deftest build-request-batches-tool-result-images-for-openai-completions
   (let [context   (fixture "mistral_request_context")
@@ -376,7 +376,7 @@
 (deftest convert-message-reconstructs-reasoning-details-from-tool-signatures
   (let [detail  {:type "reasoning.encrypted" :id "tc_1" :data "enc"}
         message {:role        :assistant
-                 :content     [{:type      :tool-call              :id "tc_1" :name "search"
+                 :content     [{:type      :tool-call               :id "tc_1" :name "search"
                                 :arguments {:q "foo"}
                                 :signature (util/json-write detail)}]
                  :api         :openai-completions

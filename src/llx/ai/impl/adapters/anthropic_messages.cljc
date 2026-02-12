@@ -1,7 +1,7 @@
 (ns llx.ai.impl.adapters.anthropic-messages
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.adapters.common :as adapter-common]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.models :as models]
@@ -476,9 +476,9 @@
 (>defn handle-open-stream-response
        [env model response]
        [:llx/env :llx/model :llx/http-response-map => :llx/http-response-map]
-       (let [response      (schema/assert-valid! :llx/http-response-map response)
-             status        (long (or (:status response) 0))
-             provider      (name (or (:provider model) "unknown"))]
+       (let [response (schema/assert-valid! :llx/http-response-map response)
+             status   (long (or (:status response) 0))
+             provider (name (or (:provider model) "unknown"))]
          (when (or (< status 200) (>= status 300))
            (let [body-string   (cond
                                  (string? (:body response)) (:body response)

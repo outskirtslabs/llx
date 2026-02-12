@@ -1,8 +1,8 @@
 (ns llx.ai.utils.tool-validation-test
   (:require
-   [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
+   [clojure.string :as str]
    [llx.ai.impl.utils.tool-validation :as sut]))
 
 (def tools

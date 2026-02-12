@@ -29,12 +29,12 @@
       :custom)))
 
 (def ^:private llx-agent-merge-placeholder-registry
-  {:llx.agent/state :any
+  {:llx.agent/state          :any
    :llx.agent/thinking-level :any
-   :llx.agent/tool :any
-   :llx.agent/message :any
-   :llx.agent/stream-fn :any
-   :llx.agent/queue-mode :any})
+   :llx.agent/tool           :any
+   :llx.agent/message        :any
+   :llx.agent/stream-fn      :any
+   :llx.agent/queue-mode     :any})
 
 (defn- merge-with-unified-request-options
   [schema-form]

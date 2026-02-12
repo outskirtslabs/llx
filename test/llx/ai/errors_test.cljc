@@ -3,8 +3,8 @@
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [async deftest is testing]]])
    [llx.ai.impl.errors :as sut]
-   [promesa.core :as p]
-   [llx.ai.test-util :as util]))
+   [llx.ai.test-util :as util]
+   [promesa.core :as p]))
 
 #?(:cljs
    (defn- fail-and-done!
@@ -317,60 +317,60 @@
 (deftest retry-loop-async-emits-retry-scheduled-trove-signal
   #?(:clj
      (util/with-captured-logs!
-      (fn [logs*]
-        (let [call-count (atom 0)
-              f          (fn []
-                           (swap! call-count inc)
-                           (if (= 1 @call-count)
-                             (throw (sut/rate-limit "openai" "rate limit"
-                                                    :retry-after 2
-                                                    :request-id "req_1"))
-                             :success))
-              _          (util/await! (sut/retry-loop-async f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"}))
-              event      (util/first-event logs* :llx.obs/retry-scheduled)]
-          (is (util/submap?
-               {:id    :llx.obs/retry-scheduled
-                :level :info
-                :data  {:call-id      "call_1"
-                        :attempt      0
-                        :next-attempt 1
-                        :max-retries  2
-                        :delay-ms     2000
-                        :error-type   :llx/rate-limit
-                        :provider     "openai"
-                        :request-id   "req_1"
-                        :retry-after  2}}
-               (util/strip-generated event))))))
+       (fn [logs*]
+         (let [call-count (atom 0)
+               f          (fn []
+                            (swap! call-count inc)
+                            (if (= 1 @call-count)
+                              (throw (sut/rate-limit "openai" "rate limit"
+                                                     :retry-after 2
+                                                     :request-id "req_1"))
+                              :success))
+               _          (util/await! (sut/retry-loop-async f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"}))
+               event      (util/first-event logs* :llx.obs/retry-scheduled)]
+           (is (util/submap?
+                {:id    :llx.obs/retry-scheduled
+                 :level :info
+                 :data  {:call-id      "call_1"
+                         :attempt      0
+                         :next-attempt 1
+                         :max-retries  2
+                         :delay-ms     2000
+                         :error-type   :llx/rate-limit
+                         :provider     "openai"
+                         :request-id   "req_1"
+                         :retry-after  2}}
+                (util/strip-generated event))))))
      :cljs
      (async done
             (util/with-captured-logs!
-             (fn [logs*]
-               (let [call-count (atom 0)
-                     f          (fn []
-                                  (swap! call-count inc)
-                                  (if (= 1 @call-count)
-                                    (throw (sut/rate-limit "openai" "rate limit"
-                                                           :retry-after 2
-                                                           :request-id "req_1"))
-                                    :success))]
-                 (-> (sut/retry-loop-async f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"})
-                     (p/then (fn [_]
-                               (let [event (util/first-event logs* :llx.obs/retry-scheduled)]
-                                 (is (util/submap?
-                                      {:id    :llx.obs/retry-scheduled
-                                       :level :info
-                                       :data  {:call-id      "call_1"
-                                               :attempt      0
-                                               :next-attempt 1
-                                               :max-retries  2
-                                               :delay-ms     2000
-                                               :error-type   :llx/rate-limit
-                                               :provider     "openai"
-                                               :request-id   "req_1"
-                                               :retry-after  2}}
-                                      (util/strip-generated event))))
-                               (done)))
-                     (p/catch (partial fail-and-done! done)))))))))
+              (fn [logs*]
+                (let [call-count (atom 0)
+                      f          (fn []
+                                   (swap! call-count inc)
+                                   (if (= 1 @call-count)
+                                     (throw (sut/rate-limit "openai" "rate limit"
+                                                            :retry-after 2
+                                                            :request-id "req_1"))
+                                     :success))]
+                  (-> (sut/retry-loop-async f 2 (fn [_ms]) {:call-id "call_1" :provider "openai"})
+                      (p/then (fn [_]
+                                (let [event (util/first-event logs* :llx.obs/retry-scheduled)]
+                                  (is (util/submap?
+                                       {:id    :llx.obs/retry-scheduled
+                                        :level :info
+                                        :data  {:call-id      "call_1"
+                                                :attempt      0
+                                                :next-attempt 1
+                                                :max-retries  2
+                                                :delay-ms     2000
+                                                :error-type   :llx/rate-limit
+                                                :provider     "openai"
+                                                :request-id   "req_1"
+                                                :retry-after  2}}
+                                       (util/strip-generated event))))
+                                (done)))
+                      (p/catch (partial fail-and-done! done)))))))))
 
 (deftest retry-loop-async-exhausts-retries-and-throws
   #?(:clj

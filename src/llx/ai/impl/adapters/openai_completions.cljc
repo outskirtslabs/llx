@@ -1,7 +1,7 @@
 (ns llx.ai.impl.adapters.openai-completions
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.adapters.common :as adapter-common]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.models :as models]

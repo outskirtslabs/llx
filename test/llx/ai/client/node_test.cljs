@@ -1,6 +1,6 @@
 (ns llx.ai.client.node-test
   (:require
-   [clojure.test :refer [deftest is testing async]]
+   [clojure.test :refer [async deftest is testing]]
    [llx.ai :as ai]
    [llx.ai.impl.client :as impl.client]
    [promesa.core :as p]

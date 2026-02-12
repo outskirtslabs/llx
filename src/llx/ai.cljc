@@ -1,8 +1,8 @@
 (ns llx.ai
   (:require
-   [llx.ai.impl.client :as impl.client]
    #?(:clj [llx.ai.impl.client.jvm :as impl.jvm])
    #?(:cljs [llx.ai.impl.client.node :as impl.node])
+   [llx.ai.impl.client :as impl.client]
    [llx.ai.impl.models :as impl.models]
    [llx.ai.impl.schema :as impl.schema]
    [llx.ai.impl.utils.overflow :as impl.overflow]

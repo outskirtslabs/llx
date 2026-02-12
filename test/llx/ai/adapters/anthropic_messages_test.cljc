@@ -1,11 +1,11 @@
 (ns llx.ai.adapters.anthropic-messages-test
   (:require
-      [clojure.string :as str]
    #?@(:clj [[clojure.test :refer [deftest is]]]
        :cljs [[cljs.test :refer-macros [deftest is]]])
-   [llx.ai.test-util :as util]
+   [clojure.string :as str]
    [llx.ai.impl.adapters.anthropic-messages :as sut]
-   [llx.ai.impl.utils.unicode :as unicode]))
+   [llx.ai.impl.utils.unicode :as unicode]
+   [llx.ai.test-util :as util]))
 
 #?(:clj (set! *warn-on-reflection* true))
 
@@ -75,21 +75,21 @@
 
 (deftest build-request-emits-provider-payload-trove-signal
   (util/with-captured-logs!
-   (fn [logs*]
-     (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
-           request (sut/build-request (stub-env) anthropic-model context {:api-key "k"} false)
-           payload (util/json-read (:body request) {:key-fn keyword})
-           event   (util/first-event logs* :llx.obs/provider-payload)]
-       (is (util/submap?
-            {:id    :llx.obs/provider-payload
-             :level :trace
-             :data  {:provider :anthropic
-                     :api      :anthropic-messages
-                     :model-id "claude-sonnet-4-5"
-                     :stream?  false
-                     :url      "https://api.anthropic.com/v1/messages"
-                     :payload  payload}}
-            (util/strip-generated event [:call-id])))))))
+    (fn [logs*]
+      (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+            request (sut/build-request (stub-env) anthropic-model context {:api-key "k"} false)
+            payload (util/json-read (:body request) {:key-fn keyword})
+            event   (util/first-event logs* :llx.obs/provider-payload)]
+        (is (util/submap?
+             {:id    :llx.obs/provider-payload
+              :level :trace
+              :data  {:provider :anthropic
+                      :api      :anthropic-messages
+                      :model-id "claude-sonnet-4-5"
+                      :stream?  false
+                      :url      "https://api.anthropic.com/v1/messages"
+                      :payload  payload}}
+             (util/strip-generated event [:call-id])))))))
 
 (deftest normalize-tool-call-id-sanitizes-and-truncates
   (let [source-id (str "call|bad/id?chars+=" (apply str (repeat 120 "z")))
@@ -199,9 +199,9 @@
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
 
 (deftest decode-event-stream-contract
-  (let [env                                                                  (stub-env)
-        chunks                                                               (fixture "stream_events")
-        init-state                                                           {:model anthropic-model}
+  (let [env                                                                   (stub-env)
+        chunks                                                                (fixture "stream_events")
+        init-state                                                            {:model anthropic-model}
         {:keys [state events]}
         (reduce (fn [{:keys [state events]} chunk]
                   (let [{next-state :state next-events :events}
@@ -210,7 +210,7 @@
                      :events (into events next-events)}))
                 {:state init-state :events []}
                 chunks)
-        finalize-result                                                      (sut/finalize env state)]
+        finalize-result                                                       (sut/finalize env state)]
     (is (= [:text-start
             :text-delta
             :text-delta
@@ -254,14 +254,14 @@
         init-state {:model priced-anthropic-model}
         start-out  (sut/decode-event env init-state
                                      (util/json-write {:type    "message_start"
-                                                      :message {:usage {:input_tokens 100}}}))
+                                                       :message {:usage {:input_tokens 100}}}))
         delta-out  (sut/decode-event env (:state start-out)
                                      (util/json-write {:type  "message_delta"
-                                                      :delta {:stop_reason "end_turn"}
-                                                      :usage {:input_tokens                100
-                                                              :output_tokens               50
-                                                              :cache_read_input_tokens     10
-                                                              :cache_creation_input_tokens 5}}))]
+                                                       :delta {:stop_reason "end_turn"}
+                                                       :usage {:input_tokens                100
+                                                               :output_tokens               50
+                                                               :cache_read_input_tokens     10
+                                                               :cache_creation_input_tokens 5}}))]
     (is (= {:input 0.1 :output 0.1 :cache-read 0.03 :cache-write 0.02 :total 0.25}
            (get-in delta-out [:state :assistant-message :usage :cost])))))
 

@@ -1,7 +1,7 @@
 (ns llx.ai.impl.client
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [clojure.string :as str]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
@@ -239,7 +239,7 @@
 
 (defn runtime-terminal-error-event
   [adapter env model state* stream-ex]
-  (let [stream-ex                     (ensure-streaming-error model stream-ex)
+  (let [stream-ex                             (ensure-streaming-error model stream-ex)
         [assistant-message normalize-failed?] (try
                                                 [(schema/assert-valid!
                                                   :llx/message-assistant
