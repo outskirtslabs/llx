@@ -2,8 +2,8 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.test-util :as util]]
-       :cljs [[cljs.test :refer [deftest is async]]
-              [llx.ai.test-util :as util]])
+       :cljs [[cljs.test :refer [deftest is]]
+              [llx.ai.test-util :as util :include-macros true]])
    [llx.ai :as client]
    [llx.ai.live.models :as models]
    [promesa.core :as p]))
@@ -44,122 +44,67 @@
                                         opts))]
     true))
 
-(defn- run-live-smoke-test!
-  [deferred]
-  #?(:clj
-     (do
-       (util/await! deferred)
-       true)
-     :cljs
-     deferred))
+(defn- run-live-async!
+  [deferred done]
+  (-> deferred
+      (p/then (fn [_] (done)))
+      (p/catch (partial util/fail-and-done! done))))
 
 (deftest ^:llx/anthropic live-anthropic-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (run-provider-smoke* {:model           models/anthropic
-                            :opts            {:max-output-tokens 128}
-                            :complete-prompt "reply with exactly: llx anthropic smoke ok"
-                            :stream-prompt   "reply with exactly: llx anthropic stream ok"}))
-     :cljs
-     (async done
-            (-> (run-live-smoke-test!
-                 (run-provider-smoke* {:model           models/anthropic
-                                       :opts            {:max-output-tokens 128}
-                                       :complete-prompt "reply with exactly: llx anthropic smoke ok"
-                                       :stream-prompt   "reply with exactly: llx anthropic stream ok"}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-provider-smoke* {:model           models/anthropic
+                                     :opts            {:max-output-tokens 128}
+                                     :complete-prompt "reply with exactly: llx anthropic smoke ok"
+                                     :stream-prompt   "reply with exactly: llx anthropic stream ok"})
+               done)))
 
 (deftest ^:llx/google live-google-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (run-provider-smoke* {:model           models/google
-                            :opts            {:max-output-tokens 96
-                                              :reasoning         {:level :high :effort :high}}
-                            :complete-prompt "reply with exactly: llx google smoke ok"
-                            :stream-prompt   "reply with exactly: llx google stream ok"}))
-     :cljs
-     (async done
-            (-> (run-live-smoke-test!
-                 (run-provider-smoke* {:model           models/google
-                                       :opts            {:max-output-tokens 96
-                                                         :reasoning         {:level :high :effort :high}}
-                                       :complete-prompt "reply with exactly: llx google smoke ok"
-                                       :stream-prompt   "reply with exactly: llx google stream ok"}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-provider-smoke* {:model           models/google
+                                     :opts            {:max-output-tokens 96
+                                                       :reasoning         {:level :high :effort :high}}
+                                     :complete-prompt "reply with exactly: llx google smoke ok"
+                                     :stream-prompt   "reply with exactly: llx google stream ok"})
+               done)))
 
 (deftest ^:llx/mistral live-mistral-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (run-provider-smoke* {:model           models/mistral
-                            :opts            {:max-output-tokens 96}
-                            :complete-prompt "reply with exactly: llx mistral smoke ok"
-                            :stream-prompt   "reply with exactly: llx mistral stream ok"}))
-     :cljs
-     (async done
-            (-> (run-live-smoke-test!
-                 (run-provider-smoke* {:model           models/mistral
-                                       :opts            {:max-output-tokens 96}
-                                       :complete-prompt "reply with exactly: llx mistral smoke ok"
-                                       :stream-prompt   "reply with exactly: llx mistral stream ok"}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-provider-smoke* {:model           models/mistral
+                                     :opts            {:max-output-tokens 96}
+                                     :complete-prompt "reply with exactly: llx mistral smoke ok"
+                                     :stream-prompt   "reply with exactly: llx mistral stream ok"})
+               done)))
 
 (deftest ^:llx/ollama live-ollama-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (run-provider-smoke* {:model           models/ollama
-                            :opts            {:max-output-tokens 64}
-                            :complete-prompt "reply with exactly: llx ollama smoke ok"
-                            :stream-prompt   "reply with exactly: llx ollama stream ok"}))
-     :cljs
-     (async done
-            (-> (run-live-smoke-test!
-                 (run-provider-smoke* {:model           models/ollama
-                                       :opts            {:max-output-tokens 64}
-                                       :complete-prompt "reply with exactly: llx ollama smoke ok"
-                                       :stream-prompt   "reply with exactly: llx ollama stream ok"}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-provider-smoke* {:model           models/ollama
+                                     :opts            {:max-output-tokens 64}
+                                     :complete-prompt "reply with exactly: llx ollama smoke ok"
+                                     :stream-prompt   "reply with exactly: llx ollama stream ok"})
+               done)))
 
 (deftest ^:llx/openai live-openai-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (p/let [out (client/complete* env models/openai-completions
-                                    {:messages [{:role      :user
-                                                 :content   "reply with exactly: llx smoke ok"
-                                                 :timestamp 1}]}
-                                    {:max-output-tokens 64})]
-        (assert-complete-ok out)
-        true))
-     :cljs
-     (async done
-            (-> (p/let [out (client/complete* env models/openai-completions
-                                              {:messages [{:role      :user
-                                                           :content   "reply with exactly: llx smoke ok"
-                                                           :timestamp 1}]}
-                                              {:max-output-tokens 64})]
-                  (assert-complete-ok out)
-                  true)
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (p/let [out (client/complete* env models/openai-completions
+                                             {:messages [{:role      :user
+                                                          :content   "reply with exactly: llx smoke ok"
+                                                          :timestamp 1}]}
+                                             {:max-output-tokens 64})]
+                 (assert-complete-ok out)
+                 true)
+               done)))
 
 (deftest ^:llx/openai live-openai-responses-smoke
-  #?(:clj
-     (run-live-smoke-test!
-      (run-provider-smoke* {:model           models/openai-responses
-                            :opts            {:max-output-tokens 96
-                                              :reasoning         {:effort :high :summary :detailed}}
-                            :complete-prompt "reply with exactly: llx openai responses smoke ok"
-                            :stream-prompt   "reply with exactly: llx openai responses stream ok"}))
-     :cljs
-     (async done
-            (-> (run-live-smoke-test!
-                 (run-provider-smoke* {:model           models/openai-responses
-                                       :opts            {:max-output-tokens 96
-                                                         :reasoning         {:effort :high :summary :detailed}}
-                                       :complete-prompt "reply with exactly: llx openai responses smoke ok"
-                                       :stream-prompt   "reply with exactly: llx openai responses stream ok"}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-provider-smoke* {:model           models/openai-responses
+                                     :opts            {:max-output-tokens 96
+                                                       :reasoning         {:effort :high :summary :detailed}}
+                                     :complete-prompt "reply with exactly: llx openai responses smoke ok"
+                                     :stream-prompt   "reply with exactly: llx openai responses stream ok"})
+               done)))

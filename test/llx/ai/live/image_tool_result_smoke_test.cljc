@@ -1,11 +1,12 @@
 (ns llx.ai.live.image-tool-result-smoke-test
   (:require
    #?@(:clj [[clojure.test :refer [deftest is]]]
-       :cljs [[cljs.test :refer [deftest is async]]])
+       :cljs [[cljs.test :refer [deftest is]]])
    [clojure.string :as str]
    [llx.ai :as client]
    [llx.ai.live.models :as models]
-   [llx.ai.test-util :as util]
+   #?@(:clj [[llx.ai.test-util :as util]]
+       :cljs [[llx.ai.test-util :as util :include-macros true]])
    [promesa.core :as p]))
 
 #?(:clj (set! *warn-on-reflection* true))
@@ -106,12 +107,11 @@
   (-> (client/complete* env model (text-and-image-context model) opts)
       (p/then assert-image-result*)))
 
-(defn- run-live!
-  [deferred]
-  #?(:clj (do
-            (util/await! deferred)
-            true)
-     :cljs deferred))
+(defn- run-live-async!
+  [deferred done]
+  (-> deferred
+      (p/then (fn [_] (done)))
+      (p/catch (partial util/fail-and-done! done))))
 
 (defn- run-image-suite!*
   [model opts]
@@ -120,37 +120,25 @@
     true))
 
 (deftest ^:llx/openai live-image-tool-result-openai-completions
-  #?(:clj
-     (run-live! (run-image-suite!* models/openai-completions {}))
-     :cljs
-     (async done
-            (-> (run-live! (run-image-suite!* models/openai-completions {}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-image-suite!* models/openai-completions {})
+               done)))
 
 (deftest ^:llx/openai live-image-tool-result-openai-responses
-  #?(:clj
-     (run-live! (run-image-suite!* models/openai-responses {}))
-     :cljs
-     (async done
-            (-> (run-live! (run-image-suite!* models/openai-responses {}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-image-suite!* models/openai-responses {})
+               done)))
 
 (deftest ^:llx/anthropic live-image-tool-result-anthropic
-  #?(:clj
-     (run-live! (run-image-suite!* models/anthropic {}))
-     :cljs
-     (async done
-            (-> (run-live! (run-image-suite!* models/anthropic {}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-image-suite!* models/anthropic {})
+               done)))
 
 (deftest ^:llx/google live-image-tool-result-google
-  #?(:clj
-     (run-live! (run-image-suite!* models/google {}))
-     :cljs
-     (async done
-            (-> (run-live! (run-image-suite!* models/google {}))
-                (p/then (fn [_] (done)))
-                (p/catch (partial util/fail-and-done! done))))))
+  (util/async done
+              (run-live-async!
+               (run-image-suite!* models/google {})
+               done)))

@@ -2,8 +2,8 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is]]
              [llx.ai.test-util :as util]]
-       :cljs [[cljs.test :refer [deftest is async]]
-              [llx.ai.test-util :as util]])
+       :cljs [[cljs.test :refer [deftest is]]
+              [llx.ai.test-util :as util :include-macros true]])
    [llx.ai :as client]
    [llx.ai.live.models :as models]
    [promesa.core :as p]))
@@ -29,181 +29,95 @@
       (is (#{:stop :length :tool-use} (:stop-reason step-2)))
       true)))
 
-(defn- run-live!
-  [deferred]
-  #?(:clj (do
-            (util/await! deferred)
-            true)
-     :cljs deferred))
-
-#?(:cljs
-   (defn- run-async!
-     [done deferred]
-     (-> deferred
-         (p/then (fn [_] (done)))
-         (p/catch (partial util/fail-and-done! done)))))
+(defn- run-live-async!
+  [deferred done]
+  (-> deferred
+      (p/then (fn [_] (done)))
+      (p/catch (partial util/fail-and-done! done))))
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-to-anthropic
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/openai-completions {:max-output-tokens 96}
-       "Give one short sentence about Clojure."
-       models/anthropic {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/openai-completions {:max-output-tokens 96}
-               "Give one short sentence about Clojure."
-               models/anthropic {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/openai-completions {:max-output-tokens 96}
+                "Give one short sentence about Clojure."
+                models/anthropic {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/anthropic {:max-output-tokens 96}
-       "Give one short sentence about Lisp history."
-       models/openai-completions {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/anthropic {:max-output-tokens 96}
-               "Give one short sentence about Lisp history."
-               models/openai-completions {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/anthropic {:max-output-tokens 96}
+                "Give one short sentence about Lisp history."
+                models/openai-completions {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-openai-responses-to-anthropic
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/openai-responses {:max-output-tokens 128
-                                :reasoning         {:effort :high :summary :detailed}}
-       "Give one short sentence about Clojure macros."
-       models/anthropic {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/openai-responses {:max-output-tokens 128
-                                        :reasoning         {:effort :high :summary :detailed}}
-               "Give one short sentence about Clojure macros."
-               models/anthropic {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/openai-responses {:max-output-tokens 128
+                                         :reasoning         {:effort :high :summary :detailed}}
+                "Give one short sentence about Clojure macros."
+                models/anthropic {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/openai true :llx/anthropic true} live-handoff-anthropic-to-openai-responses
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/anthropic {:max-output-tokens 96}
-       "Give one short sentence about Lisp history."
-       models/openai-responses {:max-output-tokens 128
-                                :reasoning         {:effort :high :summary :detailed}}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/anthropic {:max-output-tokens 96}
-               "Give one short sentence about Lisp history."
-               models/openai-responses {:max-output-tokens 128
-                                        :reasoning         {:effort :high :summary :detailed}}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/anthropic {:max-output-tokens 96}
+                "Give one short sentence about Lisp history."
+                models/openai-responses {:max-output-tokens 128
+                                         :reasoning         {:effort :high :summary :detailed}})
+               done)))
 
 (deftest ^:llx/openai live-handoff-openai-responses-to-openai-completions
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/openai-responses {:max-output-tokens 128
-                                :reasoning         {:effort :high :summary :detailed}}
-       "Give one short sentence about Clojure protocols."
-       models/openai-completions {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/openai-responses {:max-output-tokens 128
-                                        :reasoning         {:effort :high :summary :detailed}}
-               "Give one short sentence about Clojure protocols."
-               models/openai-completions {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/openai-responses {:max-output-tokens 128
+                                         :reasoning         {:effort :high :summary :detailed}}
+                "Give one short sentence about Clojure protocols."
+                models/openai-completions {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/anthropic true :llx/google true} live-handoff-anthropic-to-google
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/anthropic {:max-output-tokens 96}
-       "Give one short sentence about Clojure macros."
-       models/google {:max-output-tokens 128
-                      :reasoning         {:level :high :effort :high}}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/anthropic {:max-output-tokens 96}
-               "Give one short sentence about Clojure macros."
-               models/google {:max-output-tokens 128
-                              :reasoning         {:level :high :effort :high}}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/anthropic {:max-output-tokens 96}
+                "Give one short sentence about Clojure macros."
+                models/google {:max-output-tokens 128
+                               :reasoning         {:level :high :effort :high}})
+               done)))
 
 (deftest ^{:llx/google true :llx/openai true} live-handoff-google-to-openai-completions
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/google {:max-output-tokens 96
-                      :reasoning         {:level :high :effort :high}}
-       "Give one short sentence about Clojure protocols."
-       models/openai-completions {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/google {:max-output-tokens 96
-                              :reasoning         {:level :high :effort :high}}
-               "Give one short sentence about Clojure protocols."
-               models/openai-completions {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/google {:max-output-tokens 96
+                               :reasoning         {:level :high :effort :high}}
+                "Give one short sentence about Clojure protocols."
+                models/openai-completions {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/google true :llx/mistral true} live-handoff-google-to-mistral
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/google {:max-output-tokens 96
-                      :reasoning         {:level :high :effort :high}}
-       "Give one short sentence about Clojure protocols."
-       models/mistral {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/google {:max-output-tokens 96
-                              :reasoning         {:level :high :effort :high}}
-               "Give one short sentence about Clojure protocols."
-               models/mistral {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/google {:max-output-tokens 96
+                               :reasoning         {:level :high :effort :high}}
+                "Give one short sentence about Clojure protocols."
+                models/mistral {:max-output-tokens 128})
+               done)))
 
 (deftest ^{:llx/mistral true :llx/ollama true} live-handoff-mistral-to-ollama
-  #?(:clj
-     (run-live!
-      (handoff-check!*
-       models/mistral {:max-output-tokens 96}
-       "Give one short sentence about Clojure macros."
-       models/ollama {:max-output-tokens 128}))
-     :cljs
-     (async done
-            (run-async!
-             done
-             (run-live!
-              (handoff-check!*
-               models/mistral {:max-output-tokens 96}
-               "Give one short sentence about Clojure macros."
-               models/ollama {:max-output-tokens 128}))))))
+  (util/async done
+              (run-live-async!
+               (handoff-check!*
+                models/mistral {:max-output-tokens 96}
+                "Give one short sentence about Clojure macros."
+                models/ollama {:max-output-tokens 128})
+               done)))

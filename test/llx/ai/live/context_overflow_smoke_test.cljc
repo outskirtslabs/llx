@@ -1,13 +1,14 @@
 (ns llx.ai.live.context-overflow-smoke-test
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
-       :cljs [[cljs.test :refer [deftest is testing async]]])
+       :cljs [[cljs.test :refer [deftest is testing]]])
    [llx.ai :as client]
    [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.impl.utils.overflow :as overflow]
    [llx.ai.impl.utils.rate-limit :as rate-limit]
-   [llx.ai.test-util :as util]
+   #?@(:clj [[llx.ai.test-util :as util]]
+       :cljs [[llx.ai.test-util :as util :include-macros true]])
    [promesa.core :as p]))
 
 #?(:clj (set! *warn-on-reflection* true))
@@ -115,59 +116,43 @@
                              " elapsed-ms=" (- (util/now-ms) started-at)))
                   true)))))
 
-(defn- run-live!
-  [deferred]
-  #?(:clj (do
-            (util/await! deferred)
-            true)
-     :cljs deferred))
+(defn- run-live-async!
+  [deferred done]
+  (-> deferred
+      (p/then (fn [_] (done)))
+      (p/catch (partial util/fail-and-done! done))))
 
 (deftest ^:llx/anthropic live-overflow-anthropic
   (testing "anthropic overflow detection"
-    #?(:clj
-       (run-live! (test-context-overflow!* models/anthropic {:max-output-tokens 128}))
-       :cljs
-       (async done
-              (-> (run-live! (test-context-overflow!* models/anthropic {:max-output-tokens 128}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial util/fail-and-done! done)))))))
+    (util/async done
+                (run-live-async!
+                 (test-context-overflow!* models/anthropic {:max-output-tokens 128})
+                 done))))
 
 (deftest ^:llx/openai live-overflow-openai-completions
   (testing "openai completions overflow detection"
-    #?(:clj
-       (run-live! (test-context-overflow!* models/openai-completions {:max-output-tokens 128}))
-       :cljs
-       (async done
-              (-> (run-live! (test-context-overflow!* models/openai-completions {:max-output-tokens 128}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial util/fail-and-done! done)))))))
+    (util/async done
+                (run-live-async!
+                 (test-context-overflow!* models/openai-completions {:max-output-tokens 128})
+                 done))))
 
 (deftest ^:llx/openai live-overflow-openai-responses
   (testing "openai responses overflow detection"
-    #?(:clj
-       (run-live! (test-context-overflow!* models/openai-responses {:max-output-tokens 128}))
-       :cljs
-       (async done
-              (-> (run-live! (test-context-overflow!* models/openai-responses {:max-output-tokens 128}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial util/fail-and-done! done)))))))
+    (util/async done
+                (run-live-async!
+                 (test-context-overflow!* models/openai-responses {:max-output-tokens 128})
+                 done))))
 
 (deftest ^:llx/google live-overflow-google
   (testing "google overflow detection"
-    #?(:clj
-       (run-live! (test-context-overflow!* models/google {:max-output-tokens 128}))
-       :cljs
-       (async done
-              (-> (run-live! (test-context-overflow!* models/google {:max-output-tokens 128}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial util/fail-and-done! done)))))))
+    (util/async done
+                (run-live-async!
+                 (test-context-overflow!* models/google {:max-output-tokens 128})
+                 done))))
 
 (deftest ^:llx/mistral live-overflow-mistral
   (testing "mistral overflow detection"
-    #?(:clj
-       (run-live! (test-context-overflow!* models/mistral {:max-output-tokens 128}))
-       :cljs
-       (async done
-              (-> (run-live! (test-context-overflow!* models/mistral {:max-output-tokens 128}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial util/fail-and-done! done)))))))
+    (util/async done
+                (run-live-async!
+                 (test-context-overflow!* models/mistral {:max-output-tokens 128})
+                 done))))
