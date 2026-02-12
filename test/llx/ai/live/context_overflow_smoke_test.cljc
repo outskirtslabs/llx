@@ -124,56 +124,51 @@
      :cljs deferred))
 
 (deftest ^:llx/anthropic live-overflow-anthropic
-  (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    (testing "anthropic overflow detection"
-      #?(:clj
-         (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
-         :cljs
-         (async done
-                (-> (run-live! (test-context-overflow!* models/anthropic {:api-key api-key :max-output-tokens 128}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+  (testing "anthropic overflow detection"
+    #?(:clj
+       (run-live! (test-context-overflow!* models/anthropic {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (-> (run-live! (test-context-overflow!* models/anthropic {:max-output-tokens 128}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
 (deftest ^:llx/openai live-overflow-openai-completions
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    (testing "openai completions overflow detection"
-      #?(:clj
-         (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
-         :cljs
-         (async done
-                (-> (run-live! (test-context-overflow!* models/openai-completions {:api-key api-key :max-output-tokens 128}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+  (testing "openai completions overflow detection"
+    #?(:clj
+       (run-live! (test-context-overflow!* models/openai-completions {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (-> (run-live! (test-context-overflow!* models/openai-completions {:max-output-tokens 128}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
 (deftest ^:llx/openai live-overflow-openai-responses
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    (testing "openai responses overflow detection"
-      #?(:clj
-         (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
-         :cljs
-         (async done
-                (-> (run-live! (test-context-overflow!* models/openai-responses {:api-key api-key :max-output-tokens 128}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+  (testing "openai responses overflow detection"
+    #?(:clj
+       (run-live! (test-context-overflow!* models/openai-responses {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (-> (run-live! (test-context-overflow!* models/openai-responses {:max-output-tokens 128}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
 (deftest ^:llx/google live-overflow-google
-  (let [api-key (live-env/get-env "GEMINI_API_KEY")]
-    (testing "google overflow detection"
-      #?(:clj
-         (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
-         :cljs
-         (async done
-                (-> (run-live! (test-context-overflow!* models/google {:api-key api-key :max-output-tokens 128}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+  (testing "google overflow detection"
+    #?(:clj
+       (run-live! (test-context-overflow!* models/google {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (-> (run-live! (test-context-overflow!* models/google {:max-output-tokens 128}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))
 
 (deftest ^:llx/mistral live-overflow-mistral
-  (let [api-key (live-env/get-env "MISTRAL_API_KEY")]
-    (testing "mistral overflow detection"
-      #?(:clj
-         (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
-         :cljs
-         (async done
-                (-> (run-live! (test-context-overflow!* models/mistral {:api-key api-key :max-output-tokens 128}))
-                    (p/then (fn [_] (done)))
-                    (p/catch (partial support/fail-and-done! done))))))))
+  (testing "mistral overflow detection"
+    #?(:clj
+       (run-live! (test-context-overflow!* models/mistral {:max-output-tokens 128}))
+       :cljs
+       (async done
+              (-> (run-live! (test-context-overflow!* models/mistral {:max-output-tokens 128}))
+                  (p/then (fn [_] (done)))
+                  (p/catch (partial support/fail-and-done! done)))))))

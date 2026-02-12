@@ -4,7 +4,6 @@
        :cljs [[cljs.test :refer [deftest is async]]])
    [clojure.string :as str]
    [llx.ai :as client]
-   [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.live.support :as support]
    [llx.ai.test-util :as util]
@@ -122,41 +121,37 @@
     true))
 
 (deftest ^:llx/openai live-image-tool-result-openai-completions
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    #?(:clj
-       (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
-       :cljs
-       (async done
-              (-> (run-live! (run-image-suite!* models/openai-completions {:api-key api-key}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+  #?(:clj
+     (run-live! (run-image-suite!* models/openai-completions {}))
+     :cljs
+     (async done
+            (-> (run-live! (run-image-suite!* models/openai-completions {}))
+                (p/then (fn [_] (done)))
+                (p/catch (partial support/fail-and-done! done))))))
 
 (deftest ^:llx/openai live-image-tool-result-openai-responses
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")]
-    #?(:clj
-       (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
-       :cljs
-       (async done
-              (-> (run-live! (run-image-suite!* models/openai-responses {:api-key api-key}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+  #?(:clj
+     (run-live! (run-image-suite!* models/openai-responses {}))
+     :cljs
+     (async done
+            (-> (run-live! (run-image-suite!* models/openai-responses {}))
+                (p/then (fn [_] (done)))
+                (p/catch (partial support/fail-and-done! done))))))
 
 (deftest ^:llx/anthropic live-image-tool-result-anthropic
-  (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")]
-    #?(:clj
-       (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
-       :cljs
-       (async done
-              (-> (run-live! (run-image-suite!* models/anthropic {:api-key api-key}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+  #?(:clj
+     (run-live! (run-image-suite!* models/anthropic {}))
+     :cljs
+     (async done
+            (-> (run-live! (run-image-suite!* models/anthropic {}))
+                (p/then (fn [_] (done)))
+                (p/catch (partial support/fail-and-done! done))))))
 
 (deftest ^:llx/google live-image-tool-result-google
-  (let [api-key (live-env/get-env "GEMINI_API_KEY")]
-    #?(:clj
-       (run-live! (run-image-suite!* models/google {:api-key api-key}))
-       :cljs
-       (async done
-              (-> (run-live! (run-image-suite!* models/google {:api-key api-key}))
-                  (p/then (fn [_] (done)))
-                  (p/catch (partial support/fail-and-done! done)))))))
+  #?(:clj
+     (run-live! (run-image-suite!* models/google {}))
+     :cljs
+     (async done
+            (-> (run-live! (run-image-suite!* models/google {}))
+                (p/then (fn [_] (done)))
+                (p/catch (partial support/fail-and-done! done))))))

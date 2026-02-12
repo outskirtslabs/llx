@@ -3,7 +3,6 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [llx.ai :as client]
-   [llx.ai.live.env :as live-env]
    [llx.ai.live.models :as models]
    [llx.ai.test-util :as util]
    [llx.ai.impl.client.stream :as await])
@@ -264,8 +263,7 @@
         "accumulated text should contain 887 (453 + 434)")))
 
 (deftest ^:llx/google live-parity-google
-  (let [api-key (live-env/get-env "GEMINI_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/google opts))
     (testing "handle-tool-call"
@@ -284,8 +282,7 @@
                                         :reasoning {:level :high})))))
 
 (deftest ^:llx/openai live-parity-openai-completions
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/openai-completions opts))
     (testing "handle-tool-call"
@@ -296,8 +293,7 @@
       (handle-image! models/openai-completions opts))))
 
 (deftest ^:llx/openai live-parity-openai-responses
-  (let [api-key (live-env/get-env "OPENAI_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/openai-responses opts))
     (testing "handle-tool-call"
@@ -316,8 +312,7 @@
                                                   :reasoning {:effort :high})))))
 
 (deftest ^:llx/anthropic live-parity-anthropic
-  (let [api-key (live-env/get-env "ANTHROPIC_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/anthropic (assoc opts :reasoning {:level :high})))
     (testing "handle-tool-call"
@@ -328,8 +323,7 @@
       (handle-image! models/anthropic opts))))
 
 (deftest ^:llx/mistral live-parity-mistral-devstral
-  (let [api-key (live-env/get-env "MISTRAL_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/mistral opts))
     (testing "handle-tool-call"
@@ -343,8 +337,7 @@
                                          :reasoning {:level :medium})))))
 
 (deftest ^:llx/mistral live-parity-mistral-pixtral
-  (let [api-key (live-env/get-env "MISTRAL_API_KEY")
-        opts    {:api-key api-key :max-output-tokens 256}]
+  (let [opts {:max-output-tokens 256}]
     (testing "basic-text-generation"
       (basic-text-generation! models/mistral-pixtral opts))
     (testing "handle-tool-call"
