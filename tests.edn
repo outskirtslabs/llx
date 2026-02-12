@@ -4,7 +4,7 @@
                                              "kaocha.plugin.capture_output"
                                              "kaocha.testable"]}
   :kaocha/reporter
-  [kaocha.report/dots]
+  [kaocha.report/documentation]
 
   :plugins
   [:kaocha.plugin.alpha/info

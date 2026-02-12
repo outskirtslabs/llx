@@ -1,1 +1,2 @@
-{:throw? true}
+{:throw?                 true
+ :guardrails/use-stderr? true}

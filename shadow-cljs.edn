@@ -1,7 +1,9 @@
-{:deps {:aliases [:dev]}
+{:deps
+ {:aliases [:dev]}
  :build-defaults
  {:compiler-options
-  {:output-feature-set                 :es2020
+  {:external-config                    {:guardrails {:throw? true}}
+   :output-feature-set                 :es2020
    :output-wrapper                     false
    :source-map                         true
    :source-map-include-sources-content true

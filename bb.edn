@@ -17,12 +17,12 @@
          test:jvm
          {:doc  "Run all tests or specific test suites"
           :task (apply clojure "-M:dev:kaocha"
-                       (if (seq *command-line-args*) *command-line-args* [":unit"]))}
+                       (concat [":unit"] *command-line-args*))}
 
          test:jvm-live
          {:doc  "Run all tests or specific test suites"
           :task (let [disabled (live-env/provider-skip-meta-flags)
-                      suites   (if (seq *command-line-args*) *command-line-args* [":live"])]
+                      suites   (concat [":live"] *command-line-args*)]
                   (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
 
          funnel
@@ -42,12 +42,12 @@
          test:cljs
          {:doc  "Run CLJS unit tests through Kaocha + kaocha-cljs2"
           :task (apply clojure "-M:dev:kaocha"
-                       (if (seq *command-line-args*) *command-line-args* [":cljs"]))}
+                       (concat [":cljs"] *command-line-args*))}
 
          test:cljs-live
          {:doc  "Run CLJS live tests through Kaocha + kaocha-cljs2"
           :task (let [disabled (live-env/provider-skip-meta-flags)
-                      suites   (if (seq *command-line-args*) *command-line-args* [":cljs-live"])]
+                      suites   (concat [":cljs-live"] *command-line-args*)]
                   (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
 
          test
