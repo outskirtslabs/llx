@@ -1,15 +1,17 @@
 {:deps  {}
- :paths []
+ :paths ["test/bb"]
  :tasks {:requires
          ([clojure.string :as str]
           [clojure.pprint :refer [print-table]]
+          [llx.bb.live-env :as live-env]
           [babashka.tasks :refer [shell]])
 
          :init
-         (do (def paths ["src" "test"]))
+         (do
+           (def paths ["src" "test"]))
 
          dev
-         {:doc  "Start a local development server"
+         {:doc  "Start a local development REPL"
           :task (apply clojure "-M:repl/dev:dev" *command-line-args*)}
 
          test:jvm
@@ -19,50 +21,42 @@
 
          test:jvm-live
          {:doc  "Run all tests or specific test suites"
-          :task (let [present-or-nonempty?
-                      (fn [env-var]
-                        (let [value (System/getenv env-var)]
-                          (and (some? value) (or (= env-var "OLLAMA_API_KEY")
-                                                 (seq value)))))
-                      services                                                {"OLLAMA_API_KEY"    :llx/ollama
-                                                                               "OPENAI_API_KEY"    :llx/openai
-                                                                               "ANTHROPIC_API_KEY" :llx/anthropic
-                                                                               "GEMINI_API_KEY"    :llx/google
-                                                                               "MISTRAL_API_KEY"   :llx/mistral}
-                      disabled                                                (->> services
-                                                                                   (remove (fn [[env-var _]]
-                                                                                             (present-or-nonempty? env-var)))
-                                                                                   (mapcat (fn [[_ kw]] ["--skip-meta" (str kw)])))
-                      suites                                                  (if (seq *command-line-args*) *command-line-args* [":live"])]
+          :task (let [disabled (live-env/provider-skip-meta-flags)
+                      suites   (if (seq *command-line-args*) *command-line-args* [":live"])]
                   (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
 
+         funnel
+         {:doc  "Run Funnel websocket relay for Kaocha CLJS"
+          :task (apply clojure "-M:funnel" *command-line-args*)}
+
          test:watch-cljs
-         {:doc  "Watch CLJS tests with shadow-cljs"
-          :task (apply clojure "-M:dev:shadow-cljs" "watch" "test" *command-line-args*)}
+         {:doc  "Watch CLJS Kaocha test build with shadow-cljs"
+          :task (apply clojure "-M:dev:shadow-cljs" "watch" "kaocha-test" *command-line-args*)}
 
-         test:build-cljs
-         {:doc  "Compile CLJS tests with shadow-cljs without autorun"
-          :task (apply clojure "-M:dev:shadow-cljs" "compile" "test"
-                       "--config-merge" "{:autorun false}" *command-line-args*)}
-
-         test:build-cljs-live
-         {:doc  "Compile CLJS live tests with shadow-cljs without autorun"
-          :task (apply clojure "-M:dev:shadow-cljs" "compile" "test-live"
-                       "--config-merge" "{:autorun false}" *command-line-args*)}
+         test:cljs-build
+         {:doc  "Compile both CLJS Kaocha builds (unit + live)"
+          :task (do
+                  (clojure "-M:dev:shadow-cljs" "compile" "kaocha-test")
+                  (clojure "-M:dev:shadow-cljs" "compile" "kaocha-test-live"))}
 
          test:cljs
-         {:doc     "Compile and run CLJS tests with shadow-cljs"
-          :depends [test:build-cljs]
-          :task    (shell "node" "target/tests.js")}
+         {:doc  "Run CLJS unit tests through Kaocha + kaocha-cljs2"
+          :task (apply clojure "-M:dev:kaocha"
+                       (if (seq *command-line-args*) *command-line-args* [":cljs"]))}
 
          test:cljs-live
-         {:doc     "Compile and run CLJS live tests with shadow-cljs"
-          :depends [test:build-cljs-live]
-          :task    (shell "node" "target/tests-live.js")}
+         {:doc  "Run CLJS live tests through Kaocha + kaocha-cljs2"
+          :task (let [disabled (live-env/provider-skip-meta-flags)
+                      suites   (if (seq *command-line-args*) *command-line-args* [":cljs-live"])]
+                  (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
 
          test
-         {:doc     "TODO this description"
+         {:doc     "Run JVM + CLJS unit test suites"
           :depends [test:jvm test:cljs]}
+
+         test-live
+         {:doc     "Run JVM + CLJS live test suites"
+          :depends [test:jvm-live test:cljs-live]}
 
          generate-models
          {:doc  "Generate built-in model catalog artifact"
@@ -135,6 +129,10 @@
          {:override-builtin true
           :doc              "Clean build artifacts"
           :task             (shell "clojure -T:build clean")}
+
+         distclean
+         {:doc  "Remove all generated build/cache artifacts (target, .cpcache, .shadow-cljs, node_modules)"
+          :task (shell "rm -rf target .cpcache .shadow-cljs node_modules")}
 
          publish
          {:doc     "Publish the clojure sdk libs to clojars"

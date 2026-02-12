@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.ai.impl.client :as client]
-   [llx.ai.impl.client.stream :as stream]
+   [llx.ai.impl.client.event-stream :as stream]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]
@@ -166,43 +166,43 @@
 (>defn run-stream!
        [{:keys [adapter env model request request-opts] :as input}]
        [:llx/runtime-run-stream-base-input => :llx/runtime-run-stream-result]
-       (let [abort-controller    (js/AbortController.)
-             request             (assoc request :signal (or (:signal request)
-                                                            (.-signal abort-controller)))
-             cancel-requested?*  (atom false)
-             request-started?*   (atom false)
-             abort-request!      (fn []
-                                   (when-not (.-aborted (.-signal abort-controller))
-                                     (.abort abort-controller)))
-             cancel-request!     (fn []
-                                   (reset! cancel-requested?* true)
-                                   (when @request-started?*
-                                     (abort-request!)))
-             open-stream!        (fn []
-                                   (let [max-retries (get request-opts :max-retries 2)
-                                         sleep-fn    (or (:thread/sleep env)
-                                                         (fn [ms]
-                                                           (p/delay (long (max 0 (or ms 0))) nil)))]
-                                     (-> (errors/retry-loop-async
-                                          (fn []
-                                            (reset! request-started?* true)
-                                            (let [response-d ((:open-stream adapter) env model request)]
-                                              (when @cancel-requested?*
-                                                (abort-request!))
-                                              response-d))
-                                          max-retries
-                                          sleep-fn
-                                          {:call-id  (:call/id env)
-                                           :provider (:provider model)})
-                                         (p/then (fn [response]
-                                                   (schema/assert-valid! :llx/http-response-map response)))
-                                         (p/then (fn [response]
-                                                   (if (:body response)
-                                                     response
-                                                     (throw (errors/invalid-response
-                                                             (name (or (:provider model) "unknown"))
-                                                             "Stream response missing body"
-                                                             :context {:status (:status response)}))))))))]
+       (let [abort-controller   (js/AbortController.)
+             request            (assoc request :signal (or (:signal request)
+                                                           (.-signal abort-controller)))
+             cancel-requested?* (atom false)
+             request-started?*  (atom false)
+             abort-request!     (fn []
+                                  (when-not (.-aborted (.-signal abort-controller))
+                                    (.abort abort-controller)))
+             cancel-request!    (fn []
+                                  (reset! cancel-requested?* true)
+                                  (when @request-started?*
+                                    (abort-request!)))
+             open-stream!       (fn []
+                                  (let [max-retries (get request-opts :max-retries 2)
+                                        sleep-fn    (or (:thread/sleep env)
+                                                        (fn [ms]
+                                                          (p/delay (long (max 0 (or ms 0))) nil)))]
+                                    (-> (errors/retry-loop-async
+                                         (fn []
+                                           (reset! request-started?* true)
+                                           (let [response-d ((:open-stream adapter) env model request)]
+                                             (when @cancel-requested?*
+                                               (abort-request!))
+                                             response-d))
+                                         max-retries
+                                         sleep-fn
+                                         {:call-id  (:call/id env)
+                                          :provider (:provider model)})
+                                        (p/then (fn [response]
+                                                  (schema/assert-valid! :llx/http-response-map response)))
+                                        (p/then (fn [response]
+                                                  (if (:body response)
+                                                    response
+                                                    (throw (errors/invalid-response
+                                                            (name (or (:provider model) "unknown"))
+                                                            "Stream response missing body"
+                                                            :context {:status (:status response)}))))))))]
          (schema/assert-valid!
           :llx/runtime-run-stream-result
           (stream/run-stream!

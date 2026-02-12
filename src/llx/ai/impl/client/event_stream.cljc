@@ -1,4 +1,4 @@
-(ns llx.ai.impl.client.stream
+(ns llx.ai.impl.client.event-stream
   "Shared stream runtime orchestration for all hosts.
 
   ## Why

@@ -1,12 +1,12 @@
 (ns llx.ai.client.stream-test
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]
-             [llx.ai.impl.client.stream :as stream]
+             [llx.ai.impl.client.event-stream :as stream]
              [llx.ai.impl.schema :as schema]
              [promesa.core :as p]
              [promesa.exec.csp :as sp]]
        :cljs [[cljs.test :refer [deftest is testing async]]
-              [llx.ai.impl.client.stream :as stream]
+              [llx.ai.impl.client.event-stream :as stream]
               [llx.ai.impl.schema :as schema]
               [promesa.core :as p]
               [promesa.exec.csp :as sp]])))
@@ -80,11 +80,11 @@
                                        :cache-read   0
                                        :cache-write  0
                                        :total-tokens 0
-                                       :cost         {:input 0.0
-                                                      :output 0.0
-                                                      :cache-read 0.0
+                                       :cost         {:input       0.0
+                                                      :output      0.0
+                                                      :cache-read  0.0
                                                       :cache-write 0.0
-                                                      :total 0.0}}
+                                                      :total       0.0}}
                        :stop-reason   :error
                        :error-message (or (ex-message ex) "runtime failure")
                        :timestamp     1730000000000})})

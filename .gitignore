@@ -16,3 +16,5 @@ result
 .env
 *.md
 .shadow-cljs
+.tmuxb_session
+node_modules/

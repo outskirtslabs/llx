@@ -5,7 +5,7 @@
    [llx.ai :as client]
    [llx.ai.live.models :as models]
    [llx.ai.test-util :as util]
-   [llx.ai.impl.client.stream :as await])
+   [llx.ai.impl.client.event-stream :as await])
   (:import
    [java.util Base64]
    [java.io File]))

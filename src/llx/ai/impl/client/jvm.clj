@@ -5,7 +5,7 @@
    [clojure.java.io :as io]
    [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.ai.impl.client :as client]
-   [llx.ai.impl.client.stream :as stream]
+   [llx.ai.impl.client.event-stream :as stream]
    [llx.ai.impl.errors :as errors]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.utils.unicode :as unicode]

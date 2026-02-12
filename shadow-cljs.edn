@@ -1,54 +1,25 @@
-{:deps                                                           {:aliases [:dev]}
- :http                                                           {:port 3448}
- :nrepl                                                          {:port 3447 :host "0.0.0.0"}
- :jvm-opts                                                       ["-Xmx700m" "-Xms100m" "-XX:+UseSerialGC" "-XX:-OmitStackTraceInFastThrow"]
- :dev-http                                                       {8888 "classpath:public"}
-
+{:deps {:aliases [:dev]}
+ :build-defaults
+ {:compiler-options
+  {:output-feature-set                 :es2020
+   :output-wrapper                     false
+   :source-map                         true
+   :source-map-include-sources-content true
+   :source-map-detail-level            :all
+   :warnings                           {:fn-deprecated false}}}
  :builds
- {:test
-  {:target                                                      :node-test
-   :output-to                                                   "target/tests.js"
-   :output-dir                                                  "target/test/"
-   :ns-regexp                                                   "^(?!llx\\.ai\\.live\\.).*-test$"
-   :autorun                                                     true
+ {:kaocha-test
+  {:target     :node-test
+   :output-to  "target/kaocha-tests.js"
+   :output-dir "target/kaocha-test/"
+   :ns-regexp  "^(?!llx\\.ai\\.live\\.).*-test$"
+   :main       llx.cljs-test-runner/main
+   :autorun    false}
 
-   :compiler-options
-   {:output-feature-set                 :es2020
-    :output-wrapper                     false
-    :source-map                         true
-    :source-map-include-sources-content true
-    :source-map-detail-level            :all
-    :warnings                           {:fn-deprecated false}}}
-
-  :test-live
-  {:target                                                      :node-test
-   :output-to                                                   "target/tests-live.js"
-   :output-dir                                                  "target/test-live/"
-   :ns-regexp                                                   "^llx\\.ai\\.live\\..*-test$"
-   :autorun                                                     true
-
-   :compiler-options
-   {:output-feature-set                 :es2020
-    :output-wrapper                     false
-    :source-map                         true
-    :source-map-include-sources-content true
-    :source-map-detail-level            :all
-    :warnings                           {:fn-deprecated false}}}
-
-  :bench
-  {:target                                      :node-script
-   :output-to                                   "target/bench.js"
-   :output-dir                                  "target/bench/"
-   :main                                        bench/main
-
-   :compiler-options
-   {:output-feature-set :es2020
-    :output-wrapper     false
-    :warnings           {:fn-deprecated false}}
-
-   :release
-   {:compiler-options
-    {:fn-invoke-direct      true
-     :elide-asserts         true
-     :anon-fn-naming-policy :off}}}}}
-
+  :kaocha-test-live
+  {:target     :node-test
+   :output-to  "target/kaocha-tests-live.js"
+   :output-dir "target/kaocha-test-live/"
+   :ns-regexp  "^llx\\.ai\\.live\\..*-test$"
+   :main       llx.cljs-test-runner/main
+   :autorun    false}}}

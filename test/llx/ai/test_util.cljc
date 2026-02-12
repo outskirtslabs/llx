@@ -2,7 +2,7 @@
   (:require
    #?@(:clj [[babashka.json :as json]
              [clojure.edn :as edn]
-             [llx.ai.impl.client.stream :as stream]]
+             [llx.ai.impl.client.event-stream :as stream]]
        :cljs [[cljs.reader :as reader]
               [promesa.core :as p]
               ["node:fs" :as fs]])
@@ -98,17 +98,17 @@
 (defn- capture-log-event!
   [logs* args]
   (let [[ns loc level id opts] args
-        event (cond
-                (and (= 1 (count args))
-                     (map? (force-value (first args))))
-                (force-value (first args))
+        event                  (cond
+                                 (and (= 1 (count args))
+                                      (map? (force-value (first args))))
+                                 (force-value (first args))
 
-                :else
-                (merge {:ns    (force-value ns)
-                        :loc   (force-value loc)
-                        :level (force-value level)
-                        :id    (force-value id)}
-                       (or (force-value opts) {})))]
+                                 :else
+                                 (merge {:ns    (force-value ns)
+                                         :loc   (force-value loc)
+                                         :level (force-value level)
+                                         :id    (force-value id)}
+                                        (or (force-value opts) {})))]
     (swap! logs* conj event)
     nil))
 
@@ -169,7 +169,7 @@
       timeout-ms
       ::timeout)
      :cljs
-     (let [deadline-ms (+ (now-ms) timeout-ms)
+     (let [deadline-ms   (+ (now-ms) timeout-ms)
            timeout-token (js-obj)]
        (loop [events []]
          (let [remaining-ms (- deadline-ms (now-ms))]

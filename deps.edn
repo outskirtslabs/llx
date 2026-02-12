@@ -8,22 +8,29 @@
 
  :aliases {:kaocha
            {:extra-paths ["test"]
-            :extra-deps  {lambdaisland/kaocha       {:local/root                  "/home/ramblurr/src/github.com/lambdaisland/kaocha"
-                                                     #_#_:mvn/version "1.91.1392"}
-                          kaocha-retry/kaocha-retry {:mvn/version "0.4.0"}}
+            :extra-deps  {}
             :main-opts   ["-m" "kaocha.runner"]}
+
+           :funnel
+           {:extra-deps {lambdaisland/funnel {:mvn/version "1.6.93"}}
+            :main-opts  ["-m" "lambdaisland.funnel"]}
 
            :dev
            {:extra-paths ["dev" "test"]
             :jvm-opts    ["-Dguardrails.enabled=true"]
 
             :extra-deps  {dev.weavejester/hashp                    {:mvn/version "0.5.1"}
+                          org.slf4j/slf4j-nop                      {:mvn/version "2.0.17"}
                           io.github.tonsky/clj-reload              {:mvn/version "1.0.0"}
                           com.cnuernber/charred                    {:mvn/version "1.037"}
                           djblue/portal                            {:mvn/version "0.62.1"}
                           criterium/criterium                      {:mvn/version "0.4.6"}
                           thheller/shadow-cljs                     {:mvn/version "RELEASE"}
-                          com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}}
+                          com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}
+                          lambdaisland/kaocha                      {:local/root                  "/home/ramblurr/src/github.com/lambdaisland/kaocha"
+                                                                    #_#_:mvn/version "1.91.1392"}
+                          lambdaisland/kaocha-cljs2                {:mvn/version "0.2.72"}
+                          kaocha-retry/kaocha-retry                {:mvn/version "0.4.0"}}}
 
            :shadow-cljs
            {:main-opts ["-m" "shadow.cljs.devtools.cli"]
