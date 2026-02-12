@@ -6,6 +6,7 @@
        :cljs [[cljs.test :refer-macros [deftest is]]
               [llx.ai.impl.client.node :as runtime]])
    [llx.ai.impl.client :as sut]
+   [llx.ai.impl.errors :as errors]
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.utils.unicode :as unicode]
    #?@(:clj [[llx.ai.test-util :as util]]
@@ -40,9 +41,6 @@
    :registry                 sut/default-registry
    :clock/now-ms             (fn [] 1730000000000)
    :id/new                   (fn [] "id-1")
-   :thread/sleep             #?(:clj (fn [_ms])
-                                :cljs (fn [ms]
-                                        (p/delay (long (max 0 (or ms 0))) nil)))
    :unicode/sanitize-payload unicode/sanitize-payload})
 
 #?(:clj
@@ -79,6 +77,31 @@
       (p/then (fn [_]
                 (done)))
       (p/catch (partial util/fail-and-done! done))))
+
+(defn- transient-then-success-response
+  [call-count]
+  (swap! call-count inc)
+  (if (= 1 @call-count)
+    {:status 503
+     :body   (util/json-write {:error {:message "service unavailable"}})}
+    {:status 200
+     :body   (util/json-write
+              {:choices [{:finish_reason "stop"
+                          :message       {:role    "assistant"
+                                          :content "ok"}}]
+               :usage   {:prompt_tokens     1
+                         :completion_tokens 1
+                         :total_tokens      2}})}))
+
+(defn- complete-retry-case
+  []
+  (let [call-count (atom 0)
+        env        (stub-env (fn [_request]
+                               (transient-then-success-response call-count)))
+        context    {:messages [{:role :user :content "hi" :timestamp 1}]}
+        d          (sut/complete* env base-model context {:api-key "x" :max-retries 2})]
+    {:call-count call-count
+     :deferred   d}))
 
 (deftest complete-returns-deferred
   (util/async done
@@ -443,30 +466,41 @@
                                               (or (ex-message ex) ""))))
                                done))))
 
+#?(:clj
+   (defn- assert-complete-retry-success!
+     [{:keys [call-count deferred]} assert-out!]
+     (let [out (util/await! deferred 1000 ::timeout)]
+       (is (not (util/timeout-result? out)))
+       (is (= 2 @call-count))
+       (assert-out! out))))
+
+#?(:cljs
+   (defn- assert-complete-retry-success!
+     [{:keys [call-count deferred]} done assert-out!]
+     (-> deferred
+         (p/then (fn [out]
+                   (is (= 2 @call-count))
+                   (assert-out! out)
+                   (done)))
+         (p/catch (partial util/fail-and-done! done)))))
+
 (deftest complete-retries-on-transient-error
-  (util/async done
-              (let [call-count (atom 0)
-                    env        (stub-env (fn [_request]
-                                           (swap! call-count inc)
-                                           (if (= 1 @call-count)
-                                             {:status 503
-                                              :body   (util/json-write {:error {:message "service unavailable"}})}
-                                             {:status 200
-                                              :body   (util/json-write
-                                                       {:choices [{:finish_reason "stop"
-                                                                   :message       {:role    "assistant"
-                                                                                   :content "ok"}}]
-                                                        :usage   {:prompt_tokens     1
-                                                                  :completion_tokens 1
-                                                                  :total_tokens      2}})})))
-                    context    {:messages [{:role :user :content "hi" :timestamp 1}]}]
-                (-> (sut/complete* env base-model context {:api-key "x" :max-retries 2})
-                    (p/then (fn [out]
-                              (is (= 2 @call-count))
-                              (is (= :stop (:stop-reason out)))
-                              (is (= [{:type :text :text "ok"}] (:content out)))
-                              (done)))
-                    (p/catch (partial util/fail-and-done! done))))))
+  #?(:clj
+     (with-redefs [errors/retry-delay-ms (fn [_ex _retry-count] 1)]
+       (assert-complete-retry-success!
+        (complete-retry-case)
+        (fn [out]
+          (is (= :stop (:stop-reason out)))
+          (is (= [{:type :text :text "ok"}] (:content out))))))
+     :cljs
+     (util/async done
+                 (with-redefs [errors/retry-delay-ms (fn [_ex _retry-count] 1)]
+                   (assert-complete-retry-success!
+                    (complete-retry-case)
+                    done
+                    (fn [out]
+                      (is (= :stop (:stop-reason out)))
+                      (is (= [{:type :text :text "ok"}] (:content out)))))))))
 
 (deftest complete-does-not-retry-on-client-error
   (util/async done
@@ -488,17 +522,21 @@
                                  (is (= 1 @call-count)))
                                done))))
 
-(deftest complete-throws-config-error-when-retries-requested-without-sleep
-  (util/async done
-              (let [env-no-sleep (dissoc (stub-env (fn [_] {:status 200 :body "{}"})) :thread/sleep)
-                    context      {:messages [{:role :user :content "hi" :timestamp 1}]}
-                    d            (sut/complete* env-no-sleep base-model context {:api-key "x" :max-retries 2})]
-                (rejects-with! d
-                               (fn [ex]
-                                 (is (= {:type        :llx/config-error
-                                         :max-retries 2}
-                                        (ex-data ex))))
-                               done))))
+(deftest complete-retries-without-thread-sleep-hook
+  #?(:clj
+     (with-redefs [errors/retry-delay-ms (fn [_ex _retry-count] 1)]
+       (assert-complete-retry-success!
+        (complete-retry-case)
+        (fn [out]
+          (is (= :stop (:stop-reason out))))))
+     :cljs
+     (util/async done
+                 (with-redefs [errors/retry-delay-ms (fn [_ex _retry-count] 1)]
+                   (assert-complete-retry-success!
+                    (complete-retry-case)
+                    done
+                    (fn [out]
+                      (is (= :stop (:stop-reason out)))))))))
 
 (deftest complete-rejects-unsupported-xhigh-with-structured-error
   (util/async done
@@ -561,6 +599,27 @@
 
 (deftest stream-retries-open-stream-on-transient-error
   #?(:clj
+     (let [call-count              (atom 0)
+           env                     (stub-env (fn [_request]
+                                               (swap! call-count inc)
+                                               (if (= 1 @call-count)
+                                                 {:status 503
+                                                  :body   (util/json-write {:error {:message "service unavailable"}})}
+                                                 {:status  200
+                                                  :headers {"content-type" "text/event-stream"}
+                                                  :body    (sse-body
+                                                            ["data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"hi\"},\"index\":0}]}"
+                                                             "data: {\"choices\":[{\"delta\":{\"content\":\" there\"},\"index\":0,\"finish_reason\":\"stop\"}]}"
+                                                             "data: [DONE]"])})))
+           stream                  (sut/stream* env base-model
+                                                {:messages [{:role :user :content "hi" :timestamp 1}]}
+                                                {:api-key "x" :max-retries 2})
+           {:keys [events result]} (util/await! (util/collect-stream* stream 7000) 7500 ::timeout)]
+       (is (not (util/timeout-result? events)))
+       (is (= 2 @call-count))
+       (is (= :done (:type (last events))))
+       (is (= :stop (:stop-reason result))))
+     :cljs
      (util/async done
                  (let [call-count (atom 0)
                        env        (stub-env (fn [_request]
@@ -577,16 +636,14 @@
                        stream     (sut/stream* env base-model
                                                {:messages [{:role :user :content "hi" :timestamp 1}]}
                                                {:api-key "x" :max-retries 2})]
-                   (-> (util/collect-stream* stream 1000)
+                   (-> (util/collect-stream* stream 5000)
                        (p/then (fn [{:keys [events result]}]
                                  (is (= 2 @call-count))
                                  (is (not (util/timeout-result? events)))
                                  (is (= :done (:type (last events))))
                                  (is (= :stop (:stop-reason result)))
                                  (done)))
-                       (p/catch (partial util/fail-and-done! done)))))
-     :cljs
-     (is true)))
+                       (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest stream-close-delegates-to-runtime-cancel-fn
   (util/async done
