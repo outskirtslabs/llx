@@ -384,6 +384,13 @@
    [:map
     [:run-command! :llx.agent/runtime-command-fn]
     [:initial-state {:optional true} :llx.agent/runtime-initial-state]
+    [:convert-to-llm {:optional true} [:fn fn?]]
+    [:transform-context {:optional true} [:fn fn?]]
+    [:stream-fn {:optional true} :llx.agent/stream-fn]
+    [:get-api-key {:optional true} [:fn fn?]]
+    [:session-id {:optional true} :llx/id-string]
+    [:thinking-budgets {:optional true} :llx.agent/thinking-budgets]
+    [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
     [:steering-mode {:optional true} :llx.agent/queue-mode]
     [:follow-up-mode {:optional true} :llx.agent/queue-mode]]
 

@@ -199,8 +199,30 @@
                                     {:result  (p/resolved {:status :ok})
                                      :cancel! (fn [] nil)})
                    :initial-state {:messages [valid-user-message]}}))
+  (is (sut/valid? :llx.agent/runtime-options
+                  {:run-command!       (fn [_]
+                                         {:result  (p/resolved {:status :ok})
+                                          :cancel! (fn [] nil)})
+                   :convert-to-llm     (fn [messages] messages)
+                   :transform-context  (fn [messages _signal]
+                                         (p/resolved messages))
+                   :get-api-key        (fn [_provider] "api-key")
+                   :stream-fn          (fn [_model _context _opts])
+                   :session-id         "session-123"
+                   :thinking-budgets   {:minimal 128 :low 512}
+                   :max-retry-delay-ms 60000}))
   (is (not (sut/valid? :llx.agent/runtime-options
                        {:steering-mode :all})))
+  (is (not (sut/valid? :llx.agent/runtime-options
+                       {:run-command!       (fn [_]
+                                              {:result  (p/resolved {:status :ok})
+                                               :cancel! (fn [] nil)})
+                        :max-retry-delay-ms "60000"})))
+  (is (not (sut/valid? :llx.agent/runtime-options
+                       {:run-command!     (fn [_]
+                                            {:result  (p/resolved {:status :ok})
+                                             :cancel! (fn [] nil)})
+                        :thinking-budgets {:minimal "128"}})))
   (is (not (sut/valid? :llx.agent/runtime-options
                        {:run-command!  (fn [_]
                                          {:result  (p/resolved {:status :ok})

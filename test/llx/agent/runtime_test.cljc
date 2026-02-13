@@ -271,6 +271,59 @@
                               (done)))
                     (p/catch (partial util/fail-and-done! done))))))
 
+(deftest continue-rejects-when-no-messages
+  (util/async done
+              (let [calls*  (atom [])
+                    runtime (sut/create-runtime {:run-command! (make-immediate-runner calls*)})]
+                (-> (expect-rejection* (sut/continue! runtime)
+                                       (fn [ex]
+                                         (is (= :runtime-no-messages (-> ex ex-data :reason)))))
+                    (p/then (fn [_]
+                              (is (empty? @calls*))
+                              (sut/close! runtime)))
+                    (p/then (fn [_]
+                              (done)))
+                    (p/catch (partial util/fail-and-done! done))))))
+
+(deftest runtime-forwards-turn-hooks-and-runtime-config-to-runner
+  (util/async done
+              (let [calls*            (atom [])
+                    convert-to-llm    (fn [messages] messages)
+                    transform-context (fn [messages _signal]
+                                        (p/resolved messages))
+                    get-api-key       (fn [_provider] "api-key")
+                    stream-fn         (fn [_model _context _opts])
+                    runtime           (sut/create-runtime
+                                       {:run-command!       (fn [input]
+                                                              (swap! calls* conj input)
+                                                              {:result  (p/resolved {:status :ok})
+                                                               :cancel! (fn [] nil)})
+                                        :convert-to-llm     convert-to-llm
+                                        :transform-context  transform-context
+                                        :get-api-key        get-api-key
+                                        :stream-fn          stream-fn
+                                        :session-id         "session-123"
+                                        :thinking-budgets   {:minimal 128 :low 512}
+                                        :max-retry-delay-ms 60000
+                                        :steering-mode      :all
+                                        :follow-up-mode     :one-at-a-time})]
+                (-> (sut/prompt! runtime base-user-message)
+                    (p/then (fn [_]
+                              (is (= 1 (count @calls*)))
+                              (let [call (first @calls*)]
+                                (is (= convert-to-llm (:convert-to-llm call)))
+                                (is (= transform-context (:transform-context call)))
+                                (is (= get-api-key (:get-api-key call)))
+                                (is (= stream-fn (:stream-fn call)))
+                                (is (= "session-123" (:session-id call)))
+                                (is (= {:minimal 128 :low 512}
+                                       (:thinking-budgets call)))
+                                (is (= 60000 (:max-retry-delay-ms call))))
+                              (sut/close! runtime)))
+                    (p/then (fn [_]
+                              (done)))
+                    (p/catch (partial util/fail-and-done! done))))))
+
 (deftest abort-calls-turn-cancel-and-wait-for-idle
   (util/async done
               (let [{:keys [calls* run!]} (make-controllable-runner)

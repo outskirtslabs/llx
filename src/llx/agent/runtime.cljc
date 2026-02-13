@@ -82,6 +82,10 @@
   []
   (active-rejected-error :runtime-no-queued-messages))
 
+(defn- no-messages-error
+  []
+  (active-rejected-error :runtime-no-messages))
+
 (defn- command-slot-busy-error
   [command]
   (ex-info
@@ -234,28 +238,32 @@
     (swap! runtime-state*
            (fn [runtime-state]
              (let [agent-messages (get-in runtime-state [:agent-state :messages])]
-               (if (= :assistant (:role (last agent-messages)))
-                 (let [[steering steering-next]
-                       (queue-dequeue (:steering-queue runtime-state)
-                                      (:steering-mode runtime-state))]
-                   (if (seq steering)
-                     (do
-                       (vreset! choice*
-                                {:messages                    steering
-                                 :skip-initial-steering-poll? true})
-                       (assoc runtime-state :steering-queue steering-next))
-                     (let [[follow-up follow-up-next]
-                           (queue-dequeue (:follow-up-queue runtime-state)
-                                          (:follow-up-mode runtime-state))]
-                       (if (seq follow-up)
-                         (do
-                           (vreset! choice* {:messages follow-up})
-                           (assoc runtime-state :follow-up-queue follow-up-next))
-                         (do
-                           (vreset! choice* {:error (no-queued-messages-error)})
-                           runtime-state)))))
+               (if (seq agent-messages)
+                 (if (= :assistant (:role (last agent-messages)))
+                   (let [[steering steering-next]
+                         (queue-dequeue (:steering-queue runtime-state)
+                                        (:steering-mode runtime-state))]
+                     (if (seq steering)
+                       (do
+                         (vreset! choice*
+                                  {:messages                    steering
+                                   :skip-initial-steering-poll? true})
+                         (assoc runtime-state :steering-queue steering-next))
+                       (let [[follow-up follow-up-next]
+                             (queue-dequeue (:follow-up-queue runtime-state)
+                                            (:follow-up-mode runtime-state))]
+                         (if (seq follow-up)
+                           (do
+                             (vreset! choice* {:messages follow-up})
+                             (assoc runtime-state :follow-up-queue follow-up-next))
+                           (do
+                             (vreset! choice* {:error (no-queued-messages-error)})
+                             runtime-state)))))
+                   (do
+                     (vreset! choice* {})
+                     runtime-state))
                  (do
-                   (vreset! choice* {})
+                   (vreset! choice* {:error (no-messages-error)})
                    runtime-state)))))
     @choice*))
 
@@ -307,31 +315,48 @@
 
   - `:run-command!` (required): Turn runner function.
   - `:initial-state` (optional): Initial agent state overlay.
+  - `:convert-to-llm` (optional): Conversion hook forwarded to runner.
+  - `:transform-context` (optional): Context transform hook forwarded to runner.
+  - `:stream-fn` (optional): Stream override forwarded to runner.
+  - `:get-api-key` (optional): Dynamic key hook forwarded to runner.
+  - `:session-id` (optional): Provider session id forwarded to runner.
+  - `:thinking-budgets` (optional): Reasoning budgets forwarded to runner.
+  - `:max-retry-delay-ms` (optional): Retry cap forwarded to runner.
   - `:steering-mode` (optional): `:one-at-a-time` or `:all`.
   - `:follow-up-mode` (optional): `:one-at-a-time` or `:all`."
        [opts]
        [:map => :llx.agent/runtime-handle]
-       (let [{:keys [run-command! initial-state steering-mode follow-up-mode]}
+       (let [{:keys [run-command! initial-state steering-mode follow-up-mode
+                     convert-to-llm transform-context stream-fn get-api-key
+                     session-id thinking-budgets max-retry-delay-ms]}
              (agent-schema/validate! :llx.agent/runtime-options opts)
-             fsm-env                                                           (-> (fsm/new-env)
-                                                                                   (fsm/start!))
-             runtime-state*                                                    (atom {:agent-state        (merge default-agent-state
-                                                                                                                 initial-state)
-                                                                                      :steering-queue     []
-                                                                                      :follow-up-queue    []
-                                                                                      :steering-mode      (ensure-valid-mode (or steering-mode :one-at-a-time))
-                                                                                      :follow-up-mode     (ensure-valid-mode (or follow-up-mode :one-at-a-time))
-                                                                                      :pending-command    nil
-                                                                                      :active-command     nil
-                                                                                      :idle-waiters       []
-                                                                                      :runner-cancel!     nil
-                                                                                      :closed?            false
-                                                                                      :step-log           []
-                                                                                      :event-log          []
-                                                                                      :subscribers        {}
-                                                                                      :next-subscriber-id 0
-                                                                                      :next-run-token     0
-                                                                                      :active-run-token   nil})]
+             runner-config                                                   (cond-> {}
+                                                                               (some? convert-to-llm) (assoc :convert-to-llm convert-to-llm)
+                                                                               (some? transform-context) (assoc :transform-context transform-context)
+                                                                               (some? stream-fn) (assoc :stream-fn stream-fn)
+                                                                               (some? get-api-key) (assoc :get-api-key get-api-key)
+                                                                               (some? session-id) (assoc :session-id session-id)
+                                                                               (some? thinking-budgets) (assoc :thinking-budgets thinking-budgets)
+                                                                               (some? max-retry-delay-ms) (assoc :max-retry-delay-ms max-retry-delay-ms))
+             fsm-env                                                         (-> (fsm/new-env)
+                                                                                 (fsm/start!))
+             runtime-state*                                                  (atom {:agent-state        (merge default-agent-state
+                                                                                                               initial-state)
+                                                                                    :steering-queue     []
+                                                                                    :follow-up-queue    []
+                                                                                    :steering-mode      (ensure-valid-mode (or steering-mode :one-at-a-time))
+                                                                                    :follow-up-mode     (ensure-valid-mode (or follow-up-mode :one-at-a-time))
+                                                                                    :pending-command    nil
+                                                                                    :active-command     nil
+                                                                                    :idle-waiters       []
+                                                                                    :runner-cancel!     nil
+                                                                                    :closed?            false
+                                                                                    :step-log           []
+                                                                                    :event-log          []
+                                                                                    :subscribers        {}
+                                                                                    :next-subscriber-id 0
+                                                                                    :next-run-token     0
+                                                                                    :active-run-token   nil})]
          (letfn [(emit-event!
                    [run-token event]
                    (let [accepted?* (volatile! false)]
@@ -452,6 +477,7 @@
                                                                    :skip-initial-steering-poll? (boolean skip-initial-steering-poll?)
                                                                    :state                       (snapshot)
                                                                    :emit-event!                 emit-event}
+                                  runner-input                    (merge runner-input runner-config)
                                   {:keys [result cancel!]}
                                   (agent-schema/validate!
                                    :llx.agent/runtime-turn-result
