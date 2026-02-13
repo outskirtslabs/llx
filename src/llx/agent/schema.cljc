@@ -387,26 +387,49 @@
     [:steering-mode {:optional true} :llx.agent/queue-mode]
     [:follow-up-mode {:optional true} :llx.agent/queue-mode]]
 
-   :llx.agent/runtime-channels
-   [:map
-    [:commands :llx.agent/channel]]
+   :llx.agent/runtime-command-keyword
+   [:enum
+    :prompt
+    :continue
+    :steer
+    :follow-up
+    :abort
+    :reset
+    :wait
+    :shutdown]
 
-   :llx.agent/runtime-handle-state
+   :llx.agent/runtime-command-entry
    [:map
-    [:runtime-state* :llx.agent/runtime-state-atom]]
+    [:command :llx.agent/runtime-command-keyword]
+    [:resolve [:fn fn?]]
+    [:reject [:fn fn?]]]
 
-   :llx.agent/runtime-handle-turn
+   :llx.agent/runtime-handle
    [:map
+    [:fsm-env :llx.agent.fsm/env]
     [:runtime-state* :llx.agent/runtime-state-atom]
-    [:channels :llx.agent/runtime-channels]
+    [:submit-command! [:fn fn?]]
+    [:subscribe! [:fn fn?]]
+    [:dispatch-event! [:fn fn?]]
     [:run-command! :llx.agent/runtime-command-fn]]
 
-   :llx.agent/runtime-handle-dispatch
+   :llx.agent/runtime-state-snapshot
    [:map
-    [:runtime-state* :llx.agent/runtime-state-atom]
-    [:channels :llx.agent/runtime-channels]
-    [:run-command! :llx.agent/runtime-command-fn]
-    [:events-mx :llx.agent/channel-multiplexer]]
+    [:system-prompt :string]
+    [:model :any]
+    [:thinking-level :llx.agent/thinking-level]
+    [:tools [:vector :any]]
+    [:messages [:vector :llx.agent/message]]
+    [:streaming? :boolean]
+    [:stream-message [:maybe :llx.agent/message]]
+    [:pending-tool-calls [:set :llx/id-string]]
+    [:error [:maybe :string]]
+    [:steering-queue [:vector :llx.agent/message]]
+    [:follow-up-queue [:vector :llx.agent/message]]
+    [:steering-mode :llx.agent/queue-mode]
+    [:follow-up-mode :llx.agent/queue-mode]
+    [:closed? :boolean]
+    [:phase :keyword]]
 
    :llx.agent.fsm/state-id
    :keyword

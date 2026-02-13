@@ -6,9 +6,7 @@
 (defn create-runtime
   "Creates an agent runtime.
 
-  See [[llx.agent.runtime/create-runtime]] for full option and return-shape
-  contract, including the required `:run-command!` callback behavior
-  and `{:status keyword}` turn result value."
+  See [[llx.agent.runtime/create-runtime]] for options and return semantics."
   [opts]
   (runtime/create-runtime opts))
 

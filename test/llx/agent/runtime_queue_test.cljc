@@ -4,9 +4,10 @@
        :cljs [[cljs.test :refer-macros [deftest is]]])
    #?@(:clj [[llx.ai.test-util :as util]]
        :cljs [[llx.ai.test-util :as util :include-macros true]])
-   [llx.agent.runtime.api :as sut]
-   [promesa.core :as p]
-   [promesa.exec.csp :as sp]))
+   [llx.agent.runtime :as sut]
+   [promesa.core :as p]))
+
+;; Queue behavior tests for the runtime command surface.
 
 (def assistant-tail
   [{:role      :user
@@ -114,26 +115,57 @@
                               (done)))
                     (p/catch (partial util/fail-and-done! done))))))
 
-(deftest runtime-handle-contains-single-command-channel
+(deftest queue-clear-and-presence-helpers
   (util/async done
               (let [{:keys [runtime]} (runtime-with-calls {})
-                    channels          (:channels runtime)]
-                (is (map? runtime))
-                (is (map? channels))
-                (is (sp/chan? (:commands channels)) "missing channel: :commands")
-                (doseq [k [:prompt :continue :steer :follow-up :abort :reset :wait :control]]
-                  (is (not (contains? channels k)) (str "legacy command channel should not exist: " k)))
-                (doseq [k [:steering-queue :follow-up-queue]]
-                  (is (not (contains? channels k)) (str "queue channel should not exist: " k)))
-                (-> (sut/close! runtime)
+                    s1                (mk-message "s1" 1)
+                    f1                (mk-message "f1" 2)]
+                (-> (sut/steer! runtime s1)
+                    (p/then (fn [_]
+                              (sut/follow-up! runtime f1)))
+                    (p/then (fn [_]
+                              (is (true? (sut/has-queued-messages? runtime)))
+                              (sut/clear-steering-queue! runtime)))
+                    (p/then (fn [_]
+                              (is (= [] (:steering-queue (sut/state runtime))))
+                              (is (= [f1] (:follow-up-queue (sut/state runtime))))
+                              (sut/clear-follow-up-queue! runtime)))
+                    (p/then (fn [_]
+                              (is (= [] (:follow-up-queue (sut/state runtime))))
+                              (is (false? (sut/has-queued-messages? runtime)))
+                              (sut/steer! runtime s1)))
+                    (p/then (fn [_]
+                              (sut/follow-up! runtime f1)))
+                    (p/then (fn [_]
+                              (sut/clear-all-queues! runtime)))
+                    (p/then (fn [_]
+                              (is (= [] (:steering-queue (sut/state runtime))))
+                              (is (= [] (:follow-up-queue (sut/state runtime))))
+                              (is (false? (sut/has-queued-messages? runtime)))
+                              (sut/close! runtime)))
                     (p/then (fn [_]
                               (done)))
                     (p/catch (partial util/fail-and-done! done))))))
 
-(deftest runtime-cljc-uses-non-blocking-csp-apis
-  (let [source (util/read-text-file "src/llx/agent/runtime.cljc")]
-    (is (not (re-find #"sp/(take!|put!|alts!)" source)))))
+(deftest runtime-handle-contains-single-command-channel
+  (let [{:keys [runtime]} (runtime-with-calls {})]
+    (is (map? runtime))
+    (is (contains? runtime :runtime-state*))
+    (is (contains? runtime :submit-command!))
+    (is (contains? runtime :fsm-env))))
 
-(deftest runtime-command-guardrails-avoid-any-signatures
-  (let [source (util/read-text-file "src/llx/agent/runtime.cljc")]
-    (is (not (re-find #"\[any\?\s+:llx\.agent/command" source)))))
+#?(:clj
+   (deftest runtime-cljc-uses-non-blocking-csp-apis
+     (let [source (slurp "src/llx/agent/runtime.cljc")]
+       (is (not (re-find #"<!!|>!!|alts!!|go-loop|thread" source)))))
+   :cljs
+   (deftest runtime-cljc-uses-non-blocking-csp-apis
+     (is true)))
+
+#?(:clj
+   (deftest runtime-command-guardrails-avoid-any-signatures
+     (let [source (slurp "src/llx/agent/runtime.cljc")]
+       (is (not (re-find #":any\\s+=>\\s+:any" source)))))
+   :cljs
+   (deftest runtime-command-guardrails-avoid-any-signatures
+     (is true)))

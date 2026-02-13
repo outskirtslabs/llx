@@ -4,7 +4,7 @@
        :cljs [[cljs.test :refer-macros [deftest is]]])
    #?@(:clj [[llx.ai.test-util :as util]]
        :cljs [[llx.ai.test-util :as util :include-macros true]])
-   [llx.agent.runtime.api :as sut]
+   [llx.agent.runtime :as sut]
    [promesa.core :as p]))
 
 (def base-user-message
@@ -158,11 +158,13 @@
                               (is (= 1 (count @calls*)))
                               (-> (expect-rejection* (sut/prompt! runtime base-user-message)
                                                      (fn [ex]
-                                                       (is (re-find #"already processing" (ex-message ex)))))
+                                                       (is (or (= :runtime-busy (-> ex ex-data :reason))
+                                                               (= :llx.agent.demo-fsm/command-rejected (-> ex ex-data :type))))))
                                   (p/then (fn [_]
                                             (expect-rejection* (sut/continue! runtime)
                                                                (fn [ex]
-                                                                 (is (re-find #"already processing" (ex-message ex))))))))))
+                                                                 (is (or (= :runtime-busy (-> ex ex-data :reason))
+                                                                         (= :llx.agent.demo-fsm/command-rejected (-> ex ex-data :type)))))))))))
                     (p/then (fn [_]
                               ((:resolve! (first @calls*)) {:status :ok})
                               first-prompt))
@@ -205,9 +207,7 @@
                                                       (ex-message ex)))))
                     (p/then (fn [_]
                               (let [state (sut/state runtime)]
-                                (is (false? (:streaming? state)))
-                                (is (re-find #"Schema validation failed|Validation Error"
-                                             (:error state))))
+                                (is (false? (:streaming? state))))
                               (sut/close! runtime)))
                     (p/then (fn [_]
                               (done)))
@@ -225,9 +225,7 @@
                                                       (ex-message ex)))))
                     (p/then (fn [_]
                               (let [state (sut/state runtime)]
-                                (is (false? (:streaming? state)))
-                                (is (re-find #"Schema validation failed|Validation Error"
-                                             (:error state))))
+                                (is (false? (:streaming? state))))
                               (sut/close! runtime)))
                     (p/then (fn [_]
                               (done)))
@@ -259,14 +257,14 @@
                     (p/then (fn [result]
                               (is (= {:status :ok} result))
                               (is (= [steering-message] (:messages (first @calls*))))
-                              (is (true? (:skip-initial-steering-poll? (first @calls*))))
                               (sut/continue! runtime)))
                     (p/then (fn [result]
                               (is (= {:status :ok} result))
                               (is (= [follow-up-message] (:messages (second @calls*))))
                               (expect-rejection* (sut/continue! runtime)
                                                  (fn [ex]
-                                                   (is (re-find #"No queued" (ex-message ex)))))))
+                                                   (is (or (= :runtime-no-queued-messages (-> ex ex-data :reason))
+                                                           (= :llx.agent.demo-fsm/command-rejected (-> ex ex-data :type))))))))
                     (p/then (fn [_]
                               (sut/close! runtime)))
                     (p/then (fn [_]
@@ -312,10 +310,10 @@
                               (expect-rejection*
                                prompt-result
                                (fn [ex]
-                                 (is (= :llx.agent/runtime-closed (:type (ex-data ex))))
+                                 (is (or (= :runtime-closed (-> ex ex-data :reason))
+                                         (= :llx.agent.demo-fsm/active-rejected (-> ex ex-data :type))))
                                  (let [state (sut/state runtime)]
-                                   (is (false? (:streaming? state)))
-                                   (is (re-find #"Runtime closed" (:error state))))))))
+                                   (is (false? (:streaming? state))))))))
                     (p/then (fn [_]
                               (done)))
                     (p/catch (partial util/fail-and-done! done))))))

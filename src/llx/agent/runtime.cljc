@@ -1,10 +1,22 @@
 (ns llx.agent.runtime
+  "Statechart-backed runtime coordinator for llx.agent command execution.
+
+  This runtime composes:
+  - `llx.agent.fsm` for command/state transitions.
+  - `llx.agent.fx` for effect execution.
+
+  The mutable coordination state lives in one atom (`:runtime-state*`), while
+  transition planning remains in the statechart.
+
+  `:run-command!` must return `{:result deferred :cancel! fn}` and `:result`
+  must resolve to `{:status keyword}`."
   (:refer-clojure :exclude [reset!])
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [>defn-]]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
+   [llx.agent.fsm :as fsm]
+   [llx.agent.fx :as fx]
    [llx.agent.schema :as agent-schema]
-   [promesa.core :as p]
-   [promesa.exec.csp :as sp]))
+   [promesa.core :as p]))
 
 (def default-agent-state
   {:system-prompt      ""
@@ -17,124 +29,65 @@
    :pending-tool-calls #{}
    :error              nil})
 
-(defn- normalize-messages
-  [message-or-messages]
-  (cond
-    (nil? message-or-messages) []
-    (vector? message-or-messages) message-or-messages
-    :else [message-or-messages]))
+(def command->schema-command
+  {:prompt    :llx.agent.command/prompt
+   :continue  :llx.agent.command/continue
+   :steer     :llx.agent.command/steer
+   :follow-up :llx.agent.command/follow-up
+   :abort     :llx.agent.command/abort
+   :reset     :llx.agent.command/reset
+   :wait      :llx.agent.command/wait
+   :shutdown  :llx.agent.command/shutdown})
 
-(defn- busy-runtime-error
-  []
-  (ex-info
-   "Runtime is already processing a prompt or continue command."
-   {:type :llx.agent/runtime-busy}))
+(defn- throwable?
+  [x]
+  #?(:clj (instance? Throwable x)
+     :cljs (instance? js/Error x)))
 
-(defn- no-messages-error
-  []
+(>defn- normalize-messages
+        [message-or-messages]
+        [:llx.agent/command-message-input => [:vector :llx.agent/message]]
+        (cond
+          (nil? message-or-messages) []
+          (vector? message-or-messages) message-or-messages
+          :else [message-or-messages]))
+
+(>defn- ensure-valid-mode
+        [mode]
+        [:llx.agent/queue-mode => :llx.agent/queue-mode]
+        mode)
+
+(defn- command-rejected-error
+  [reason]
   (ex-info
-   "Cannot continue: no messages in runtime state."
-   {:type :llx.agent/runtime-no-messages}))
+   "Command rejected."
+   {:type   :llx.agent.runtime/command-rejected
+    :reason reason}))
+
+(defn- active-rejected-error
+  [reason]
+  (ex-info
+   "Active command rejected."
+   {:type   :llx.agent.runtime/active-rejected
+    :reason reason}))
+
+(defn- wait-rejected-error
+  [reason]
+  (ex-info
+   "Idle waiter rejected."
+   {:type   :llx.agent.runtime/wait-rejected
+    :reason reason}))
 
 (defn- no-queued-messages-error
   []
+  (active-rejected-error :runtime-no-queued-messages))
+
+(defn- command-slot-busy-error
+  [command]
   (ex-info
-   "No queued steering or follow-up messages available for continue."
-   {:type :llx.agent/runtime-no-queued-messages}))
-
-(defn- runtime-closed-error
-  []
-  (ex-info
-   "Runtime closed while turn was active."
-   {:type :llx.agent/runtime-closed}))
-
-(defn- runtime-reset-error
-  []
-  (ex-info
-   "Runtime reset while turn was active."
-   {:type :llx.agent/runtime-reset}))
-
-(defn- runtime-closed-wait-error
-  []
-  (ex-info
-   "Runtime closed while waiting for idle."
-   {:type :llx.agent/runtime-closed}))
-
-(def command-type-key
-  :llx.agent.command/type)
-
-(defn- ensure-valid-mode
-  [mode]
-  (if (#{:all :one-at-a-time} mode)
-    mode
-    (throw (ex-info "Invalid queue mode." {:mode mode}))))
-
-(defn ->queue
-  ([] #?(:clj clojure.lang.PersistentQueue/EMPTY
-         :cljs #queue []))
-  ([coll]
-   (into (->queue) coll)))
-
-(defn- dequeue-queued-messages!
-  [runtime-state* queue-key mode]
-  (let [dequeued* (volatile! [])]
-    (swap! runtime-state*
-           (fn [runtime-state]
-             (let [queue                            (or (get runtime-state queue-key) (->queue))
-                   [dequeued next-queue]
-                   (if (= :all mode)
-                     [(vec queue) (->queue)]
-                     (if (seq queue)
-                       [[(peek queue)] (pop queue)]
-                       [[] queue]))]
-               (vreset! dequeued* dequeued)
-               (assoc runtime-state queue-key next-queue))))
-    @dequeued*))
-
-(defn- enqueue-messages!
-  [runtime-state* queue-key messages]
-  (swap! runtime-state* update queue-key
-         (fn [queue]
-           (into (or queue (->queue)) messages)))
-  true)
-
-(defn- state->snapshot
-  [{:keys [agent-state steering-queue follow-up-queue steering-mode follow-up-mode]}]
-  (assoc agent-state
-         :steering-queue (vec steering-queue)
-         :follow-up-queue (vec follow-up-queue)
-         :steering-mode steering-mode
-         :follow-up-mode follow-up-mode))
-
-(defn- safe-resolve
-  [resolve value]
-  (when (fn? resolve)
-    (resolve value))
-  nil)
-
-(defn- safe-reject
-  [reject ex]
-  (when (fn? reject)
-    (reject ex))
-  nil)
-
-(defn- resolve-idle-waiters!
-  [runtime-state*]
-  (let [waiters (:idle-waiters @runtime-state*)]
-    (swap! runtime-state* assoc :idle-waiters [])
-    (run! (fn [{:keys [resolve]}]
-            (safe-resolve resolve true))
-          waiters)
-    nil))
-
-(defn- reject-idle-waiters!
-  [runtime-state* ex]
-  (let [waiters (:idle-waiters @runtime-state*)]
-    (swap! runtime-state* assoc :idle-waiters [])
-    (run! (fn [{:keys [reject]}]
-            (safe-reject reject ex))
-          waiters)
-    nil))
+   "Command slot busy."
+   {:type    :llx.agent.runtime/command-slot-busy
+    :command command}))
 
 (defn- event->error
   [event]
@@ -162,458 +115,683 @@
        agent-state)
       (event->error event) (assoc :error (event->error event)))))
 
-(defn- emit-event!
-  [{:keys [runtime-state* events-mx]} turn-id event]
-  (if (= turn-id (:active-turn-id @runtime-state*))
-    (do
-      (swap! runtime-state* update :agent-state apply-event event)
-      (-> (sp/put events-mx event)
-          (p/then boolean)))
-    (p/resolved false)))
+(defn- command-messages
+  [effect]
+  (let [payload (:payload effect)]
+    (if (and (map? payload) (contains? payload :messages))
+      (:messages payload)
+      payload)))
 
-(defn- finish-turn!
-  [runtime-state* turn-id error-text]
-  (let [finished?* (atom false)]
+(defn- effect-messages
+  [effect]
+  (let [messages (:messages effect)]
+    (if (and (map? messages) (contains? messages :messages))
+      (:messages messages)
+      messages)))
+
+(defn- safe-resolve
+  [resolve value]
+  (when (fn? resolve)
+    (resolve value))
+  nil)
+
+(defn- safe-reject
+  [reject ex]
+  (when (fn? reject)
+    (reject ex))
+  nil)
+
+(defn- effect->ex
+  [default-ex effect]
+  (let [error-value (:error effect)
+        reason      (:reason effect)]
+    (cond
+      (throwable? error-value)
+      error-value
+
+      (map? error-value)
+      (ex-info (or (:error-message error-value)
+                   (ex-message default-ex))
+               (merge (ex-data default-ex)
+                      (select-keys effect [:reason])
+                      error-value))
+
+      :else
+      (if reason
+        (ex-info (ex-message default-ex)
+                 (assoc (ex-data default-ex) :reason reason))
+        default-ex))))
+
+(defn- queue-dequeue
+  [queue mode]
+  (if (= :all mode)
+    [queue []]
+    (if (seq queue)
+      [[(first queue)] (vec (rest queue))]
+      [[] queue])))
+
+(defn- pop-slot!
+  [runtime-state* slot]
+  (let [entry* (volatile! nil)]
     (swap! runtime-state*
            (fn [runtime-state]
-             (if (= turn-id (:active-turn-id runtime-state))
-               (let [next-state (-> runtime-state
-                                    (assoc :active-turn-id nil
-                                           :abort-fn nil
-                                           :active-turn-reject nil)
-                                    (update :agent-state
-                                            (fn [agent-state]
-                                              (-> agent-state
-                                                  (assoc :streaming? false
-                                                         :stream-message nil
-                                                         :pending-tool-calls #{}
-                                                         :error error-text)))))]
-                 (clojure.core/reset! finished?* true)
-                 next-state)
-               runtime-state)))
-    (when @finished?*
-      (resolve-idle-waiters! runtime-state*))
-    @finished?*))
+             (vreset! entry* (get runtime-state slot))
+             (assoc runtime-state slot nil)))
+    @entry*))
 
-(defn- allocate-turn-id!
+(defn- pop-idle-waiters!
   [runtime-state*]
-  (:next-turn-id
-   (swap! runtime-state* update :next-turn-id (fnil inc 0))))
-
-(>defn- validate-turn-result-value
-        [turn-value]
-        [:llx.agent/runtime-turn-value => :llx.agent/runtime-turn-value]
-        turn-value)
-
-(defn- begin-turn!
-  "Starts a runtime turn, marks streaming state, and wires completion callbacks.
-
-  `run-command!` must return `{:result deferred :cancel! fn}`, and the deferred
-  must resolve to `:llx.agent/runtime-turn-value`."
-  [{:keys [runtime-state* run-command!] :as runtime}
-   {:keys [command messages skip-initial-steering-poll? resolve reject]}]
-  (let [turn-id    (allocate-turn-id! runtime-state*)
-        turn-state (state->snapshot @runtime-state*)
-        messages   (when (seq messages) (vec messages))
-        emit-event (fn [event]
-                     (emit-event! runtime turn-id event))]
+  (let [waiters* (volatile! [])]
     (swap! runtime-state*
            (fn [runtime-state]
-             (-> runtime-state
-                 (assoc :active-turn-id turn-id
-                        :abort-fn nil
-                        :active-turn-reject reject)
-                 (update :agent-state
-                         (fn [agent-state]
-                           (-> agent-state
-                               (assoc :streaming? true
-                                      :stream-message nil
-                                      :error nil
-                                      :pending-tool-calls #{})))))))
-    (try
-      (let [{:keys [result cancel!]}
-            (agent-schema/validate!
-             :llx.agent/runtime-turn-result
-             (run-command! {:command                     command
-                            :messages                    messages
-                            :skip-initial-steering-poll? (boolean skip-initial-steering-poll?)
-                            :state                       turn-state
-                            :emit-event!                 emit-event}))]
-        (swap! runtime-state* assoc :abort-fn cancel!)
-        (-> result
-            (p/then (fn [value]
-                      (let [value (validate-turn-result-value value)]
-                        (when (finish-turn! runtime-state* turn-id nil)
-                          (safe-resolve resolve value)))))
-            (p/catch (fn [ex]
-                       (when (finish-turn! runtime-state* turn-id
-                                           (or (ex-message ex) "Runtime turn command failed."))
-                         (safe-reject reject ex))))))
-      (catch #?(:clj Exception :cljs :default) ex
-        (when (finish-turn! runtime-state* turn-id
-                            (or (ex-message ex) "Runtime turn command failed."))
-          (safe-reject reject ex))))
-    nil))
+             (vreset! waiters* (vec (:idle-waiters runtime-state)))
+             (assoc runtime-state :idle-waiters [])))
+    @waiters*))
 
-(>defn- handle-prompt!
-        [{:keys [runtime-state*] :as runtime} {:keys [messages resolve reject]}]
-        [:llx.agent/runtime-handle-turn :llx.agent/command-prompt => :llx/deferred]
-        (let [messages    (normalize-messages messages)
-              agent-state (:agent-state @runtime-state*)]
-          (cond
-            (:streaming? agent-state)
-            (safe-reject reject (busy-runtime-error))
+(defn- allocate-run-token!
+  [runtime-state*]
+  (let [token* (volatile! nil)]
+    (swap! runtime-state*
+           (fn [runtime-state]
+             (let [token (inc (or (:next-run-token runtime-state) 0))]
+               (vreset! token* token)
+               (assoc runtime-state
+                      :next-run-token token
+                      :active-run-token token))))
+    @token*))
 
-            (empty? messages)
-            (safe-reject reject (ex-info "Prompt requires one or more messages."
-                                         {:type :llx.agent/runtime-empty-prompt}))
+(defn- reset-runtime-transients
+  [runtime-state]
+  (let [agent-state           (:agent-state runtime-state)
+        preserved-agent-state (select-keys agent-state
+                                           [:system-prompt
+                                            :model
+                                            :thinking-level
+                                            :tools])]
+    (-> runtime-state
+        (assoc :agent-state (merge default-agent-state
+                                   preserved-agent-state)
+               :steering-queue []
+               :follow-up-queue []
+               :idle-waiters []
+               :runner-cancel! nil
+               :active-run-token nil
+               :active-command nil))))
 
-            :else
-            (begin-turn! runtime {:command  :prompt
-                                  :messages messages
-                                  :resolve  resolve
-                                  :reject   reject})))
-        (p/resolved nil))
+(defn- state-snapshot
+  [{:keys [agent-state steering-queue follow-up-queue
+           steering-mode follow-up-mode closed?]}]
+  (assoc agent-state
+         :steering-queue steering-queue
+         :follow-up-queue follow-up-queue
+         :steering-mode steering-mode
+         :follow-up-mode follow-up-mode
+         :closed? closed?))
 
-(>defn- handle-continue!
-        [{:keys [runtime-state*] :as runtime} {:keys [resolve reject]}]
-        [:llx.agent/runtime-handle-turn :llx.agent/command-continue => :llx/deferred]
-        (let [{:keys [agent-state steering-mode follow-up-mode]}
-              @runtime-state*
-              messages                                           (:messages agent-state)
-              busy?                                              (:streaming? agent-state)]
-          (cond
-            busy?
-            (safe-reject reject (busy-runtime-error))
+(defn- continue-input!
+  [runtime-state*]
+  (let [choice* (volatile! nil)]
+    (swap! runtime-state*
+           (fn [runtime-state]
+             (let [agent-messages (get-in runtime-state [:agent-state :messages])]
+               (if (= :assistant (:role (last agent-messages)))
+                 (let [[steering steering-next]
+                       (queue-dequeue (:steering-queue runtime-state)
+                                      (:steering-mode runtime-state))]
+                   (if (seq steering)
+                     (do
+                       (vreset! choice*
+                                {:messages                    steering
+                                 :skip-initial-steering-poll? true})
+                       (assoc runtime-state :steering-queue steering-next))
+                     (let [[follow-up follow-up-next]
+                           (queue-dequeue (:follow-up-queue runtime-state)
+                                          (:follow-up-mode runtime-state))]
+                       (if (seq follow-up)
+                         (do
+                           (vreset! choice* {:messages follow-up})
+                           (assoc runtime-state :follow-up-queue follow-up-next))
+                         (do
+                           (vreset! choice* {:error (no-queued-messages-error)})
+                           runtime-state)))))
+                 (do
+                   (vreset! choice* {})
+                   runtime-state)))))
+    @choice*))
 
-            (empty? messages)
-            (safe-reject reject (no-messages-error))
+(defn- resolve-command-input!
+  [runtime-state* command effect]
+  (let [payload-messages (command-messages effect)]
+    (cond
+      (some? payload-messages)
+      {:messages                    (normalize-messages payload-messages)
+       :skip-initial-steering-poll? (boolean (get-in effect [:payload :skip-initial-steering-poll?]))}
 
-            (= :assistant (:role (last messages)))
-            (let [steering-dequeued
-                  (dequeue-queued-messages! runtime-state*
-                                            :steering-queue
-                                            steering-mode)]
-              (if (seq steering-dequeued)
-                (begin-turn! runtime {:command                     :continue
-                                      :messages                    steering-dequeued
-                                      :skip-initial-steering-poll? true
-                                      :resolve                     resolve
-                                      :reject                      reject})
-                (let [follow-up-dequeued
-                      (dequeue-queued-messages! runtime-state*
-                                                :follow-up-queue
-                                                follow-up-mode)]
-                  (if (seq follow-up-dequeued)
-                    (begin-turn! runtime {:command  :continue
-                                          :messages follow-up-dequeued
-                                          :resolve  resolve
-                                          :reject   reject})
-                    (safe-reject reject (no-queued-messages-error))))))
+      (= :continue command)
+      (continue-input! runtime-state*)
 
-            :else
-            (begin-turn! runtime {:command :continue
-                                  :resolve resolve
-                                  :reject  reject})))
-        (p/resolved nil))
+      :else
+      {:messages nil})))
 
-(>defn- handle-steer!
-        [{:keys [runtime-state*]} {:keys [messages resolve reject]}]
-        [:llx.agent/runtime-handle-state :llx.agent/command-steer => :llx/deferred]
-        (let [messages (normalize-messages messages)]
-          (try
-            (enqueue-messages! runtime-state*
-                               :steering-queue
-                               messages)
-            (safe-resolve resolve true)
-            (catch #?(:clj Exception :cljs :default) ex
-              (safe-reject reject ex))))
-        (p/resolved nil))
+(defn- notify-subscribers!
+  [runtime-state* event]
+  (let [subscribers (vals (:subscribers @runtime-state*))]
+    (run! (fn [handler]
+            (try
+              (handler event)
+              (catch #?(:clj Exception :cljs :default) _
+                nil)))
+          subscribers))
+  nil)
 
-(>defn- handle-follow-up!
-        [{:keys [runtime-state*]} {:keys [messages resolve reject]}]
-        [:llx.agent/runtime-handle-state :llx.agent/command-follow-up => :llx/deferred]
-        (let [messages (normalize-messages messages)]
-          (try
-            (enqueue-messages! runtime-state*
-                               :follow-up-queue
-                               messages)
-            (safe-resolve resolve true)
-            (catch #?(:clj Exception :cljs :default) ex
-              (safe-reject reject ex))))
-        (p/resolved nil))
+(defn- validate-command!
+  [command payload]
+  (let [schema-command (get command->schema-command command)]
+    (when-not schema-command
+      (throw (ex-info "Unknown runtime command."
+                      {:type    :llx.agent.runtime/unknown-command
+                       :command command})))
+    (agent-schema/validate!
+     :llx.agent/command
+     (cond-> {:llx.agent.command/type schema-command}
+       (contains? payload :messages) (assoc :messages (:messages payload))))))
 
-(>defn- handle-abort!
-        [{:keys [runtime-state*]} {:keys [resolve]}]
-        [:llx.agent/runtime-handle-state :llx.agent/command-abort => :llx/deferred]
-        (let [{:keys [abort-fn agent-state]} @runtime-state*]
-          (if (:streaming? agent-state)
-            (do
-              (when (fn? abort-fn)
-                (abort-fn))
-              (safe-resolve resolve true))
-            (safe-resolve resolve false)))
-        (p/resolved nil))
+(defn- runtime-handle
+  [runtime]
+  (agent-schema/validate! :llx.agent/runtime-handle runtime))
 
-(>defn- handle-reset!
-        [{:keys [runtime-state*]} {:keys [resolve]}]
-        [:llx.agent/runtime-handle-state :llx.agent/command-reset => :llx/deferred]
-        (let [{:keys [agent-state abort-fn active-turn-id active-turn-reject
-                      next-turn-id steering-mode follow-up-mode]}
-              @runtime-state*
-
-              preserved-agent-state
-              (select-keys agent-state
-                           [:system-prompt
-                            :model
-                            :thinking-level
-                            :tools])]
-          (when (fn? abort-fn)
-            (abort-fn))
-          (when active-turn-id
-            (let [reset-ex (runtime-reset-error)]
-              (finish-turn! runtime-state* active-turn-id (ex-message reset-ex))
-              (safe-reject active-turn-reject reset-ex)))
-          (swap! runtime-state*
-                 (fn [runtime-state]
-                   (assoc runtime-state
-                          :agent-state (merge default-agent-state
-                                              preserved-agent-state)
-                          :steering-queue (->queue)
-                          :follow-up-queue (->queue)
-                          :next-turn-id next-turn-id
-                          :steering-mode steering-mode
-                          :follow-up-mode follow-up-mode
-                          :active-turn-id nil
-                          :abort-fn nil
-                          :active-turn-reject nil
-                          :idle-waiters [])))
-          (resolve-idle-waiters! runtime-state*)
-          (safe-resolve resolve (state->snapshot @runtime-state*)))
-        (p/resolved nil))
-
-(>defn- handle-wait!
-        [{:keys [runtime-state*]} {:keys [resolve reject]}]
-        [:llx.agent/runtime-handle-state :llx.agent/command-wait => :llx/deferred]
-        (if (get-in @runtime-state* [:agent-state :streaming?])
-          (swap! runtime-state* update :idle-waiters conj {:resolve resolve :reject reject})
-          (safe-resolve resolve true))
-        (p/resolved nil))
-
-(defn- close-command-channels!
-  [channels]
-  (run! sp/close
-        [(:commands channels)]))
-
-(>defn- handle-command!
-        [{:keys [channels events-mx runtime-state*] :as runtime} command]
-        [:llx.agent/runtime-handle-dispatch :llx.agent/command => [:or :llx/deferred [:= :stop]]]
-        (let [command-type (get command command-type-key)
-              resolve      (:resolve command)
-              reject       (:reject command)]
-          (case command-type
-            :llx.agent.command/prompt
-            (handle-prompt! runtime command)
-
-            :llx.agent.command/continue
-            (handle-continue! runtime command)
-
-            :llx.agent.command/steer
-            (handle-steer! runtime command)
-
-            :llx.agent.command/follow-up
-            (handle-follow-up! runtime command)
-
-            :llx.agent.command/abort
-            (handle-abort! runtime command)
-
-            :llx.agent.command/reset
-            (handle-reset! runtime command)
-
-            :llx.agent.command/wait
-            (handle-wait! runtime command)
-
-            :llx.agent.command/shutdown
-            (do
-              (let [{:keys [active-turn-id abort-fn active-turn-reject]} @runtime-state*
-                    closed-ex                                            (runtime-closed-error)]
-                (when (fn? abort-fn)
-                  (abort-fn))
-                (reject-idle-waiters! runtime-state* (runtime-closed-wait-error))
-                (when active-turn-id
-                  (finish-turn! runtime-state* active-turn-id (ex-message closed-ex))
-                  (safe-reject active-turn-reject closed-ex)))
-              (safe-resolve resolve true)
-              (close-command-channels! channels)
-              (sp/close events-mx)
-              :stop)
-
-            (do
-              (safe-reject reject
-                           (ex-info "Unknown runtime command."
-                                    {:type            :llx.agent/runtime-unknown-command
-                                     command-type-key command-type}))
-              (p/resolved nil)))))
-
-(defn- start-coordinator!
-  [{:keys [channels] :as runtime}]
-  (p/loop []
-    (p/let [command (sp/take (:commands channels))
-            result  (if (nil? command)
-                      :stop
-                      (handle-command! runtime command))]
-      (if (= :stop result)
-        nil
-        (p/recur)))))
-
-(defn- submit-command!
-  [{:keys [channels]} command-type payload]
-  (let [commands-ch (:commands channels)
-        command     (assoc payload command-type-key command-type)]
-    (p/create
-     (fn [resolve reject]
-       (if (nil? commands-ch)
-         (reject (ex-info "Runtime command channel missing." {:channel :commands}))
-         (try
-           (agent-schema/validate! :llx.agent/command command)
-           (-> (sp/put commands-ch (assoc command
-                                          :resolve resolve
-                                          :reject reject))
-               (p/then (fn [accepted?]
-                         (when-not accepted?
-                           (reject (ex-info "Runtime channel is closed."
-                                            {:channel :commands})))))
-               (p/catch reject))
-           (catch #?(:clj Exception :cljs :default) ex
-             (reject ex))))))))
-
-(defn create-runtime
-  "Creates an agent runtime coordinator.
+(>defn create-runtime
+       "Creates an FSM/FX-backed runtime coordinator.
 
   Options:
 
-  | key               | description                                                                          |
-  |-------------------|--------------------------------------------------------------------------------------|
-  | `:run-command!`   | Required function that executes a turn and returns `{:result deferred :cancel! fn}`; deferred resolves to `{:status keyword}`. |
-  | `:initial-state`  | Optional initial runtime state map.                                                  |
-  | `:steering-mode`  | Optional queue mode, one of `:one-at-a-time` or `:all`.                              |
-  | `:follow-up-mode` | Optional queue mode, one of `:one-at-a-time` or `:all`.                              |"
-  [opts]
-  (let [opts
-        (agent-schema/validate! :llx.agent/runtime-options opts)
-        run-command!
-        (:run-command! opts)
-        channels
-        {:commands (sp/chan :buf 128)}
-        events-mx
-        (sp/mult :buf (sp/sliding-buffer 128))
-        initial
-        (merge default-agent-state
-               (:initial-state opts))
-        runtime-state*
-        (atom {:agent-state        initial
-               :steering-queue     (->queue)
-               :follow-up-queue    (->queue)
-               :steering-mode      (ensure-valid-mode (or (:steering-mode opts) :one-at-a-time))
-               :follow-up-mode     (ensure-valid-mode (or (:follow-up-mode opts) :one-at-a-time))
-               :next-turn-id       0
-               :active-turn-id     nil
-               :abort-fn           nil
-               :active-turn-reject nil
-               :idle-waiters       []})
-        runtime
-        {:run-command!   run-command!
-         :runtime-state* runtime-state*
-         :channels       channels
-         :events-mx      events-mx}]
-    (assoc runtime :coordinator (start-coordinator! runtime))))
+  - `:run-command!` (required): Turn runner function.
+  - `:initial-state` (optional): Initial agent state overlay.
+  - `:steering-mode` (optional): `:one-at-a-time` or `:all`.
+  - `:follow-up-mode` (optional): `:one-at-a-time` or `:all`."
+       [opts]
+       [:map => :llx.agent/runtime-handle]
+       (let [{:keys [run-command! initial-state steering-mode follow-up-mode]}
+             (agent-schema/validate! :llx.agent/runtime-options opts)
+             fsm-env                                                           (-> (fsm/new-env)
+                                                                                   (fsm/start!))
+             runtime-state*                                                    (atom {:agent-state        (merge default-agent-state
+                                                                                                                 initial-state)
+                                                                                      :steering-queue     []
+                                                                                      :follow-up-queue    []
+                                                                                      :steering-mode      (ensure-valid-mode (or steering-mode :one-at-a-time))
+                                                                                      :follow-up-mode     (ensure-valid-mode (or follow-up-mode :one-at-a-time))
+                                                                                      :pending-command    nil
+                                                                                      :active-command     nil
+                                                                                      :idle-waiters       []
+                                                                                      :runner-cancel!     nil
+                                                                                      :closed?            false
+                                                                                      :step-log           []
+                                                                                      :event-log          []
+                                                                                      :subscribers        {}
+                                                                                      :next-subscriber-id 0
+                                                                                      :next-run-token     0
+                                                                                      :active-run-token   nil})]
+         (letfn [(emit-event!
+                   [run-token event]
+                   (let [accepted?* (volatile! false)]
+                     (swap! runtime-state*
+                            (fn [runtime-state]
+                              (if (and (= run-token (:active-run-token runtime-state))
+                                       (not (:closed? runtime-state)))
+                                (do
+                                  (vreset! accepted?* true)
+                                  (-> runtime-state
+                                      (update :event-log conj event)
+                                      (update :agent-state apply-event event)))
+                                runtime-state)))
+                     (when @accepted?*
+                       (notify-subscribers! runtime-state* event))
+                     (p/resolved @accepted?*)))
 
-(defn state
-  [runtime]
-  (state->snapshot @(-> runtime :runtime-state*)))
+                 (snapshot
+                   []
+                   (state-snapshot @runtime-state*))
 
-(defn prompt!
-  [runtime message-or-messages]
-  (submit-command! runtime :llx.agent.command/prompt {:messages message-or-messages}))
+                 (resolve-slot!
+                   [slot value]
+                   (when-let [entry (pop-slot! runtime-state* slot)]
+                     (safe-resolve (:resolve entry) value))
+                   true)
 
-(defn continue!
-  [runtime]
-  (submit-command! runtime :llx.agent.command/continue {}))
+                 (reject-slot!
+                   [slot ex]
+                   (when-let [entry (pop-slot! runtime-state* slot)]
+                     (safe-reject (:reject entry) ex))
+                   true)
 
-(defn steer!
-  [runtime message-or-messages]
-  (submit-command! runtime :llx.agent.command/steer {:messages message-or-messages}))
+                 (resolve-idle-waiters!
+                   []
+                   (let [waiters (pop-idle-waiters! runtime-state*)]
+                     (run! (fn [{:keys [resolve]}]
+                             (safe-resolve resolve true))
+                           waiters))
+                   true)
 
-(defn follow-up!
-  [runtime message-or-messages]
-  (submit-command! runtime :llx.agent.command/follow-up {:messages message-or-messages}))
+                 (reject-idle-waiters!
+                   [ex]
+                   (let [waiters (pop-idle-waiters! runtime-state*)]
+                     (run! (fn [{:keys [reject]}]
+                             (safe-reject reject ex))
+                           waiters))
+                   true)
 
-(defn abort!
-  [runtime]
-  (submit-command! runtime :llx.agent.command/abort {}))
+                 (dispatch!
+                   ([event]
+                    (dispatch! event nil))
+                   ([event payload]
+                    (-> (if (some? payload)
+                          (fx/dispatch-event! (fx-context) fsm-env event payload)
+                          (fx/dispatch-event! (fx-context) fsm-env event))
+                        (p/then (fn [step-result]
+                                  (swap! runtime-state* update :step-log conj step-result)
+                                  step-result)))))
 
-(defn wait-for-idle
-  [runtime]
-  (submit-command! runtime :llx.agent.command/wait {}))
+                 (fx-context
+                   []
+                   {:start-turn!
+                    (fn [_ _]
+                      (swap! runtime-state*
+                             (fn [runtime-state]
+                               (let [pending          (:pending-command runtime-state)
+                                     next-agent-state (-> (:agent-state runtime-state)
+                                                          (assoc :streaming? true
+                                                                 :stream-message nil
+                                                                 :pending-tool-calls #{}
+                                                                 :error nil))]
+                                 (-> runtime-state
+                                     (assoc :active-command pending
+                                            :pending-command nil
+                                            :runner-cancel! nil
+                                            :active-run-token nil
+                                            :agent-state next-agent-state)))))
+                      true)
 
-(defn reset!
-  [runtime]
-  (submit-command! runtime :llx.agent.command/reset {}))
+                    :finish-turn!
+                    (fn [_ effect]
+                      (let [error-msg (or (:error-message effect)
+                                          (get-in effect [:error :error-message]))]
+                        (swap! runtime-state*
+                               (fn [runtime-state]
+                                 (-> runtime-state
+                                     (assoc :runner-cancel! nil
+                                            :active-run-token nil)
+                                     (update :agent-state
+                                             (fn [agent-state]
+                                               (cond-> (-> agent-state
+                                                           (assoc :streaming? false
+                                                                  :stream-message nil
+                                                                  :pending-tool-calls #{}))
+                                                 (string? error-msg) (assoc :error error-msg))))))))
+                      true)
 
-(defn close!
-  [runtime]
-  (submit-command! runtime :llx.agent.command/shutdown {}))
+                    :invoke-runner!
+                    (fn [_ effect]
+                      (let [command                                                (:command effect)
+                            {:keys [messages error skip-initial-steering-poll?]}
+                            (resolve-command-input! runtime-state* command effect)]
+                        (if error
+                          (do
+                            (-> (dispatch! fsm/runner-start-failed
+                                           {:error-message (ex-message error)
+                                            :error         error
+                                            :reason        (-> error ex-data :reason)})
+                                (p/catch (fn [_] nil)))
+                            {:status :start-failed})
+                          (try
+                            (let [run-token                       (allocate-run-token! runtime-state*)
+                                  emit-event                      (fn [event]
+                                                                    (emit-event! run-token event))
+                                  runner-input                    {:command                     command
+                                                                   :messages                    (when (seq messages) messages)
+                                                                   :skip-initial-steering-poll? (boolean skip-initial-steering-poll?)
+                                                                   :state                       (snapshot)
+                                                                   :emit-event!                 emit-event}
+                                  {:keys [result cancel!]}
+                                  (agent-schema/validate!
+                                   :llx.agent/runtime-turn-result
+                                   (run-command! runner-input))]
+                              (swap! runtime-state* assoc :runner-cancel! cancel!)
+                              (-> (dispatch! fsm/runner-started)
+                                  (p/catch (fn [_] nil)))
+                              (-> result
+                                  (p/then (fn [value]
+                                            (let [value (agent-schema/validate! :llx.agent/runtime-turn-value value)]
+                                              (dispatch! fsm/runner-succeeded value))))
+                                  (p/catch (fn [ex]
+                                             (dispatch! fsm/runner-failed
+                                                        {:error-message (or (ex-message ex)
+                                                                            "Runner failed.")
+                                                         :error         ex})))
+                                  (p/catch (fn [_] nil)))
+                              {:status :started})
+                            (catch #?(:clj Exception :cljs :default) ex
+                              (-> (dispatch! fsm/runner-start-failed
+                                             {:error-message (or (ex-message ex)
+                                                                 "Runner start failed.")
+                                              :error         ex})
+                                  (p/catch (fn [_] nil)))
+                              {:status :start-failed})))))
 
-(defn subscribe
-  [{:keys [events-mx]} handler]
-  (let [sub-ch   (sp/chan :buf (sp/sliding-buffer 64))
-        stopped* (atom false)]
-    (sp/tap events-mx sub-ch false)
-    (p/loop []
-      (p/let [event (sp/take sub-ch)]
-        (when (and (not @stopped*) (some? event))
-          (try
-            (handler event)
-            (catch #?(:clj Exception :cljs :default) _
-              nil))
-          (p/recur))))
-    (fn []
-      (when (compare-and-set! stopped* false true)
-        (sp/untap events-mx sub-ch)
-        (sp/close sub-ch)
-        true))))
+                    :cancel-runner!
+                    (fn [_ _]
+                      (when-let [cancel! (:runner-cancel! @runtime-state*)]
+                        (cancel!))
+                      (swap! runtime-state* assoc
+                             :runner-cancel! nil
+                             :active-run-token nil)
+                      true)
 
-(defn set-steering-mode!
-  [{:keys [runtime-state*] :as runtime} mode]
-  (ensure-valid-mode mode)
-  (swap! runtime-state* assoc :steering-mode mode)
-  (state runtime))
+                    :resolve-command!
+                    (fn [_ effect]
+                      (if (= :reset-snapshot (:value effect))
+                        (do
+                          (swap! runtime-state* reset-runtime-transients)
+                          (resolve-slot! :pending-command (snapshot)))
+                        (resolve-slot! :pending-command
+                                       (get effect :value true))))
 
-(defn set-follow-up-mode!
-  [{:keys [runtime-state*] :as runtime} mode]
-  (ensure-valid-mode mode)
-  (swap! runtime-state* assoc :follow-up-mode mode)
-  (state runtime))
+                    :reject-command!
+                    (fn [_ effect]
+                      (reject-slot! :pending-command
+                                    (effect->ex (command-rejected-error :runtime-rejected)
+                                                effect)))
 
-(defn clear-steering-queue!
-  [{:keys [runtime-state*] :as runtime}]
-  (swap! runtime-state* assoc :steering-queue (->queue))
-  (state runtime))
+                    :resolve-active!
+                    (fn [_ effect]
+                      (resolve-slot! :active-command
+                                     (get effect :value true)))
 
-(defn clear-follow-up-queue!
-  [{:keys [runtime-state*] :as runtime}]
-  (swap! runtime-state* assoc :follow-up-queue (->queue))
-  (state runtime))
+                    :reject-active!
+                    (fn [_ effect]
+                      (let [error-msg (or (:error-message effect)
+                                          (get-in effect [:error :error-message]))]
+                        (swap! runtime-state*
+                               (fn [runtime-state]
+                                 (-> runtime-state
+                                     (assoc :runner-cancel! nil
+                                            :active-run-token nil)
+                                     (update :agent-state
+                                             (fn [agent-state]
+                                               (cond-> (-> agent-state
+                                                           (assoc :streaming? false
+                                                                  :stream-message nil
+                                                                  :pending-tool-calls #{}))
+                                                 (string? error-msg) (assoc :error error-msg))))))))
+                      (reject-slot! :active-command
+                                    (effect->ex (active-rejected-error :runtime-failed)
+                                                effect)))
 
-(defn clear-all-queues!
-  [{:keys [runtime-state*] :as runtime}]
-  (swap! runtime-state* assoc
-         :steering-queue (->queue)
-         :follow-up-queue (->queue))
-  (state runtime))
+                    :resolve-waiters!
+                    (fn [_ _]
+                      (resolve-idle-waiters!))
 
-(defn has-queued-messages?
-  [{:keys [runtime-state*]}]
-  (let [{:keys [steering-queue follow-up-queue]} @runtime-state*]
-    (or (seq steering-queue)
-        (seq follow-up-queue))))
+                    :reject-waiters!
+                    (fn [_ effect]
+                      (reject-idle-waiters! (effect->ex (wait-rejected-error :runtime-rejected)
+                                                        effect)))
+
+                    :enqueue-idle-waiter!
+                    (fn [_ _]
+                      (swap! runtime-state*
+                             (fn [runtime-state]
+                               (if-let [pending (:pending-command runtime-state)]
+                                 (-> runtime-state
+                                     (update :idle-waiters conj pending)
+                                     (assoc :pending-command nil))
+                                 runtime-state)))
+                      true)
+
+                    :enqueue-steering!
+                    (fn [_ effect]
+                      (swap! runtime-state* update :steering-queue into
+                             (normalize-messages (effect-messages effect)))
+                      true)
+
+                    :enqueue-follow-up!
+                    (fn [_ effect]
+                      (swap! runtime-state* update :follow-up-queue into
+                             (normalize-messages (effect-messages effect)))
+                      true)
+
+                    :close-runtime!
+                    (fn [_ _]
+                      (swap! runtime-state* assoc :closed? true)
+                      true)})
+
+                 (submit-command!
+                   [command payload]
+                   (p/create
+                    (fn [resolve reject]
+                      (try
+                        (validate-command! command payload)
+                        (let [entry      {:command command
+                                          :resolve resolve
+                                          :reject  reject}
+                              accepted?* (volatile! false)]
+                          (swap! runtime-state*
+                                 (fn [runtime-state]
+                                   (if (nil? (:pending-command runtime-state))
+                                     (do
+                                       (vreset! accepted?* true)
+                                       (assoc runtime-state :pending-command entry))
+                                     runtime-state)))
+                          (if-not @accepted?*
+                            (reject (command-slot-busy-error command))
+                            (-> (if (seq payload)
+                                  (fx/dispatch-command! (fx-context) fsm-env command payload)
+                                  (fx/dispatch-command! (fx-context) fsm-env command))
+                                (p/then (fn [step-result]
+                                          (swap! runtime-state* update :step-log conj step-result)
+                                          nil))
+                                (p/catch (fn [ex]
+                                           (swap! runtime-state*
+                                                  (fn [runtime-state]
+                                                    (if (= entry (:pending-command runtime-state))
+                                                      (assoc runtime-state :pending-command nil)
+                                                      runtime-state)))
+                                           (reject ex))))))
+                        (catch #?(:clj Exception :cljs :default) ex
+                          (reject ex))))))
+
+                 (subscribe!
+                   [handler]
+                   (let [subscriber-id* (volatile! nil)]
+                     (swap! runtime-state*
+                            (fn [runtime-state]
+                              (let [subscriber-id (inc (:next-subscriber-id runtime-state))]
+                                (vreset! subscriber-id* subscriber-id)
+                                (-> runtime-state
+                                    (assoc :next-subscriber-id subscriber-id)
+                                    (assoc-in [:subscribers subscriber-id] handler)))))
+                     (fn []
+                       (let [removed?* (volatile! false)
+                             id        @subscriber-id*]
+                         (swap! runtime-state*
+                                (fn [runtime-state]
+                                  (if (contains? (:subscribers runtime-state) id)
+                                    (do
+                                      (vreset! removed?* true)
+                                      (update runtime-state :subscribers dissoc id))
+                                    runtime-state)))
+                         @removed?*))))]
+           {:fsm-env         fsm-env
+            :runtime-state*  runtime-state*
+            :submit-command! submit-command!
+            :subscribe!      subscribe!
+            :dispatch-event! dispatch!
+            :run-command!    run-command!})))
+
+(>defn state
+       "Returns a snapshot of runtime-visible state.
+
+  Includes queue data and current FSM phase for operational visibility."
+       [runtime]
+       [:map => :llx.agent/runtime-state-snapshot]
+       (let [runtime                                            (runtime-handle runtime)
+             {:keys [runtime-state* fsm-env]}                   runtime
+             {:keys [agent-state steering-queue follow-up-queue
+                     steering-mode follow-up-mode closed?]}
+             @runtime-state*]
+         (assoc agent-state
+                :phase           (fsm/phase fsm-env)
+                :steering-queue  steering-queue
+                :follow-up-queue follow-up-queue
+                :steering-mode   steering-mode
+                :follow-up-mode  follow-up-mode
+                :closed?         closed?)))
+
+(>defn prompt!
+       "Queues a prompt command.
+
+  `message-or-messages` may be one message or a vector of messages."
+       [runtime message-or-messages]
+       [:map :any => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :prompt
+          {:messages message-or-messages})))
+
+(>defn continue!
+       "Queues a continue command.
+
+  If the current transcript ends in assistant output, queued steering messages
+  are consumed first, then follow-up queue messages."
+       [runtime]
+       [:map => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :continue
+          nil)))
+
+(>defn steer!
+       "Enqueues steering messages for the next eligible continue command."
+       [runtime message-or-messages]
+       [:map :any => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :steer
+          {:messages message-or-messages})))
+
+(>defn follow-up!
+       "Enqueues follow-up messages for the next eligible continue command."
+       [runtime message-or-messages]
+       [:map :any => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :follow-up
+          {:messages message-or-messages})))
+
+(>defn abort!
+       "Requests cancellation of the active turn.
+
+  Resolves to `true` when a turn was active, else `false`."
+       [runtime]
+       [:map => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :abort
+          nil)))
+
+(>defn wait-for-idle
+       "Resolves when the runtime reaches idle.
+
+  Returns immediately with `true` when already idle."
+       [runtime]
+       [:map => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :wait
+          nil)))
+
+(>defn reset!
+       "Resets transient runtime state while preserving core configuration.
+
+  Preserved keys:
+  - `:system-prompt`
+  - `:model`
+  - `:thinking-level`
+  - `:tools`"
+       [runtime]
+       [:map => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :reset
+          nil)))
+
+(>defn close!
+       "Shuts down the runtime and rejects active/pending waits as needed."
+       [runtime]
+       [:map => :llx/deferred]
+       (let [runtime (runtime-handle runtime)]
+         ((:submit-command! runtime)
+          :shutdown
+          nil)))
+
+(>defn subscribe
+       "Subscribes to emitted runtime events.
+
+  Returns an unsubscribe function."
+       [runtime handler]
+       [:map [:fn fn?] => [:fn fn?]]
+       (let [runtime (runtime-handle runtime)]
+         ((:subscribe! runtime) handler)))
+
+(>defn set-steering-mode!
+       "Updates steering queue dequeue mode (`:one-at-a-time` or `:all`)."
+       [runtime mode]
+       [:map :llx.agent/queue-mode => :llx.agent/runtime-state-snapshot]
+       (let [{:keys [runtime-state*] :as runtime} (runtime-handle runtime)]
+         (ensure-valid-mode mode)
+         (swap! runtime-state* assoc :steering-mode mode)
+         (state runtime)))
+
+(>defn set-follow-up-mode!
+       "Updates follow-up queue dequeue mode (`:one-at-a-time` or `:all`)."
+       [runtime mode]
+       [:map :llx.agent/queue-mode => :llx.agent/runtime-state-snapshot]
+       (let [{:keys [runtime-state*] :as runtime} (runtime-handle runtime)]
+         (ensure-valid-mode mode)
+         (swap! runtime-state* assoc :follow-up-mode mode)
+         (state runtime)))
+
+(>defn clear-steering-queue!
+       "Clears queued steering messages."
+       [runtime]
+       [:map => :llx.agent/runtime-state-snapshot]
+       (let [{:keys [runtime-state*] :as runtime} (runtime-handle runtime)]
+         (swap! runtime-state* assoc :steering-queue [])
+         (state runtime)))
+
+(>defn clear-follow-up-queue!
+       "Clears queued follow-up messages."
+       [runtime]
+       [:map => :llx.agent/runtime-state-snapshot]
+       (let [{:keys [runtime-state*] :as runtime} (runtime-handle runtime)]
+         (swap! runtime-state* assoc :follow-up-queue [])
+         (state runtime)))
+
+(>defn clear-all-queues!
+       "Clears both steering and follow-up queues."
+       [runtime]
+       [:map => :llx.agent/runtime-state-snapshot]
+       (let [{:keys [runtime-state*] :as runtime} (runtime-handle runtime)]
+         (swap! runtime-state* assoc
+                :steering-queue []
+                :follow-up-queue [])
+         (state runtime)))
+
+(>defn has-queued-messages?
+       "Returns true when either steering or follow-up queue has entries."
+       [runtime]
+       [:map => :boolean]
+       (let [{:keys [runtime-state*]}                 (runtime-handle runtime)
+             {:keys [steering-queue follow-up-queue]} @runtime-state*]
+         (boolean
+          (or (seq steering-queue)
+              (seq follow-up-queue)))))
