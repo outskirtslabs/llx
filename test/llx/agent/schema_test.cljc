@@ -2,7 +2,8 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
-   [llx.agent.schema :as sut]))
+   [llx.agent.schema :as sut]
+   [promesa.core :as p]))
 
 (def valid-model
   {:id             "gpt-5"
@@ -150,6 +151,67 @@
   (is (sut/valid? :llx.agent/event {:llx.agent.event/type :agent-start}))
   (is (not (sut/valid? :llx.agent/event {:llx.agent.event/type :turn-end}))))
 
+(deftest runtime-command-schemas
+  (is (sut/valid? :llx.agent/command-type :llx.agent.command/prompt))
+  (is (sut/valid? :llx.agent/command-type :llx.agent.command/shutdown))
+  (is (not (sut/valid? :llx.agent/command-type :prompt)))
+
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/prompt
+                   :messages               valid-user-message}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/prompt
+                   :messages               [valid-user-message]}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/continue}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/steer
+                   :messages               valid-user-message}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/follow-up
+                   :messages               [valid-user-message]}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/abort}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/reset}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/wait}))
+  (is (sut/valid? :llx.agent/command
+                  {:llx.agent.command/type :llx.agent.command/shutdown}))
+
+  (is (sut/valid? :llx.agent/runtime-turn-value
+                  {:status :ok}))
+  (is (not (sut/valid? :llx.agent/runtime-turn-value
+                       {:status "ok"})))
+
+  (is (sut/valid? :llx.agent/runtime-turn-result
+                  {:result  (p/resolved {:status :ok})
+                   :cancel! (fn [] nil)}))
+  (is (not (sut/valid? :llx.agent/runtime-turn-result
+                       {:result (p/resolved {:status :ok})})))
+
+  (is (sut/valid? :llx.agent/runtime-options
+                  {:run-command! (fn [_]
+                                   {:result  (p/resolved {:status :ok})
+                                    :cancel! (fn [] nil)})}))
+  (is (sut/valid? :llx.agent/runtime-options
+                  {:run-command!  (fn [_]
+                                    {:result  (p/resolved {:status :ok})
+                                     :cancel! (fn [] nil)})
+                   :initial-state {:messages [valid-user-message]}}))
+  (is (not (sut/valid? :llx.agent/runtime-options
+                       {:steering-mode :all})))
+  (is (not (sut/valid? :llx.agent/runtime-options
+                       {:run-command!  (fn [_]
+                                         {:result  (p/resolved {:status :ok})
+                                          :cancel! (fn [] nil)})
+                        :initial-state {:messages [{:role :assistant}]}})))
+
+  (is (not (sut/valid? :llx.agent/command
+                       {:llx.agent.command/type :prompt})))
+  (is (not (sut/valid? :llx.agent/command
+                       {:llx.agent.command/type :llx.agent.command/prompt}))))
+
 (deftest proxy-and-agent-option-schemas
   (is (sut/valid? :llx.agent/proxy-event {:llx.agent.proxy-event/type :start}))
   (is (sut/valid? :llx.agent/proxy-event {:llx.agent.proxy-event/type          :text-start
@@ -234,6 +296,12 @@
                      :llx.agent/event-tool-execution-update
                      :llx.agent/event-tool-execution-end
                      :llx.agent/event
+                     :llx.agent/command-type
+                     :llx.agent/command
+                     :llx.agent/runtime-turn-value
+                     :llx.agent/runtime-turn-result
+                     :llx.agent/runtime-initial-state
+                     :llx.agent/runtime-options
                      :llx.agent/proxy-event
                      :llx.agent/proxy-options
                      :llx.agent/agent-options]]

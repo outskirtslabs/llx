@@ -4,7 +4,9 @@
    [llx.ai :as ai]
    [malli.core :as m]
    [malli.error :as me]
-   [malli.util :as mu]))
+   [malli.util :as mu]
+   [promesa.exec.csp :as sp]
+   [promesa.protocols :as pp]))
 
 (def canonical-message-roles #{:user :assistant :tool-result})
 
@@ -20,6 +22,14 @@
   [role]
   (and (keyword? role)
        (not (contains? canonical-message-roles role))))
+
+(defn runtime-state-ref?
+  [value]
+  (try
+    (deref value)
+    true
+    (catch #?(:clj Exception :cljs :default) _
+      false)))
 
 (defn message-dispatch
   [message]
@@ -177,6 +187,66 @@
     [:tool-execution-update :llx.agent/event-tool-execution-update]
     [:tool-execution-end :llx.agent/event-tool-execution-end]]
 
+   :llx.agent/command-type
+   [:enum
+    :llx.agent.command/prompt
+    :llx.agent.command/continue
+    :llx.agent.command/steer
+    :llx.agent.command/follow-up
+    :llx.agent.command/abort
+    :llx.agent.command/reset
+    :llx.agent.command/wait
+    :llx.agent.command/shutdown]
+
+   :llx.agent/command-message-input
+   [:maybe [:or :llx.agent/message [:vector :llx.agent/message]]]
+
+   :llx.agent/command-prompt
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/prompt]]
+    [:messages :llx.agent/command-message-input]]
+
+   :llx.agent/command-continue
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/continue]]]
+
+   :llx.agent/command-steer
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/steer]]
+    [:messages :llx.agent/command-message-input]]
+
+   :llx.agent/command-follow-up
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/follow-up]]
+    [:messages :llx.agent/command-message-input]]
+
+   :llx.agent/command-abort
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/abort]]]
+
+   :llx.agent/command-reset
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/reset]]]
+
+   :llx.agent/command-wait
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/wait]]]
+
+   :llx.agent/command-shutdown
+   [:map
+    [:llx.agent.command/type [:= :llx.agent.command/shutdown]]]
+
+   :llx.agent/command
+   [:multi {:dispatch :llx.agent.command/type}
+    [:llx.agent.command/prompt :llx.agent/command-prompt]
+    [:llx.agent.command/continue :llx.agent/command-continue]
+    [:llx.agent.command/steer :llx.agent/command-steer]
+    [:llx.agent.command/follow-up :llx.agent/command-follow-up]
+    [:llx.agent.command/abort :llx.agent/command-abort]
+    [:llx.agent.command/reset :llx.agent/command-reset]
+    [:llx.agent.command/wait :llx.agent/command-wait]
+    [:llx.agent.command/shutdown :llx.agent/command-shutdown]]
+
    :llx.agent/proxy-event-start
    [:map
     [:llx.agent.proxy-event/type [:= :start]]]
@@ -269,6 +339,67 @@
 
    :llx.agent/queue-mode
    [:enum :all :one-at-a-time]
+
+   :llx.agent/channel
+   [:fn sp/chan?]
+
+   :llx.agent/channel-multiplexer
+   [:fn #(satisfies? pp/IChannelMultiplexer %)]
+
+   :llx.agent/runtime-state-atom
+   [:fn runtime-state-ref?]
+
+   :llx.agent/runtime-command-fn
+   [:fn fn?]
+
+   :llx.agent/runtime-turn-value
+   [:map
+    [:status :keyword]]
+
+   :llx.agent/runtime-turn-result
+   [:map
+    [:result :llx/deferred]
+    [:cancel! [:fn fn?]]]
+
+   :llx.agent/runtime-initial-state
+   [:map
+    [:system-prompt {:optional true} :string]
+    [:model {:optional true} :any]
+    [:thinking-level {:optional true} :llx.agent/thinking-level]
+    [:tools {:optional true} [:vector :any]]
+    [:messages {:optional true} [:vector :llx.agent/message]]
+    [:streaming? {:optional true} :boolean]
+    [:stream-message {:optional true} [:maybe :llx.agent/message]]
+    [:pending-tool-calls {:optional true} [:set :llx/id-string]]
+    [:error {:optional true} [:maybe :string]]]
+
+   :llx.agent/runtime-options
+   [:map
+    [:run-command! :llx.agent/runtime-command-fn]
+    [:initial-state {:optional true} :llx.agent/runtime-initial-state]
+    [:steering-mode {:optional true} :llx.agent/queue-mode]
+    [:follow-up-mode {:optional true} :llx.agent/queue-mode]]
+
+   :llx.agent/runtime-channels
+   [:map
+    [:commands :llx.agent/channel]]
+
+   :llx.agent/runtime-handle-state
+   [:map
+    [:runtime-state* :llx.agent/runtime-state-atom]]
+
+   :llx.agent/runtime-handle-turn
+   [:map
+    [:runtime-state* :llx.agent/runtime-state-atom]
+    [:channels :llx.agent/runtime-channels]
+    [:run-command! :llx.agent/runtime-command-fn]]
+
+   :llx.agent/runtime-handle-dispatch
+   [:map
+    [:runtime-state* :llx.agent/runtime-state-atom]
+    [:channels :llx.agent/runtime-channels]
+    [:run-command! :llx.agent/runtime-command-fn]
+    [:events-mx :llx.agent/channel-multiplexer]]
 
    :llx.agent/agent-options
    (merge-with-unified-request-options

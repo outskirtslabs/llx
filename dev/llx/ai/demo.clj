@@ -1,7 +1,8 @@
 (ns llx.ai.demo
   (:require
    [llx.ai :as ai]
-   [llx.ai.stream :as stream]))
+   [llx.ai.impl.client.event-stream :as stream]
+   [promesa.exec.csp :as sp]))
 
 (set! *warn-on-reflection* true)
 
@@ -64,20 +65,15 @@
 
 (defn- collect-stream!
   [st]
-  (let [events* (atom [])
-        result* (promise)
-        close*  (promise)]
-    (stream/consume! st
-                     {:on-event  (fn [event]
-                                   (swap! events* conj event))
-                      :on-result (fn [assistant-message]
-                                   (deliver result* assistant-message))
-                      :on-close  (fn [_close-meta]
-                                   (deliver close* true))})
-    (deref close* 60000 false)
-    (let [result (deref result* 1000 nil)]
-      {:events @events*
-       :result result})))
+  (let [events* (atom [])]
+    (loop []
+      (if-let [event (stream/await! (sp/take st) 60000 nil)]
+        (do
+          (swap! events* conj event)
+          (recur))
+        (let [events @events*]
+          {:events events
+           :result (:assistant-message (last events))})))))
 
 (comment
   (ai/complete demo-env openai-model
