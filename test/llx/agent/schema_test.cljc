@@ -276,6 +276,39 @@
                    :max-tokens     512}))
   (is (not (sut/valid? :llx.agent/proxy-options {:auth-token "x"}))))
 
+(deftest fsm-and-fx-schemas
+  (let [effect {:op :llx.agent.fsm/fx-start-turn}
+        event  {:name :llx.agent.fsm/cmd-prompt :data {:messages [valid-user-message]}}
+        plan   {:state              :llx.agent.fsm/idle
+                :event              :llx.agent.fsm/cmd-prompt
+                :payload            {:messages [valid-user-message]}
+                :planned-next-state :llx.agent.fsm/starting
+                :effects            [effect]
+                :supported?         true}
+        step   (assoc plan
+                      :before        :llx.agent.fsm/idle
+                      :after         :llx.agent.fsm/starting
+                      :active-states #{:llx.agent.fsm/runtime :llx.agent.fsm/starting})]
+    (is (sut/valid? :llx.agent.fsm/event event))
+    (is (sut/valid? :llx.agent.fsm/event-or-name event))
+    (is (sut/valid? :llx.agent.fsm/event-or-name :llx.agent.fsm/cmd-reset))
+    (is (sut/valid? :llx.agent.fsm/effect effect))
+    (is (sut/valid? :llx.agent.fsm/transition-plan plan))
+    (is (sut/valid? :llx.agent.fsm/step step))
+    (is (sut/valid? :llx.agent.fsm/new-env-options {:session-id :demo
+                                                    :system-env {::example true}}))
+    (is (sut/valid? :llx.agent.fsm/env {:system-env {} :session-id :demo :chart-src :chart}))
+    (is (not (sut/valid? :llx.agent.fsm/env {:system-env {}})))
+
+    (is (sut/valid? :llx.agent.fx/callbacks {:start-turn! (fn [_ _] :ok)}))
+    (is (sut/valid? :llx.agent.fx/handlers {:llx.agent.fsm/fx-start-turn (fn [_ _] :ok)}))
+    (is (sut/valid? :llx.agent.fx/context {:handlers           {:llx.agent.fsm/fx-start-turn (fn [_ _] :ok)}
+                                           :on-missing-handler :ignore}))
+    (is (sut/valid? :llx.agent.fx/effects-options {:continue-on-error? true}))
+    (is (sut/valid? :llx.agent.fx/effect-result {:effect effect :status :ok :value :ok}))
+    (is (sut/valid? :llx.agent.fx/step-result {:step step :effect-results [{:effect effect :status :ok}]}))
+    (is (not (sut/valid? :llx.agent.fx/effect-result {:status :ok})))))
+
 (deftest registry-contains-schema-ids
   (doseq [schema-id [:llx.agent/thinking-level
                      :llx.agent/tool-result
@@ -302,6 +335,24 @@
                      :llx.agent/runtime-turn-result
                      :llx.agent/runtime-initial-state
                      :llx.agent/runtime-options
+                     :llx.agent.fsm/state-id
+                     :llx.agent.fsm/event-id
+                     :llx.agent.fsm/effect-op
+                     :llx.agent.fsm/event
+                     :llx.agent.fsm/event-or-name
+                     :llx.agent.fsm/effect
+                     :llx.agent.fsm/effects
+                     :llx.agent.fsm/transition-plan
+                     :llx.agent.fsm/step
+                     :llx.agent.fsm/new-env-options
+                     :llx.agent.fsm/env
+                     :llx.agent.fx/callback-key
+                     :llx.agent.fx/callbacks
+                     :llx.agent.fx/handlers
+                     :llx.agent.fx/context
+                     :llx.agent.fx/effects-options
+                     :llx.agent.fx/effect-result
+                     :llx.agent.fx/step-result
                      :llx.agent/proxy-event
                      :llx.agent/proxy-options
                      :llx.agent/agent-options]]

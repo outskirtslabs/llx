@@ -31,6 +31,13 @@
     (catch #?(:clj Exception :cljs :default) _
       false)))
 
+(defn fsm-env-handle?
+  [value]
+  (and (map? value)
+       (map? (:system-env value))
+       (keyword? (:session-id value))
+       (keyword? (:chart-src value))))
+
 (defn message-dispatch
   [message]
   (let [role (:role message)]
@@ -400,6 +407,132 @@
     [:channels :llx.agent/runtime-channels]
     [:run-command! :llx.agent/runtime-command-fn]
     [:events-mx :llx.agent/channel-multiplexer]]
+
+   :llx.agent.fsm/state-id
+   :keyword
+
+   :llx.agent.fsm/event-id
+   :keyword
+
+   :llx.agent.fsm/effect-op
+   :keyword
+
+   :llx.agent.fsm/event
+   [:map
+    [:name :llx.agent.fsm/event-id]
+    [:data {:optional true} :map]]
+
+   :llx.agent.fsm/event-or-name
+   [:or :llx.agent.fsm/event-id :llx.agent.fsm/event]
+
+   :llx.agent.fsm/effect
+   [:map
+    [:op :llx.agent.fsm/effect-op]]
+
+   :llx.agent.fsm/effects
+   [:vector :llx.agent.fsm/effect]
+
+   :llx.agent.fsm/transition-plan
+   [:map
+    [:state :llx.agent.fsm/state-id]
+    [:event :llx.agent.fsm/event-id]
+    [:payload {:optional true} [:maybe :map]]
+    [:planned-next-state :llx.agent.fsm/state-id]
+    [:effects :llx.agent.fsm/effects]
+    [:supported? :boolean]]
+
+   :llx.agent.fsm/step
+   [:map
+    [:state :llx.agent.fsm/state-id]
+    [:event :llx.agent.fsm/event-id]
+    [:payload {:optional true} [:maybe :map]]
+    [:planned-next-state :llx.agent.fsm/state-id]
+    [:effects :llx.agent.fsm/effects]
+    [:supported? :boolean]
+    [:before :llx.agent.fsm/state-id]
+    [:after :llx.agent.fsm/state-id]
+    [:active-states [:set :llx.agent.fsm/state-id]]]
+
+   :llx.agent.fsm/new-env-options
+   [:map
+    [:session-id {:optional true} :keyword]
+    [:system-env {:optional true} :map]]
+
+   :llx.agent.fsm/env
+   [:fn fsm-env-handle?]
+
+   :llx.agent.fx/callback-key
+   [:enum
+    :start-turn!
+    :finish-turn!
+    :invoke-runner!
+    :cancel-runner!
+    :resolve-command!
+    :reject-command!
+    :resolve-active!
+    :reject-active!
+    :resolve-waiters!
+    :reject-waiters!
+    :enqueue-idle-waiter!
+    :enqueue-steering!
+    :enqueue-follow-up!
+    :close-runtime!]
+
+   :llx.agent.fx/callbacks
+   [:map
+    [:start-turn! {:optional true} [:fn fn?]]
+    [:finish-turn! {:optional true} [:fn fn?]]
+    [:invoke-runner! {:optional true} [:fn fn?]]
+    [:cancel-runner! {:optional true} [:fn fn?]]
+    [:resolve-command! {:optional true} [:fn fn?]]
+    [:reject-command! {:optional true} [:fn fn?]]
+    [:resolve-active! {:optional true} [:fn fn?]]
+    [:reject-active! {:optional true} [:fn fn?]]
+    [:resolve-waiters! {:optional true} [:fn fn?]]
+    [:reject-waiters! {:optional true} [:fn fn?]]
+    [:enqueue-idle-waiter! {:optional true} [:fn fn?]]
+    [:enqueue-steering! {:optional true} [:fn fn?]]
+    [:enqueue-follow-up! {:optional true} [:fn fn?]]
+    [:close-runtime! {:optional true} [:fn fn?]]]
+
+   :llx.agent.fx/handlers
+   [:map-of :llx.agent.fsm/effect-op [:fn fn?]]
+
+   :llx.agent.fx/context
+   [:map
+    [:handlers {:optional true} :llx.agent.fx/handlers]
+    [:on-missing-handler {:optional true} [:enum :ignore]]
+    [:start-turn! {:optional true} [:fn fn?]]
+    [:finish-turn! {:optional true} [:fn fn?]]
+    [:invoke-runner! {:optional true} [:fn fn?]]
+    [:cancel-runner! {:optional true} [:fn fn?]]
+    [:resolve-command! {:optional true} [:fn fn?]]
+    [:reject-command! {:optional true} [:fn fn?]]
+    [:resolve-active! {:optional true} [:fn fn?]]
+    [:reject-active! {:optional true} [:fn fn?]]
+    [:resolve-waiters! {:optional true} [:fn fn?]]
+    [:reject-waiters! {:optional true} [:fn fn?]]
+    [:enqueue-idle-waiter! {:optional true} [:fn fn?]]
+    [:enqueue-steering! {:optional true} [:fn fn?]]
+    [:enqueue-follow-up! {:optional true} [:fn fn?]]
+    [:close-runtime! {:optional true} [:fn fn?]]]
+
+   :llx.agent.fx/effects-options
+   [:map
+    [:continue-on-error? {:optional true} :boolean]]
+
+   :llx.agent.fx/effect-result
+   [:map
+    [:effect :llx.agent.fsm/effect]
+    [:status [:enum :ok :ignored :error]]
+    [:value {:optional true} :any]
+    [:reason {:optional true} :keyword]
+    [:error {:optional true} :any]]
+
+   :llx.agent.fx/step-result
+   [:map
+    [:step :llx.agent.fsm/step]
+    [:effect-results [:vector :llx.agent.fx/effect-result]]]
 
    :llx.agent/agent-options
    (merge-with-unified-request-options
