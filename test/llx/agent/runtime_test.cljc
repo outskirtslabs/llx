@@ -5,6 +5,7 @@
    #?@(:clj [[llx.ai.test-util :as util]]
        :cljs [[llx.ai.test-util :as util :include-macros true]])
    [llx.agent.runtime :as sut]
+   [promesa.exec.csp :as sp]
    [promesa.core :as p]))
 
 (def base-user-message
@@ -26,6 +27,17 @@
                  :cost         {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
    :stop-reason :stop
    :timestamp   1730000000001})
+
+(def base-model
+  {:id             "gpt-4o-mini"
+   :name           "GPT-4o Mini"
+   :provider       :openai
+   :api            :openai-completions
+   :base-url       "https://api.openai.com/v1"
+   :context-window 128000
+   :max-tokens     16384
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? false :input #{:text}}})
 
 (defn- now-ms
   []
@@ -61,6 +73,20 @@
             (Thread/sleep ms)
             (p/resolved true))
      :cljs (p/delay ms true)))
+
+(defn- channel-from-events
+  [events]
+  (let [ch (sp/chan 32)]
+    (-> (reduce
+         (fn [acc event]
+           (p/then acc
+                   (fn [_]
+                     (sp/put ch event))))
+         (p/resolved true)
+         events)
+        (p/finally (fn [_ _]
+                     (sp/close ch))))
+    ch))
 
 (defn- expect-rejection*
   [deferred assert-error!]
@@ -441,6 +467,78 @@
                               (pause* 20)))
                     (p/then (fn [_]
                               (is (= @count-before* (count @events*)))
+                              (sut/close! runtime)))
+                    (p/then (fn [_]
+                              (done)))
+                    (p/catch (partial util/fail-and-done! done))))))
+
+(deftest create-runtime-uses-built-in-runner-when-run-command-omitted
+  (util/async done
+              (let [runtime (sut/create-runtime
+                             {:initial-state {:model base-model}
+                              :env           {}
+                              :stream-fn     (fn [_env _model _context _opts]
+                                               (channel-from-events
+                                                [{:type :start}
+                                                 {:type              :done
+                                                  :assistant-message base-assistant-message}]))})]
+                (-> (sut/prompt! runtime base-user-message)
+                    (p/then (fn [result]
+                              (is (= {:status :ok} result))
+                              (let [messages (:messages (sut/state runtime))]
+                                (is (= :user (:role (first messages))))
+                                (is (= :assistant (:role (last messages)))))
+                              (sut/close! runtime)))
+                    (p/then (fn [_]
+                              (done)))
+                    (p/catch (partial util/fail-and-done! done))))))
+
+(deftest runtime-mutation-api-updates-state
+  (let [runtime (sut/create-runtime {:run-command!  (make-immediate-runner (atom []))
+                                     :initial-state {:model base-model}})]
+    (sut/set-system-prompt! runtime "new system")
+    (sut/set-model! runtime (assoc base-model :id "gpt-5"))
+    (sut/set-thinking-level! runtime :low)
+    (sut/set-tools! runtime [{:name         "search"
+                              :label        "Search"
+                              :description  "Search docs"
+                              :input-schema [:map [:q :string]]
+                              :execute      (fn [_tool-call-id _args _signal _on-update]
+                                              {:content [{:type :text :text "ok"}]
+                                               :details {}})}])
+    (sut/replace-messages! runtime [base-user-message])
+    (sut/append-message! runtime base-assistant-message)
+    (is (= "new system" (:system-prompt (sut/state runtime))))
+    (is (= "gpt-5" (get-in (sut/state runtime) [:model :id])))
+    (is (= :low (:thinking-level (sut/state runtime))))
+    (is (= "search" (get-in (sut/state runtime) [:tools 0 :name])))
+    (is (= 2 (count (:messages (sut/state runtime)))))
+    (sut/clear-messages! runtime)
+    (is (= [] (:messages (sut/state runtime))))
+    (sut/close! runtime)))
+
+(deftest prompt-string-and-images-convenience
+  (util/async done
+              (let [calls*  (atom [])
+                    runtime (sut/create-runtime {:run-command!  (make-immediate-runner calls*)
+                                                 :initial-state {:model base-model}})]
+                (-> (sut/prompt! runtime "hello from text")
+                    (p/then (fn [_]
+                              (let [msg (first (:messages (first @calls*)))]
+                                (is (= :user (:role msg)))
+                                (is (= [{:type :text :text "hello from text"}]
+                                       (:content msg))))
+                              (sut/prompt! runtime
+                                           "look at this"
+                                           [{:type      :image
+                                             :data      "ZmFrZQ=="
+                                             :mime-type "image/png"}])))
+                    (p/then (fn [_]
+                              (let [msg (first (:messages (second @calls*)))]
+                                (is (= :user (:role msg)))
+                                (is (= [{:type :text :text "look at this"}
+                                        {:type :image :data "ZmFrZQ==" :mime-type "image/png"}]
+                                       (:content msg))))
                               (sut/close! runtime)))
                     (p/then (fn [_]
                               (done)))

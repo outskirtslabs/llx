@@ -31,6 +31,12 @@
     (catch #?(:clj Exception :cljs :default) _
       false)))
 
+(defn runtime-options-ready?
+  [opts]
+  (or (fn? (:run-command! opts))
+      (some? (:model opts))
+      (some? (get-in opts [:initial-state :model]))))
+
 (defn fsm-env-handle?
   [value]
   (and (map? value)
@@ -46,12 +52,13 @@
       :custom)))
 
 (def ^:private llx-agent-merge-placeholder-registry
-  {:llx.agent/state          :any
-   :llx.agent/thinking-level :any
-   :llx.agent/tool           :any
-   :llx.agent/message        :any
-   :llx.agent/stream-fn      :any
-   :llx.agent/queue-mode     :any})
+  {:llx.agent/state            :any
+   :llx.agent/thinking-level   :any
+   :llx.agent/thinking-budgets :any
+   :llx.agent/tool             :any
+   :llx.agent/message          :any
+   :llx.agent/stream-fn        :any
+   :llx.agent/queue-mode       :any})
 
 (defn- merge-with-unified-request-options
   [schema-form]
@@ -116,12 +123,17 @@
    :llx.agent/loop-config
    (merge-with-unified-request-options
     [:map
+     [:env {:optional true} :map]
      [:model :llx/model]
      [:convert-to-llm [:fn fn?]]
      [:transform-context {:optional true} [:fn fn?]]
+     [:stream-fn {:optional true} :llx.agent/stream-fn]
      [:get-api-key {:optional true} [:fn fn?]]
      [:get-steering-messages {:optional true} [:fn fn?]]
-     [:get-follow-up-messages {:optional true} [:fn fn?]]])
+     [:get-follow-up-messages {:optional true} [:fn fn?]]
+     [:session-id {:optional true} :llx/id-string]
+     [:thinking-budgets {:optional true} :llx.agent/thinking-budgets]
+     [:max-retry-delay-ms {:optional true} :llx/non-neg-int]])
 
    :llx.agent/event-agent-start
    [:map
@@ -342,7 +354,8 @@
    (merge-with-unified-request-options
     [:map
      [:proxy-url :llx/id-string]
-     [:auth-token {:optional true} :llx/id-string]])
+     [:auth-token {:optional true} :llx/id-string]
+     [:fetch-stream! {:optional true} [:fn fn?]]])
 
    :llx.agent/queue-mode
    [:enum :all :one-at-a-time]
@@ -381,18 +394,22 @@
     [:error {:optional true} [:maybe :string]]]
 
    :llx.agent/runtime-options
-   [:map
-    [:run-command! :llx.agent/runtime-command-fn]
-    [:initial-state {:optional true} :llx.agent/runtime-initial-state]
-    [:convert-to-llm {:optional true} [:fn fn?]]
-    [:transform-context {:optional true} [:fn fn?]]
-    [:stream-fn {:optional true} :llx.agent/stream-fn]
-    [:get-api-key {:optional true} [:fn fn?]]
-    [:session-id {:optional true} :llx/id-string]
-    [:thinking-budgets {:optional true} :llx.agent/thinking-budgets]
-    [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
-    [:steering-mode {:optional true} :llx.agent/queue-mode]
-    [:follow-up-mode {:optional true} :llx.agent/queue-mode]]
+   [:and
+    [:map
+     [:run-command! {:optional true} :llx.agent/runtime-command-fn]
+     [:env {:optional true} :map]
+     [:model {:optional true} :llx/model]
+     [:initial-state {:optional true} :llx.agent/runtime-initial-state]
+     [:convert-to-llm {:optional true} [:fn fn?]]
+     [:transform-context {:optional true} [:fn fn?]]
+     [:stream-fn {:optional true} :llx.agent/stream-fn]
+     [:get-api-key {:optional true} [:fn fn?]]
+     [:session-id {:optional true} :llx/id-string]
+     [:thinking-budgets {:optional true} :llx.agent/thinking-budgets]
+     [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
+     [:steering-mode {:optional true} :llx.agent/queue-mode]
+     [:follow-up-mode {:optional true} :llx.agent/queue-mode]]
+    [:fn runtime-options-ready?]]
 
    :llx.agent/runtime-command-keyword
    [:enum

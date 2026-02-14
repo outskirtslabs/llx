@@ -105,6 +105,14 @@
                    :reasoning      :low
                    :max-tokens     512
                    :metadata       {:trace-id "abc"}}))
+  (is (sut/valid? :llx.agent/loop-config
+                  {:env                {}
+                   :model              valid-model
+                   :convert-to-llm     (fn [msgs] msgs)
+                   :stream-fn          (fn [_env _model _context _opts])
+                   :session-id         "session-123"
+                   :thinking-budgets   {:minimal 128}
+                   :max-retry-delay-ms 30000}))
 
   (is (not (sut/valid? :llx.agent/loop-config
                        {:model          valid-model
@@ -211,6 +219,13 @@
                    :session-id         "session-123"
                    :thinking-budgets   {:minimal 128 :low 512}
                    :max-retry-delay-ms 60000}))
+  (is (sut/valid? :llx.agent/runtime-options
+                  {:initial-state     {:model valid-model}
+                   :env               {}
+                   :convert-to-llm    (fn [messages] messages)
+                   :transform-context (fn [messages _signal]
+                                        (p/resolved messages))
+                   :stream-fn         (fn [_env _model _context _opts])}))
   (is (not (sut/valid? :llx.agent/runtime-options
                        {:steering-mode :all})))
   (is (not (sut/valid? :llx.agent/runtime-options
@@ -228,6 +243,8 @@
                                          {:result  (p/resolved {:status :ok})
                                           :cancel! (fn [] nil)})
                         :initial-state {:messages [{:role :assistant}]}})))
+  (is (not (sut/valid? :llx.agent/runtime-options
+                       {:initial-state {:messages [valid-user-message]}})))
 
   (is (not (sut/valid? :llx.agent/command
                        {:llx.agent.command/type :prompt})))
@@ -275,11 +292,12 @@
                    :llx.agent.proxy-event/usage         valid-usage}))
 
   (is (sut/valid? :llx.agent/proxy-options
-                  {:proxy-url  "https://agent.example/stream"
-                   :auth-token "token"
-                   :reasoning  :medium
-                   :max-tokens 512
-                   :headers    {"x-trace-id" "abc"}}))
+                  {:proxy-url     "https://agent.example/stream"
+                   :auth-token    "token"
+                   :fetch-stream! (fn [_request])
+                   :reasoning     :medium
+                   :max-tokens    512
+                   :headers       {"x-trace-id" "abc"}}))
 
   (is (sut/valid? :llx.agent/agent-options
                   {:initial-state  {:system-prompt      "x"
