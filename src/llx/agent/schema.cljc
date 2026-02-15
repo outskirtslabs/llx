@@ -84,11 +84,88 @@
      [:map
       [:type :keyword]]
 
+     :llx.agent/event-type
+     [:enum
+      :llx.agent.event/agent-start
+      :llx.agent.event/agent-end
+      :llx.agent.event/turn-start
+      :llx.agent.event/turn-end
+      :llx.agent.event/message-start
+      :llx.agent.event/message-update
+      :llx.agent.event/message-end
+      :llx.agent.event/tool-execution-start
+      :llx.agent.event/tool-execution-update
+      :llx.agent.event/tool-execution-end]
+
+     :llx.agent/event-agent-start
+     [:map
+      [:type [:= :llx.agent.event/agent-start]]]
+
+     :llx.agent/event-agent-end
+     [:map
+      [:type [:= :llx.agent.event/agent-end]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent/event-turn-start
+     [:map
+      [:type [:= :llx.agent.event/turn-start]]]
+
+     :llx.agent/event-turn-end
+     [:map
+      [:type [:= :llx.agent.event/turn-end]]
+      [:message {:optional true} :map]]
+
+     :llx.agent/event-message-start
+     [:map
+      [:type [:= :llx.agent.event/message-start]]
+      [:message :map]]
+
+     :llx.agent/event-message-update
+     [:map
+      [:type [:= :llx.agent.event/message-update]]
+      [:chunk :map]]
+
+     :llx.agent/event-message-end
+     [:map
+      [:type [:= :llx.agent.event/message-end]]
+      [:message :map]]
+
+     :llx.agent/event-tool-execution-start
+     [:map
+      [:type [:= :llx.agent.event/tool-execution-start]]
+      [:tool-call-id :string]
+      [:tool-name :string]
+      [:args :map]]
+
+     :llx.agent/event-tool-execution-update
+     [:map
+      [:type [:= :llx.agent.event/tool-execution-update]]
+      [:tool-call-id :string]
+      [:tool-name :string]
+      [:partial-result :map]]
+
+     :llx.agent/event-tool-execution-end
+     [:map
+      [:type [:= :llx.agent.event/tool-execution-end]]
+      [:result :map]]
+
+     :llx.agent/event
+     [:multi {:dispatch :type}
+      [:llx.agent.event/agent-start :llx.agent/event-agent-start]
+      [:llx.agent.event/agent-end :llx.agent/event-agent-end]
+      [:llx.agent.event/turn-start :llx.agent/event-turn-start]
+      [:llx.agent.event/turn-end :llx.agent/event-turn-end]
+      [:llx.agent.event/message-start :llx.agent/event-message-start]
+      [:llx.agent.event/message-update :llx.agent/event-message-update]
+      [:llx.agent.event/message-end :llx.agent/event-message-end]
+      [:llx.agent.event/tool-execution-start :llx.agent/event-tool-execution-start]
+      [:llx.agent.event/tool-execution-update :llx.agent/event-tool-execution-update]
+      [:llx.agent.event/tool-execution-end :llx.agent/event-tool-execution-end]]
+
      :llx.agent.fx/effect-emit-event
      [:map
       [:llx.agent.fx/type [:= :emit-event]]
-      [:event :map] ;; TODO spec the events
-      ]
+      [:event :llx.agent/event]]
 
      :llx.agent.fx/effect-call-llm
      [:map

@@ -242,6 +242,10 @@
        (is (thrown? Exception
                     (fx/execute-fx env {::fx/type :call-llm})))
        (is (thrown? Exception
-                    (fx/execute-fx env {::fx/type :unknown}))))
+                    (fx/execute-fx env {::fx/type :unknown})))
+       (is (thrown? Exception
+                    (fx/execute-fx env
+                                   {::fx/type :emit-event
+                                    :event    {:type :llx.agent.event/message-update}}))))
      :cljs
      (is true)))
