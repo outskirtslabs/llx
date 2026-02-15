@@ -3,6 +3,7 @@
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai :as ai]
+   [llx.agent.fx :as fx]
    [llx.agent.loop :as sut]))
 
 (defn- initial-state
@@ -27,7 +28,7 @@
 
 (defn- fx-types
   [effects]
-  (mapv :fx/type effects))
+  (mapv ::fx/type effects))
 
 (deftest initial-state-has-expected-shape-test
   (is (= {:node               :node/idle
@@ -322,7 +323,7 @@
   (let [state            (state-with {:node :node/idle})
         [state' effects] (sut/idle-transition state {:type :signal/llm-chunk})]
     (is (= state state'))
-    (is (= [{:fx/type :reject :reason :invalid-signal}] effects))))
+    (is (= [{::fx/type :reject :reason :invalid-signal}] effects))))
 
 (deftest streaming-transition-llm-start-test
   (let [msg              {:role :assistant :content "partial"}
@@ -330,8 +331,8 @@
         [state' effects] (sut/streaming-transition state {:type    :signal/llm-start
                                                           :message msg})]
     (is (= msg (:stream-message state')))
-    (is (= [{:fx/type :emit-event
-             :event   {:type :event/message-start :message msg}}]
+    (is (= [{::fx/type :emit-event
+             :event    {:type :event/message-start :message msg}}]
            effects))))
 
 (deftest streaming-transition-llm-chunk-test
@@ -341,8 +342,8 @@
         [state' effects] (sut/streaming-transition state {:type  :signal/llm-chunk
                                                           :chunk chunk})]
     (is (= chunk (:stream-message state')))
-    (is (= [{:fx/type :emit-event
-             :event   {:type :event/message-update :chunk chunk}}]
+    (is (= [{::fx/type :emit-event
+             :event    {:type :event/message-update :chunk chunk}}]
            effects))))
 
 (deftest streaming-transition-llm-done-no-tools-test
@@ -536,11 +537,11 @@
                            :tool-name      "slow_tool"
                            :partial-result {:progress 50}})]
     (is (= state state'))
-    (is (= [{:fx/type :emit-event
-             :event   {:type           :event/tool-execution-update
-                       :tool-call-id   "tc-1"
-                       :tool-name      "slow_tool"
-                       :partial-result {:progress 50}}}]
+    (is (= [{::fx/type :emit-event
+             :event    {:type           :event/tool-execution-update
+                        :tool-call-id   "tc-1"
+                        :tool-name      "slow_tool"
+                        :partial-result {:progress 50}}}]
            effects))))
 
 (deftest tool-executing-transition-abort-test
@@ -627,7 +628,7 @@
                                           :messages [{:role :user :content "hello"}]})]
     (is (= :node/streaming (:node state')))
     (is (= [{:role :user :content "hello"}] (:messages state')))
-    (is (= :call-llm (:fx/type (last effects))))))
+    (is (= :call-llm (::fx/type (last effects))))))
 
 (deftest step-prompt-when-streaming-is-rejected-test
   (let [state            (state-with {:node :node/streaming})
@@ -652,7 +653,7 @@
                                       :messages [{:role :user :content "do stuff"}]})
         [state' effects] (sut/step state {:type :signal/llm-done :message message})]
     (is (= :node/tool-executing (:node state')))
-    (is (some #(= :execute-tool (:fx/type %)) effects))))
+    (is (some #(= :execute-tool (::fx/type %)) effects))))
 
 (deftest step-abort-from-streaming-to-closed-test
   (testing "abort signal from streaming"

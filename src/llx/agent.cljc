@@ -6,7 +6,7 @@
   (:refer-clojure :exclude [reset!])
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
-   [llx.agent.fx :as fx]
+   [llx.agent.driver :as driver]
    [llx.agent.schema :as schema]
    [malli.core :as m]
    [malli.transform :as mt]
@@ -150,7 +150,7 @@
 (>defn- dispatch!
         [agent command]
         [:llx.agent/env :llx.agent/command => :llx/deferred]
-        (fx/run agent command))
+        (driver/run agent command))
 
 (defn- dispatch-queued-messages!
   [agent command-type messages]

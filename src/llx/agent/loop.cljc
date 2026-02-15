@@ -1,7 +1,6 @@
 (ns llx.agent.loop
   (:require
-   [promesa.core :as p]
-   [promesa.exec.csp :as sp]))
+   [llx.agent.fx :as fx]))
 
 (def empty-queue
   #?(:clj  clojure.lang.PersistentQueue/EMPTY
@@ -188,27 +187,27 @@
       [(-> state
            (assoc :messages messages')
            (assoc :node :node/streaming))
-       (into [{:fx/type :emit-event :event {:type :event/agent-start}}
-              {:fx/type :emit-event :event {:type :event/turn-start}}]
+       (into [{::fx/type :emit-event :event {:type :event/agent-start}}
+              {::fx/type :emit-event :event {:type :event/turn-start}}]
              (concat
-              (mapcat (fn [m] [{:fx/type :emit-event :event {:type :event/message-start :message m}}
-                               {:fx/type :emit-event :event {:type :event/message-end :message m}}])
+              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :event/message-start :message m}}
+                               {::fx/type :emit-event :event {:type :event/message-end :message m}}])
                       (:messages msg))
-              [{:fx/type :call-llm :messages messages'}]))])
+              [{::fx/type :call-llm :messages messages'}]))])
 
     :signal/continue-start
     (let [messages' (into (:messages state) (:messages msg))]
       [(-> state
            (assoc :messages messages')
            (assoc :node :node/streaming))
-       (into [{:fx/type :emit-event :event {:type :event/turn-start}}]
+       (into [{::fx/type :emit-event :event {:type :event/turn-start}}]
              (concat
-              (mapcat (fn [m] [{:fx/type :emit-event :event {:type :event/message-start :message m}}
-                               {:fx/type :emit-event :event {:type :event/message-end :message m}}])
+              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :event/message-start :message m}}
+                               {::fx/type :emit-event :event {:type :event/message-end :message m}}])
                       (:messages msg))
-              [{:fx/type :call-llm :messages messages'}]))])
+              [{::fx/type :call-llm :messages messages'}]))])
 
-    [state [{:fx/type :reject :reason :invalid-signal}]]))
+    [state [{::fx/type :reject :reason :invalid-signal}]]))
 
 (defn streaming-transition
   "Pure transition from :node/streaming state. Returns [state' effects]."
@@ -216,13 +215,13 @@
   (case (:type msg)
     :signal/llm-start
     [(assoc state :stream-message (:message msg))
-     [{:fx/type :emit-event
-       :event   {:type :event/message-start :message (:message msg)}}]]
+     [{::fx/type :emit-event
+       :event    {:type :event/message-start :message (:message msg)}}]]
 
     :signal/llm-chunk
     [(assoc state :stream-message (:chunk msg))
-     [{:fx/type :emit-event
-       :event   {:type :event/message-update :chunk (:chunk msg)}}]]
+     [{::fx/type :emit-event
+       :event    {:type :event/message-update :chunk (:chunk msg)}}]]
 
     :signal/llm-done
     (let [message    (:message msg)
@@ -234,34 +233,34 @@
              (assoc :node :node/tool-executing)
              (assoc :stream-message nil)
              (assoc :pending-tool-calls (vec tool-calls)))
-         [{:fx/type :emit-event :event {:type :event/message-end :message message}}
-          {:fx/type :emit-event :event {:type         :event/tool-execution-start
-                                        :tool-call-id (:id first-tool)
-                                        :tool-name    (:name first-tool)
-                                        :args         (:arguments first-tool)}}
-          {:fx/type :execute-tool :tool-call first-tool}]]
+         [{::fx/type :emit-event :event {:type :event/message-end :message message}}
+          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+                                         :tool-call-id (:id first-tool)
+                                         :tool-name    (:name first-tool)
+                                         :args         (:arguments first-tool)}}
+          {::fx/type :execute-tool :tool-call first-tool}]]
         [(-> state
              (update :messages conj message)
              (assoc :node :node/idle)
              (assoc :stream-message nil))
-         [{:fx/type :emit-event :event {:type :event/message-end :message message}}
-          {:fx/type :emit-event :event {:type :event/turn-end :message message}}]]))
+         [{::fx/type :emit-event :event {:type :event/message-end :message message}}
+          {::fx/type :emit-event :event {:type :event/turn-end :message message}}]]))
 
     :signal/llm-error
     [(-> state
          (assoc :node :node/idle)
          (assoc :error (:error msg)))
-     [{:fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :error}}}
-      {:fx/type :emit-event :event {:type :event/turn-end}}
-      {:fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :error}}}
+      {::fx/type :emit-event :event {:type :event/turn-end}}
+      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
 
     :signal/abort
     [(-> state
          (assoc :node :node/closed)
          (assoc :stream-message nil))
-     [{:fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :aborted}}}
-      {:fx/type :emit-event :event {:type :event/turn-end}}
-      {:fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :aborted}}}
+      {::fx/type :emit-event :event {:type :event/turn-end}}
+      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
 
     [state []]))
 
@@ -279,19 +278,19 @@
                           (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{:fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
-          {:fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {:fx/type :emit-event :event {:type         :event/tool-execution-start
-                                        :tool-call-id (:id next-tool)
-                                        :tool-name    (:name next-tool)
-                                        :args         (:arguments next-tool)}}
-          {:fx/type :execute-tool :tool-call next-tool}]]
+         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
+          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+                                         :tool-call-id (:id next-tool)
+                                         :tool-name    (:name next-tool)
+                                         :args         (:arguments next-tool)}}
+          {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{:fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
-          {:fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/turn-end}}]]))
+         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
+          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/turn-end}}]]))
 
     :signal/tool-error
     (let [remaining    (rest (:pending-tool-calls state))
@@ -305,34 +304,34 @@
                            (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{:fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
-          {:fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {:fx/type :emit-event :event {:type         :event/tool-execution-start
-                                        :tool-call-id (:id next-tool)
-                                        :tool-name    (:name next-tool)
-                                        :args         (:arguments next-tool)}}
-          {:fx/type :execute-tool :tool-call next-tool}]]
+         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
+          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+                                         :tool-call-id (:id next-tool)
+                                         :tool-name    (:name next-tool)
+                                         :args         (:arguments next-tool)}}
+          {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{:fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
-          {:fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {:fx/type :emit-event :event {:type :event/turn-end}}]]))
+         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
+          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type :event/turn-end}}]]))
 
     :signal/tool-update
     [state
-     [{:fx/type :emit-event
-       :event   {:type           :event/tool-execution-update
-                 :tool-call-id   (:tool-call-id msg)
-                 :tool-name      (:tool-name msg)
-                 :partial-result (:partial-result msg)}}]]
+     [{::fx/type :emit-event
+       :event    {:type           :event/tool-execution-update
+                  :tool-call-id   (:tool-call-id msg)
+                  :tool-name      (:tool-name msg)
+                  :partial-result (:partial-result msg)}}]]
 
     :signal/abort
     [(-> state
          (assoc :node :node/closed)
          (assoc :pending-tool-calls []))
-     [{:fx/type :emit-event :event {:type :event/turn-end}}
-      {:fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :event/turn-end}}
+      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
 
     [state []]))
 
@@ -401,9 +400,9 @@
         agent-ended?     (and (not= :node/idle prev-node)
                               (= :node/idle next-node))]
     (if agent-ended?
-      [state'' (conj effects {:fx/type :emit-event
-                              :event   {:type     :event/agent-end
-                                        :messages (:messages state'')}})]
+      [state'' (conj effects {::fx/type :emit-event
+                              :event    {:type     :event/agent-end
+                                         :messages (:messages state'')}})]
       [state'' effects])))
 
 (defn step

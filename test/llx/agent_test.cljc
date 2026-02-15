@@ -5,7 +5,7 @@
    [com.fulcrologic.guardrails.malli.registry :as gr.reg]
    [llx.ai :as ai]
    [llx.agent :as sut]
-   [llx.agent.fx :as fx]
+   [llx.agent.driver :as driver]
    [llx.agent.schema :as agent.schema]
    [malli.registry :as mr]
    [promesa.core :as p]
@@ -186,13 +186,13 @@
        :cljs
        (is true))))
 
-(deftest command-wrappers-dispatch-through-fx-run-test
+(deftest command-wrappers-dispatch-through-driver-run-test
   (let [seen*  (atom [])
         marker (p/resolved ::marker)
         agent  (sut/create-agent required-env-opts)]
-    (with-redefs [fx/run (fn [env input]
-                           (swap! seen* conj [env input])
-                           marker)]
+    (with-redefs [driver/run (fn [env input]
+                               (swap! seen* conj [env input])
+                               marker)]
       (testing "prompt dispatches vector messages"
         (is (identical? marker (sut/prompt agent [{:role :user :content "hello" :timestamp 1}]))))
 
@@ -218,9 +218,9 @@
   (let [seen*  (atom [])
         marker (p/resolved ::marker)
         agent  (sut/create-agent required-env-opts)]
-    (with-redefs [fx/run (fn [_env input]
-                           (swap! seen* conj input)
-                           marker)]
+    (with-redefs [driver/run (fn [_env input]
+                               (swap! seen* conj input)
+                               marker)]
       (is (thrown? #?(:clj clojure.lang.ExceptionInfo
                       :cljs js/Error)
                    (sut/prompt agent {:role :user :content "not-a-vector"})))
@@ -295,9 +295,9 @@
                                                           [:timestamp :int]]}}))
         seen*          (atom [])
         marker         (p/resolved ::ok)]
-    (with-redefs [fx/run (fn [_env command]
-                           (swap! seen* conj command)
-                           marker)]
+    (with-redefs [driver/run (fn [_env command]
+                               (swap! seen* conj command)
+                               marker)]
       (is (identical? marker (sut/prompt agent [custom-message])))
       (is (identical? marker (sut/append-message agent custom-message)))
       (is (identical? marker (sut/replace-messages agent [custom-message]))))
@@ -343,9 +343,9 @@
                                                                                  [:timestamp :int]]}}))
         seen*           (atom [])
         marker          (p/resolved ::ok)]
-    (with-redefs [fx/run (fn [_env command]
-                           (swap! seen* conj command)
-                           marker)]
+    (with-redefs [driver/run (fn [_env command]
+                               (swap! seen* conj command)
+                               marker)]
       (is (identical? marker (sut/prompt agent [valid-message])))
       (is (thrown? #?(:clj Exception :cljs js/Error)
                    (sut/prompt agent [invalid-message]))))

@@ -60,7 +60,7 @@
                                                           model
                                                           context
                                                           (assoc options :max-tokens 64)))}
-                     effect {:fx/type  :call-llm
+                     effect {::fx/type :call-llm
                              :messages [{:role      :user
                                          :content   "Reply with exactly: llx agent fx live ok"
                                          :timestamp 1}]}

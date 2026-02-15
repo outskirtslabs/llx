@@ -4,7 +4,7 @@
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [llx.ai :as ai]
    [llx.agent.schema :as schema]
-   [llx.agent.fx :as sut]
+   [llx.agent.fx :as fx]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -50,13 +50,13 @@
 
 (defn- test-env
   [state overrides]
-  (merge {:state_           (atom state)
-          :command>         (sp/chan)
-          :events-mx>       (sp/mult :buf (sp/sliding-buffer 16))
-          :schema-registry  (schema/registry {})
-          :convert-to-llm   identity
-          :tools            {}
-          :abort-signal     nil}
+  (merge {:state_          (atom state)
+          :command>        (sp/chan)
+          :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
+          :schema-registry (schema/registry {})
+          :convert-to-llm  identity
+          :tools           {}
+          :abort-signal    nil}
          overrides))
 
 (deftest fx-call-llm-runs-hooks-and-maps-events-test
@@ -106,7 +106,7 @@
                                                      (p/delay 1 "token"))
                                :thinking-budgets   {:high 1234}
                                :max-retry-delay-ms 2500})
-        out                  (sut/execute-fx env {:fx/type :call-llm :messages input-messages})]
+        out                  (fx/execute-fx env {::fx/type :call-llm :messages input-messages})]
     #?(:clj
        (let [signals (read-signals! out)]
          (is (= [:signal/llm-start
@@ -173,7 +173,7 @@
                                                   :context     context
                                                   :options     options})
                                    (stream-with-events events))]
-      (let [out     (sut/execute-fx env {:fx/type :call-llm :messages [{:role :user :content "hi" :timestamp 2}]})
+      (let [out     (fx/execute-fx env {::fx/type :call-llm :messages [{:role :user :content "hi" :timestamp 2}]})
             signals #?(:clj (read-signals! out)
                        :cljs [])]
         #?(:clj
@@ -214,7 +214,7 @@
                 :steering-mode      :one-at-a-time
                 :follow-up-mode     :one-at-a-time}
                {:convert-to-llm (fn [_] (throw (ex-info "boom" {:type ::hook-failed})))})
-        out   (sut/execute-fx env {:fx/type :call-llm :messages [{:role :user :content "hi" :timestamp 1}]})]
+        out   (fx/execute-fx env {::fx/type :call-llm :messages [{:role :user :content "hi" :timestamp 1}]})]
     #?(:clj
        (let [signals (read-signals! out)]
          (is (= 1 (count signals)))
@@ -244,8 +244,8 @@
     #?(:clj
        (do
          (is (thrown? Exception
-                      (sut/execute-fx env {:fx/type :call-llm})))
+                      (fx/execute-fx env {::fx/type :call-llm})))
          (is (thrown? Exception
-                      (sut/execute-fx env {:fx/type :unknown}))))
+                      (fx/execute-fx env {::fx/type :unknown}))))
        :cljs
        (is true))))
