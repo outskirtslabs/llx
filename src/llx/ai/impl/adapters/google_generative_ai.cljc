@@ -267,20 +267,27 @@
       "MEDIUM")))
 
 (defn- google-thinking-budget
-  [model effort]
-  (let [pro-budgets   {:minimal 128 :low 2048 :medium 8192 :high 32768}
-        flash-budgets {:minimal 128 :low 2048 :medium 8192 :high 24576}]
+  [model effort custom-budgets]
+  (let [default-budgets (cond
+                          (str/includes? (or (:id model) "") "2.5-pro")
+                          {:minimal 128 :low 2048 :medium 8192 :high 32768}
+
+                          (str/includes? (or (:id model) "") "2.5-flash")
+                          {:minimal 128 :low 2048 :medium 8192 :high 24576}
+
+                          :else nil)
+        budgets         (merge default-budgets (or custom-budgets {}))]
     (cond
       (str/includes? (or (:id model) "") "2.5-pro")
-      (get pro-budgets effort 8192)
+      (get budgets effort 8192)
 
       (str/includes? (or (:id model) "") "2.5-flash")
-      (get flash-budgets effort 8192)
+      (get budgets effort 8192)
 
       :else -1)))
 
 (defn- reasoning->thinking-config
-  [model reasoning]
+  [model reasoning thinking-budgets]
   (when (and (true? (get-in model [:capabilities :reasoning?]))
              (map? reasoning))
     (let [effort (or (:level reasoning) (:effort reasoning) :medium)]
@@ -290,7 +297,7 @@
          :thinkingLevel   (gemini3-thinking-level effort model)}
 
         :else
-        (let [budget (google-thinking-budget model effort)]
+        (let [budget (google-thinking-budget model effort thinking-budgets)]
           {:includeThoughts true
            :thinkingBudget  budget})))))
 
@@ -305,7 +312,7 @@
                                     (env-get "GEMINI_API_KEY")))
               _               (when-not (seq api-key)
                                 (throw (ex-info "Google API key is required" {:provider (:provider model)})))
-              thinking-config (reasoning->thinking-config model (:reasoning opts))
+              thinking-config (reasoning->thinking-config model (:reasoning opts) (:thinking-budgets opts))
               config          (cond-> {}
                                 (contains? opts :temperature) (assoc :temperature (:temperature opts))
                                 (:max-output-tokens opts) (assoc :maxOutputTokens (:max-output-tokens opts))

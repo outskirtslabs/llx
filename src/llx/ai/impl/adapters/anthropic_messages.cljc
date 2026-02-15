@@ -167,8 +167,9 @@
     "high"))
 
 (defn- adjust-max-tokens-for-thinking
-  [base-max-tokens model-max-tokens reasoning-level]
-  (let [budgets         {:minimal 1024 :low 2048 :medium 8192 :high 16384}
+  [base-max-tokens model-max-tokens reasoning-level custom-budgets]
+  (let [default-budgets {:minimal 1024 :low 2048 :medium 8192 :high 16384}
+        budgets         (merge default-budgets (or custom-budgets {}))
         level           (if (= :xhigh reasoning-level) :high reasoning-level)
         thinking-budget (get budgets level 8192)
         max-tokens      (min (+ base-max-tokens thinking-budget) model-max-tokens)
@@ -208,7 +209,7 @@
                                    (max 1 (long (/ (:max-tokens model) 3))))
               adjusted         (when budget?
                                  (adjust-max-tokens-for-thinking
-                                  base-max (:max-tokens model) reasoning-level))
+                                  base-max (:max-tokens model) reasoning-level (:thinking-budgets opts)))
               payload          (cond-> {:model      (:id model)
                                         :messages   (convert-messages model context)
                                         :max_tokens (if adjusted

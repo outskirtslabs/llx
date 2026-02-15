@@ -72,7 +72,7 @@
 
 (deftest create-agent-default-convert-to-llm-test
   (gr.reg/merge-schemas!
-   (merge (agent.schema/schemas {:custom-message-schemas {:custom :test/message-custom
+   (merge (agent.schema/schemas {:custom-message-schemas {:custom       :test/message-custom
                                                           :notification :test/message-notification}})
           {:test/message-custom
            [:map
@@ -233,21 +233,21 @@
              @seen*)))))
 
 (deftest custom-message-schemas-validate-message-and-messages-test
-  (let [custom-message            {:role :my-app/notification
-                                   :text "Heads up"
-                                   :timestamp 1}
-        canonical-user-message    {:role :user
-                                   :content "hello"
-                                   :timestamp 2}
-        custom-message-invalid    (dissoc custom-message :text)
-        base-registry             (agent.schema/registry {})
-        custom-enabled-registry   (mr/composite-registry
-                                   (agent.schema/registry {:custom-message-schemas {:my-app/notification :my/message-notification}})
-                                   {:my/message-notification
-                                    [:map
-                                     [:role [:= :my-app/notification]]
-                                     [:text :string]
-                                     [:timestamp :int]]})]
+  (let [custom-message          {:role      :my-app/notification
+                                 :text      "Heads up"
+                                 :timestamp 1}
+        canonical-user-message  {:role      :user
+                                 :content   "hello"
+                                 :timestamp 2}
+        custom-message-invalid  (dissoc custom-message :text)
+        base-registry           (agent.schema/registry {})
+        custom-enabled-registry (mr/composite-registry
+                                 (agent.schema/registry {:custom-message-schemas {:my-app/notification :my/message-notification}})
+                                 {:my/message-notification
+                                  [:map
+                                   [:role [:= :my-app/notification]]
+                                   [:text :string]
+                                   [:timestamp :int]]})]
     (testing ":llx.agent/custom-message-schemas requires namespace-qualified dispatch keys"
       (is (thrown? #?(:clj clojure.lang.ExceptionInfo
                       :cljs js/Error)
@@ -288,11 +288,11 @@
         agent          (sut/create-agent
                         (merge required-env-opts
                                {:custom-message-schemas {:my-app/notification :my/message-notification}
-                                :schema-registry       {:my/message-notification
-                                                        [:map
-                                                         [:role [:= :my-app/notification]]
-                                                         [:text :string]
-                                                         [:timestamp :int]]}}))
+                                :schema-registry        {:my/message-notification
+                                                         [:map
+                                                          [:role [:= :my-app/notification]]
+                                                          [:text :string]
+                                                          [:timestamp :int]]}}))
         seen*          (atom [])
         marker         (p/resolved ::ok)]
     (with-redefs [fx/run (fn [_env command]
@@ -310,11 +310,11 @@
   (let [custom-message {:role :my-app/notification :text "rehydrated" :timestamp 1}
         opts           (merge required-env-opts
                               {:custom-message-schemas {:my-app/notification :my/message-notification}
-                               :schema-registry       {:my/message-notification
-                                                       [:map
-                                                        [:role [:= :my-app/notification]]
-                                                        [:text :string]
-                                                        [:timestamp :int]]}})
+                               :schema-registry        {:my/message-notification
+                                                        [:map
+                                                         [:role [:= :my-app/notification]]
+                                                         [:text :string]
+                                                         [:timestamp :int]]}})
         valid-state    (base-state [custom-message])]
     (is (= valid-state
            (sut/state (sut/rehydrate-agent valid-state opts))))
@@ -326,21 +326,21 @@
                (sut/create-agent
                 (merge required-env-opts
                        {:custom-message-schemas {:my-app/notification :my/missing-schema}
-                        :schema-registry       {:my/other-schema [:map [:x :int]]}})))))
+                        :schema-registry        {:my/other-schema [:map [:x :int]]}})))))
 
 (deftest custom-message-schema-may-reference-provided-schemas-test
-  (let [valid-message   {:role :my-app/rich-note
-                         :payload {:text "hello"}
+  (let [valid-message   {:role      :my-app/rich-note
+                         :payload   {:text "hello"}
                          :timestamp 1}
         invalid-message (assoc valid-message :payload {})
         agent           (sut/create-agent
                          (merge required-env-opts
                                 {:custom-message-schemas {:my-app/rich-note :my/rich-note-message}
-                                 :schema-registry       {:my/rich-note-payload [:map [:text :string]]
-                                                         :my/rich-note-message [:map
-                                                                                [:role [:= :my-app/rich-note]]
-                                                                                [:payload :my/rich-note-payload]
-                                                                                [:timestamp :int]]}}))
+                                 :schema-registry        {:my/rich-note-payload [:map [:text :string]]
+                                                          :my/rich-note-message [:map
+                                                                                 [:role [:= :my-app/rich-note]]
+                                                                                 [:payload :my/rich-note-payload]
+                                                                                 [:timestamp :int]]}}))
         seen*           (atom [])
         marker          (p/resolved ::ok)]
     (with-redefs [fx/run (fn [_env command]

@@ -154,6 +154,15 @@
             :reasoning         {:level :high}}
            (sut/unified-opts->request-opts model
                                            {:max-tokens 99 :reasoning :xhigh :temperature 0.2})))
+    (is (= {:max-output-tokens  88
+            :session-id         "session-1"
+            :thinking-budgets   {:high 1234}
+            :max-retry-delay-ms 2500}
+           (sut/unified-opts->request-opts model
+                                           {:max-tokens         88
+                                            :session-id         "session-1"
+                                            :thinking-budgets   {:high 1234}
+                                            :max-retry-delay-ms 2500})))
     (is (= {:max-output-tokens 32000}
            (sut/unified-opts->request-opts model {})))
     (is (= {:max-output-tokens 77

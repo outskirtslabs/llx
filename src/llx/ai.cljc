@@ -39,9 +39,11 @@
   | `:temperature`       | Sampling temperature.                                       |
   | `:top-p`             | Nucleus sampling probability.                               |
   | `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
+  | `:session-id`        | Optional session identifier for provider-side caching/routing. |
   | `:api-key`           | Provider API key override for this call.                    |
   | `:headers`           | Additional provider request headers.                        |
   | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
+  | `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
   | `:metadata`          | Request metadata map forwarded to adapter payload builders. |
   | `:registry`          | Per-call adapter registry override.                         |
   | `:max-retries`       | Retry count for transient failures (default `2`).           |
@@ -71,9 +73,11 @@
   | `:temperature`       | Sampling temperature.                                      |
   | `:top-p`             | Nucleus sampling probability.                              |
   | `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
+  | `:session-id`        | Optional session identifier for provider-side caching/routing. |
   | `:api-key`           | Provider API key override for this call.                   |
   | `:headers`           | Additional provider request headers.                       |
   | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
+  | `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
   | `:metadata`          | Request metadata map forwarded to adapter payload builders.|
   | `:registry`          | Per-call adapter registry override.                        |
   | `:max-retries`       | Retry count for transient failures (default `2`).          |
@@ -107,9 +111,12 @@
   | `:top-p`            | Nucleus sampling probability.                                     |
   | `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
   | `:reasoning-effort` | Alias for `:reasoning`.                                           |
+  | `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+  | `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
   | `:api-key`          | Provider API key override for this call.                          |
   | `:headers`          | Additional provider request headers.                              |
   | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+  | `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 
@@ -137,9 +144,12 @@
   | `:top-p`            | Nucleus sampling probability.                                     |
   | `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
   | `:reasoning-effort` | Alias for `:reasoning`.                                           |
+  | `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+  | `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
   | `:api-key`          | Provider API key override for this call.                          |
   | `:headers`          | Additional provider request headers.                              |
   | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+  | `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 

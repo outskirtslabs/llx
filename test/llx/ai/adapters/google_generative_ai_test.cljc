@@ -131,6 +131,14 @@
                       :payload  payload}}
              (util/strip-generated event [:call-id])))))))
 
+(deftest build-request-uses-custom-thinking-budgets
+  (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+        request (sut/build-request (stub-env) google-model context
+                                   {:reasoning        {:level :high}
+                                    :thinking-budgets {:high 999}} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= 999 (get-in payload [:generationConfig :thinkingConfig :thinkingBudget])))))
+
 (deftest build-request-tool-result-image-forwarding-by-model-capability
   (let [context            {:messages [{:role      :user
                                         :content   "use the tool"

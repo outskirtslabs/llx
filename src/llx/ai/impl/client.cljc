@@ -69,11 +69,14 @@
                                    {:effort reasoning-level}
                                    {:level reasoning-level}))]
          (cond-> {:max-output-tokens max-output-tokens}
+           (contains? unified-opts :session-id) (assoc :session-id (:session-id unified-opts))
            (contains? unified-opts :temperature) (assoc :temperature (:temperature unified-opts))
            (contains? unified-opts :top-p) (assoc :top-p (:top-p unified-opts))
+           (contains? unified-opts :thinking-budgets) (assoc :thinking-budgets (:thinking-budgets unified-opts))
            (contains? unified-opts :api-key) (assoc :api-key (:api-key unified-opts))
            (contains? unified-opts :headers) (assoc :headers (:headers unified-opts))
            (contains? unified-opts :signal) (assoc :signal (:signal unified-opts))
+           (contains? unified-opts :max-retry-delay-ms) (assoc :max-retry-delay-ms (:max-retry-delay-ms unified-opts))
            (contains? unified-opts :metadata) (assoc :metadata (:metadata unified-opts))
            (contains? unified-opts :registry) (assoc :registry (:registry unified-opts))
            reasoning (assoc :reasoning reasoning))))
@@ -301,8 +304,9 @@
                                 :has-tools?         (boolean (seq (:tools context)))
                                 :has-system-prompt? (boolean (seq (:system-prompt context)))}})
            (-> (errors/retry-loop-async do-request max-retries p/delay
-                                        {:call-id  (:call/id call-env)
-                                         :provider (:provider model)})
+                                        {:call-id            (:call/id call-env)
+                                         :provider           (:provider model)
+                                         :max-retry-delay-ms (:max-retry-delay-ms request-opts)})
                (p/then (fn [response]
                          (let [{:keys [assistant-message]} (schema/assert-valid!
                                                             :llx/runtime-finalize-result

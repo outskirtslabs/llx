@@ -54,42 +54,44 @@
         llm-messages         [{:role :user :content "llm message" :timestamp 3}]
         final-message        (assistant-message model "Hello")
         seen*                (atom {})
-        env                  {:state_            (atom {:node               :node/streaming
-                                                       :system-prompt      "sys"
-                                                       :model              model
-                                                       :thinking-level     :medium
-                                                       :tools              [{:name "read_file"}]
-                                                       :messages           input-messages
-                                                       :stream-message     nil
-                                                       :pending-tool-calls []
-                                                       :error              nil
-                                                       :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                                                              :cljs #queue [])
-                                                       :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                                                              :cljs #queue [])
-                                                       :steering-mode      :one-at-a-time
-                                                       :follow-up-mode     :one-at-a-time})
-                              :convert-to-llm    (fn [messages]
-                                                   (swap! seen* assoc :convert-input messages)
-                                                   (p/delay 1 llm-messages))
-                              :transform-context (fn [messages signal]
-                                                   (swap! seen* assoc :transform-input {:messages messages
-                                                                                        :signal signal})
-                                                   (p/delay 1 transformed-messages))
-                              :stream-fn         (fn [m context options]
-                                                   (swap! seen* assoc :stream-input {:model m
-                                                                                     :context context
-                                                                                     :options options})
-                                                   (stream-with-events
-                                                    [{:type :start}
-                                                     {:type :text-start}
-                                                     {:type :text-delta :text "Hel"}
-                                                     {:type :text-delta :text "lo"}
-                                                     {:type :done :assistant-message final-message}]))
-                              :abort-signal      ::abort-signal
-                              :session-id        "session-1"
-                              :get-api-key       (fn [_provider] "token")
-                              :thinking-budgets  {:high 1234}
+        env                  {:state_             (atom {:node               :node/streaming
+                                                         :system-prompt      "sys"
+                                                         :model              model
+                                                         :thinking-level     :medium
+                                                         :tools              [{:name "read_file"}]
+                                                         :messages           input-messages
+                                                         :stream-message     nil
+                                                         :pending-tool-calls []
+                                                         :error              nil
+                                                         :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                                                                :cljs #queue [])
+                                                         :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                                                                :cljs #queue [])
+                                                         :steering-mode      :one-at-a-time
+                                                         :follow-up-mode     :one-at-a-time})
+                              :convert-to-llm     (fn [messages]
+                                                    (swap! seen* assoc :convert-input messages)
+                                                    (p/delay 1 llm-messages))
+                              :transform-context  (fn [messages signal]
+                                                    (swap! seen* assoc :transform-input {:messages messages
+                                                                                         :signal   signal})
+                                                    (p/delay 1 transformed-messages))
+                              :stream-fn          (fn [m context options]
+                                                    (swap! seen* assoc :stream-input {:model   m
+                                                                                      :context context
+                                                                                      :options options})
+                                                    (stream-with-events
+                                                     [{:type :start}
+                                                      {:type :text-start}
+                                                      {:type :text-delta :text "Hel"}
+                                                      {:type :text-delta :text "lo"}
+                                                      {:type :done :assistant-message final-message}]))
+                              :abort-signal       ::abort-signal
+                              :session-id         "session-1"
+                              :get-api-key        (fn [provider]
+                                                    (swap! seen* assoc :get-api-key-provider provider)
+                                                    (p/delay 1 "token"))
+                              :thinking-budgets   {:high 1234}
                               :max-retry-delay-ms 2500}
         out                  (sut/execute-fx env {:fx/type :call-llm :messages input-messages})]
     #?(:clj
@@ -115,6 +117,8 @@
                 (get-in @seen* [:stream-input :context])))
          (is (= :medium (get-in @seen* [:stream-input :options :reasoning])))
          (is (= ::abort-signal (get-in @seen* [:stream-input :options :signal])))
+         (is (= "token" (get-in @seen* [:stream-input :options :api-key])))
+         (is (= "openai" (:get-api-key-provider @seen*)))
          (is (= "session-1" (get-in @seen* [:stream-input :options :session-id])))
          (is (= {:high 1234} (get-in @seen* [:stream-input :options :thinking-budgets])))
          (is (= 2500 (get-in @seen* [:stream-input :options :max-retry-delay-ms])))
@@ -123,35 +127,38 @@
        (is true))))
 
 (deftest fx-call-llm-uses-default-stream-fn-when-not-provided-test
-  (let [model    (ai/get-model :openai "gpt-4o")
-        seen*    (atom nil)
-        env      {:state_         (atom {:node               :node/streaming
-                                         :system-prompt      "sys"
-                                         :model              model
-                                         :thinking-level     :low
-                                         :tools              []
-                                         :messages           [{:role :user :content "x" :timestamp 1}]
-                                         :stream-message     nil
-                                         :pending-tool-calls []
-                                         :error              nil
-                                         :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                                                :cljs #queue [])
-                                         :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                                                :cljs #queue [])
-                                         :steering-mode      :one-at-a-time
-                                         :follow-up-mode     :one-at-a-time})
-                  :convert-to-llm identity
-                  :abort-signal   ::abort-signal
-                  :session-id     "session-ignored-with-default"}
-        events   [{:type :start}
-                  {:type :done :assistant-message (assistant-message model "ok")}]]
+  (let [model  (ai/get-model :openai "gpt-4o")
+        seen*  (atom nil)
+        env    {:state_             (atom {:node               :node/streaming
+                                           :system-prompt      "sys"
+                                           :model              model
+                                           :thinking-level     :low
+                                           :tools              []
+                                           :messages           [{:role :user :content "x" :timestamp 1}]
+                                           :stream-message     nil
+                                           :pending-tool-calls []
+                                           :error              nil
+                                           :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                                                  :cljs #queue [])
+                                           :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                                                  :cljs #queue [])
+                                           :steering-mode      :one-at-a-time
+                                           :follow-up-mode     :one-at-a-time})
+                :convert-to-llm     identity
+                :abort-signal       ::abort-signal
+                :session-id         "session-default"
+                :get-api-key        (fn [_provider] "resolved-key")
+                :thinking-budgets   {:low 4321}
+                :max-retry-delay-ms 1500}
+        events [{:type :start}
+                {:type :done :assistant-message (assistant-message model "ok")}]]
     (with-redefs [ai/default-env (fn [] ::ai-env)
-                  ai/stream (fn [runtime-env stream-model context options]
-                              (reset! seen* {:runtime-env runtime-env
-                                             :model       stream-model
-                                             :context     context
-                                             :options     options})
-                              (stream-with-events events))]
+                  ai/stream      (fn [runtime-env stream-model context options]
+                                   (reset! seen* {:runtime-env runtime-env
+                                                  :model       stream-model
+                                                  :context     context
+                                                  :options     options})
+                                   (stream-with-events events))]
       (let [out     (sut/execute-fx env {:fx/type :call-llm :messages [{:role :user :content "hi" :timestamp 2}]})
             signals #?(:clj (read-signals! out)
                        :cljs [])]
@@ -166,7 +173,11 @@
                     (:context @seen*)))
              (is (= :low (get-in @seen* [:options :reasoning])))
              (is (= ::abort-signal (get-in @seen* [:options :signal])))
-             (is (nil? (get-in @seen* [:options :session-id]))))
+             (is (= "session-default" (get-in @seen* [:options :session-id])))
+             (is (= "resolved-key" (get-in @seen* [:options :api-key])))
+             (is (= {:low 4321} (get-in @seen* [:options :thinking-budgets])))
+             (is (= 1500 (get-in @seen* [:options :max-retry-delay-ms])))
+             (is (nil? (get-in @seen* [:options :get-api-key]))))
            :cljs
            (is true))))))
 

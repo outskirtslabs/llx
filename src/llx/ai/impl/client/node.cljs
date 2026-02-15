@@ -189,8 +189,9 @@
                                              response-d))
                                          max-retries
                                          p/delay
-                                         {:call-id  (:call/id env)
-                                          :provider (:provider model)})
+                                         {:call-id            (:call/id env)
+                                          :provider           (:provider model)
+                                          :max-retry-delay-ms (:max-retry-delay-ms request-opts)})
                                         (p/then (fn [response]
                                                   (schema/assert-valid! :llx/http-response-map response)))
                                         (p/then (fn [response]

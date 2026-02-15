@@ -57,6 +57,13 @@
    :llx/reasoning-level
    [:enum :minimal :low :medium :high :xhigh]
 
+   :llx/thinking-budgets
+   [:map
+    [:minimal {:optional true} :llx/non-neg-int]
+    [:low {:optional true} :llx/non-neg-int]
+    [:medium {:optional true} :llx/non-neg-int]
+    [:high {:optional true} :llx/non-neg-int]]
+
    :llx/cache-control
    [:enum :none :short :long]
 
@@ -300,11 +307,14 @@
     [:max-tokens {:optional true} :llx/non-neg-int]
     [:reasoning {:optional true} :llx/reasoning-level]
     [:reasoning-effort {:optional true} :llx/reasoning-level]
+    [:session-id {:optional true} :llx/id-string]
     [:temperature {:optional true} :llx/non-neg-number]
     [:top-p {:optional true} :llx/non-neg-number]
+    [:thinking-budgets {:optional true} :llx/thinking-budgets]
     [:api-key {:optional true} :llx/id-string]
     [:headers {:optional true} [:map-of :string :string]]
     [:signal {:optional true} :any]
+    [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
     [:metadata {:optional true} :llx/metadata-map]
     [:registry {:optional true} :any]]
 
@@ -327,6 +337,7 @@
     [:top-p {:optional true} :llx/non-neg-number]
     [:max-output-tokens {:optional true} :llx/non-neg-int]
     [:signal {:optional true} :any]
+    [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
     [:metadata {:optional true} :llx/metadata-map]
     [:registry {:optional true} :any]
     [:max-retries {:optional true} :llx/non-neg-int]]

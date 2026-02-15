@@ -181,6 +181,19 @@
             :stream     false}
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
 
+(deftest build-request-uses-custom-thinking-budgets
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-model context
+                                   {:api-key          "k"
+                                    :reasoning        {:level :medium}
+                                    :thinking-budgets {:medium 2048}} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= {:thinking   {:type "enabled" :budget_tokens 2048}
+            :max_tokens 4778
+            :model      "claude-sonnet-4-5"
+            :stream     false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
 (deftest build-request-omits-thinking-when-no-reasoning-opts
   (let [context {:messages [{:role :user :content "just chat" :timestamp 1}]}
         request (sut/build-request (stub-env) anthropic-model context

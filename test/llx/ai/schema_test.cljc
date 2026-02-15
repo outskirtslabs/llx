@@ -149,15 +149,18 @@
     (is (sut/valid? :llx/event {:type :toolcall-delta :id "call_1" :name "search" :arguments {:q "foo"}}))))
 
 (deftest options-schema
-  (let [unified-opts  {:max-tokens       1024
-                       :reasoning        :high
-                       :reasoning-effort :high
-                       :temperature      0.3
-                       :top-p            0.95
-                       :api-key          "k"
-                       :headers          {"x-trace-id" "abc"}
-                       :signal           ::sig
-                       :metadata         {:request-id "abc"}}
+  (let [unified-opts  {:max-tokens         1024
+                       :reasoning          :high
+                       :reasoning-effort   :high
+                       :session-id         "session-unified"
+                       :temperature        0.3
+                       :top-p              0.95
+                       :thinking-budgets   {:high 1234}
+                       :api-key            "k"
+                       :headers            {"x-trace-id" "abc"}
+                       :signal             ::sig
+                       :max-retry-delay-ms 2500
+                       :metadata           {:request-id "abc"}}
         provider-opts {:tools             [valid-tool]
                        :tool-choice       :auto
                        :reasoning         {:level :high}

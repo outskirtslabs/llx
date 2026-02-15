@@ -80,6 +80,16 @@
           :http-status  429}
          (ex-data (sut/quota-exceeded "openai" "Quota exceeded" :http-status 429)))))
 
+(deftest retry-delay-exceeded-is-not-recoverable
+  (is (= {:type         :llx/retry-delay-exceeded
+          :message      "Server requested 120.0s retry delay (max: 60.0s)."
+          :recoverable? false
+          :provider     "google"
+          :request-id   "req_1"
+          :context      {:requested-delay-ms 120000
+                         :max-delay-ms       60000}}
+         (ex-data (sut/retry-delay-exceeded "google" 120000 60000 :request-id "req_1")))))
+
 (deftest content-filter-is-not-recoverable
   (is (= {:type          :llx/content-filter
           :message       "Content filtered"
@@ -313,6 +323,50 @@
                             (is (= 1 (count @sleep-ms)))
                             (done)))
                   (p/catch (partial fail-and-done! done)))))))
+
+(deftest retry-loop-async-fails-when-server-retry-delay-exceeds-cap
+  #?(:clj
+     (let [f  (fn []
+                (throw (sut/rate-limit "google" "rate limit"
+                                       :retry-after 10
+                                       :request-id "req_1")))
+           ex (try
+                (util/await! (sut/retry-loop-async f 2 (fn [_ms])
+                                                   {:provider           "google"
+                                                    :max-retry-delay-ms 5000}))
+                nil
+                (catch #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) e
+                  e))]
+       (is (= {:type         :llx/retry-delay-exceeded
+               :message      "Server requested 10.0s retry delay (max: 5.0s)."
+               :recoverable? false
+               :provider     "google"
+               :request-id   "req_1"
+               :context      {:requested-delay-ms 10000
+                              :max-delay-ms       5000}}
+              (ex-data ex))))
+     :cljs
+     (async done
+            (let [f (fn []
+                      (throw (sut/rate-limit "google" "rate limit"
+                                             :retry-after 10
+                                             :request-id "req_1")))]
+              (-> (sut/retry-loop-async f 2 (fn [_ms])
+                                        {:provider           "google"
+                                         :max-retry-delay-ms 5000})
+                  (p/then (fn [_]
+                            (is nil "expected rejection")
+                            (done)))
+                  (p/catch (fn [ex]
+                             (is (= {:type         :llx/retry-delay-exceeded
+                                     :message      "Server requested 10.0s retry delay (max: 5.0s)."
+                                     :recoverable? false
+                                     :provider     "google"
+                                     :request-id   "req_1"
+                                     :context      {:requested-delay-ms 10000
+                                                    :max-delay-ms       5000}}
+                                    (ex-data ex)))
+                             (done))))))))
 
 (deftest retry-loop-async-emits-retry-scheduled-trove-signal
   #?(:clj

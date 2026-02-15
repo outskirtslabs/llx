@@ -9,6 +9,7 @@
     :llx/authorization-error
     :llx/invalid-request
     :llx/model-not-found
+    :llx/retry-delay-exceeded
     :llx/quota-exceeded
     :llx/content-filter
     :llx/unsupported-reasoning-level
@@ -120,6 +121,20 @@
                              :provider provider
                              :http-status (or http-status 429)
                              :recoverable? false)))
+
+(defn retry-delay-exceeded
+  [provider requested-delay-ms max-delay-ms & {:keys [request-id]}]
+  (let [requested-seconds (double (/ (long requested-delay-ms) 1000.0))
+        max-seconds       (double (/ (long max-delay-ms) 1000.0))
+        message           (str "Server requested " requested-seconds
+                               "s retry delay (max: " max-seconds "s).")]
+    (ex-info message
+             (build-error-data :llx/retry-delay-exceeded message
+                               :provider provider
+                               :request-id request-id
+                               :recoverable? false
+                               :context {:requested-delay-ms requested-delay-ms
+                                         :max-delay-ms       max-delay-ms}))))
 
 (defn content-filter
   [provider message & {:keys [provider-code]}]
@@ -315,7 +330,7 @@
 (defn retry-loop-async
   ([f max-retries sleep-fn]
    (retry-loop-async f max-retries sleep-fn {}))
-  ([f max-retries sleep-fn {:keys [call-id provider]}]
+  ([f max-retries sleep-fn {:keys [call-id provider max-retry-delay-ms]}]
    (letfn [(sleep! [delay-ms]
              (let [v (sleep-fn delay-ms)]
                (if (p/deferred? v)
@@ -329,20 +344,30 @@
                     (if (should-retry? ex :max-retries max-retries
                                        :current-retry attempt)
                       (let [delay-ms (retry-delay-ms ex attempt)
-                            exd      (ex-data ex)]
-                        (trove/log! {:level :info
-                                     :id    :llx.obs/retry-scheduled
-                                     :data  {:call-id      call-id
-                                             :attempt      attempt
-                                             :next-attempt (inc attempt)
-                                             :max-retries  max-retries
-                                             :delay-ms     delay-ms
-                                             :error-type   (:type exd)
-                                             :provider     (or provider (:provider exd))
-                                             :request-id   (:request-id exd)
-                                             :retry-after  (:retry-after exd)}})
-                        (-> (sleep! delay-ms)
-                            (p/then (fn [_]
-                                      (step (inc attempt))))))
+                            exd      (ex-data ex)
+                            provider (or provider (:provider exd))
+                            capped?  (and (some? max-retry-delay-ms)
+                                          (pos? max-retry-delay-ms)
+                                          (some? (:retry-after exd))
+                                          (> delay-ms max-retry-delay-ms))]
+                        (if capped?
+                          (p/rejected
+                           (retry-delay-exceeded provider delay-ms max-retry-delay-ms
+                                                 :request-id (:request-id exd)))
+                          (do
+                            (trove/log! {:level :info
+                                         :id    :llx.obs/retry-scheduled
+                                         :data  {:call-id      call-id
+                                                 :attempt      attempt
+                                                 :next-attempt (inc attempt)
+                                                 :max-retries  max-retries
+                                                 :delay-ms     delay-ms
+                                                 :error-type   (:type exd)
+                                                 :provider     provider
+                                                 :request-id   (:request-id exd)
+                                                 :retry-after  (:retry-after exd)}})
+                            (-> (sleep! delay-ms)
+                                (p/then (fn [_]
+                                          (step (inc attempt))))))))
                       (p/rejected ex))))))]
      (step 0))))
