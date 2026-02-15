@@ -11,6 +11,8 @@
    [llx.ai.impl.registry :as registry]
    [llx.ai.impl.schema :as schema]
    [llx.ai.impl.transform-messages :as transform-messages]
+   [malli.core :as m]
+   [malli.transform :as mt]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]
    [taoensso.trove :as trove]))
@@ -31,6 +33,21 @@
       (registry/register-adapter
        (google-generative-ai/adapter)
        builtins-source-id)))
+
+(def ^:private default-transformer
+  (mt/default-value-transformer {::mt/add-optional-keys true}))
+
+(def ^:private unified->provider-passthrough-keys
+  [:session-id
+   :temperature
+   :top-p
+   :thinking-budgets
+   :api-key
+   :headers
+   :signal
+   :max-retry-delay-ms
+   :metadata
+   :registry])
 
 (defn- assert-context!
   [context]
@@ -53,33 +70,36 @@
     :high
     level))
 
+(defn- reasoning-option
+  [model unified-opts]
+  (let [reasoning-level (or (:reasoning unified-opts)
+                            (:reasoning-effort unified-opts))
+        reasoning-level (when reasoning-level
+                          (clamp-reasoning-level model reasoning-level))]
+    (when reasoning-level
+      (if (= :openai-responses (:api model))
+        {:effort reasoning-level}
+        {:level reasoning-level}))))
+
 (>defn unified-opts->request-opts
        "Converts unified options to provider-path request options.
 
   See [[llx.ai/complete]] and [[llx.ai/stream]] for unified option semantics."
        [model unified-opts]
        [:llx/model [:maybe :llx/unified-request-options] => :llx/provider-request-options]
-       (let [unified-opts      (or unified-opts {})
+       (let [registry          (schema/registry)
+             unified-opts      (m/coerce :llx/unified-request-options (or unified-opts {}) default-transformer {:registry registry})
              max-output-tokens (or (:max-tokens unified-opts)
                                    (min (long (:max-tokens model)) 32000))
-             reasoning-level   (or (:reasoning unified-opts) (:reasoning-effort unified-opts))
-             reasoning-level   (when reasoning-level (clamp-reasoning-level model reasoning-level))
-             reasoning         (when reasoning-level
-                                 (if (= :openai-responses (:api model))
-                                   {:effort reasoning-level}
-                                   {:level reasoning-level}))]
-         (cond-> {:max-output-tokens max-output-tokens}
-           (contains? unified-opts :session-id) (assoc :session-id (:session-id unified-opts))
-           (contains? unified-opts :temperature) (assoc :temperature (:temperature unified-opts))
-           (contains? unified-opts :top-p) (assoc :top-p (:top-p unified-opts))
-           (contains? unified-opts :thinking-budgets) (assoc :thinking-budgets (:thinking-budgets unified-opts))
-           (contains? unified-opts :api-key) (assoc :api-key (:api-key unified-opts))
-           (contains? unified-opts :headers) (assoc :headers (:headers unified-opts))
-           (contains? unified-opts :signal) (assoc :signal (:signal unified-opts))
-           (contains? unified-opts :max-retry-delay-ms) (assoc :max-retry-delay-ms (:max-retry-delay-ms unified-opts))
-           (contains? unified-opts :metadata) (assoc :metadata (:metadata unified-opts))
-           (contains? unified-opts :registry) (assoc :registry (:registry unified-opts))
-           reasoning (assoc :reasoning reasoning))))
+             reasoning         (reasoning-option model unified-opts)
+             request-opts      (merge
+                                {:max-output-tokens max-output-tokens}
+                                (select-keys unified-opts unified->provider-passthrough-keys)
+                                (when reasoning {:reasoning reasoning}))]
+         (m/coerce :llx/provider-request-options
+                   request-opts
+                   default-transformer
+                   {:registry registry})))
 
 (defn- assert-reasoning-level!
   [model opts]
