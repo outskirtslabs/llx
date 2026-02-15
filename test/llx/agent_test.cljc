@@ -26,21 +26,21 @@
 
 (defn- base-state
   [messages]
-  {:node               :node/idle
-   :system-prompt      ""
-   :model              (ai/get-model :openai "gpt-5.2-codex")
-   :thinking-level     :off
-   :tools              []
-   :messages           messages
-   :stream-message     nil
-   :pending-tool-calls []
-   :error              nil
-   :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
-                          :cljs #queue [])
-   :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
-                          :cljs #queue [])
-   :steering-mode      :one-at-a-time
-   :follow-up-mode     :one-at-a-time})
+  {:llx.agent.loop/phase :llx.agent.loop/idle
+   :system-prompt        ""
+   :model                (ai/get-model :openai "gpt-5.2-codex")
+   :thinking-level       :off
+   :tools                []
+   :messages             messages
+   :stream-message       nil
+   :pending-tool-calls   []
+   :error                nil
+   :steering-queue       #?(:clj clojure.lang.PersistentQueue/EMPTY
+                            :cljs #queue [])
+   :follow-up-queue      #?(:clj clojure.lang.PersistentQueue/EMPTY
+                            :cljs #queue [])
+   :steering-mode        :one-at-a-time
+   :follow-up-mode       :one-at-a-time})
 
 (deftest create-agent-initializes-state-test
   (let [model (ai/get-model :openai "gpt-4o")
@@ -138,21 +138,21 @@
 
 (deftest rehydrate-agent-uses-snapshot-test
   (let [model (ai/get-model :openai "gpt-4o")
-        state {:node               :node/idle
-               :system-prompt      "Hydrated"
-               :model              model
-               :thinking-level     :medium
-               :tools              [{:name "read_file"}]
-               :messages           [{:role :user :content "old" :timestamp 1}]
-               :stream-message     nil
-               :pending-tool-calls []
-               :error              nil
-               :steering-queue     #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                      :cljs #queue [])
-               :follow-up-queue    #?(:clj clojure.lang.PersistentQueue/EMPTY
-                                      :cljs #queue [])
-               :steering-mode      :one-at-a-time
-               :follow-up-mode     :one-at-a-time}
+        state {:llx.agent.loop/phase :llx.agent.loop/idle
+               :system-prompt        "Hydrated"
+               :model                model
+               :thinking-level       :medium
+               :tools                [{:name "read_file"}]
+               :messages             [{:role :user :content "old" :timestamp 1}]
+               :stream-message       nil
+               :pending-tool-calls   []
+               :error                nil
+               :steering-queue       #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                        :cljs #queue [])
+               :follow-up-queue      #?(:clj clojure.lang.PersistentQueue/EMPTY
+                                        :cljs #queue [])
+               :steering-mode        :one-at-a-time
+               :follow-up-mode       :one-at-a-time}
         agent (sut/rehydrate-agent state required-env-opts)]
     (is (= state (sut/state agent)))))
 
@@ -160,8 +160,8 @@
   (let [agent      (sut/create-agent required-env-opts)
         default-ch (sut/subscribe agent)
         custom-ch  (sp/chan :buf (sp/sliding-buffer 8))
-        event-1    {:type :event/test :n 1}
-        event-2    {:type :event/test :n 2}]
+        event-1    {:type :llx.agent.event/test :n 1}
+        event-2    {:type :llx.agent.event/test :n 2}]
     (is (sp/chan? default-ch))
     (is (identical? custom-ch (sut/subscribe agent custom-ch)))
 

@@ -8,19 +8,19 @@
 
 (defn- initial-state
   []
-  {:node               :node/idle
-   :system-prompt      ""
-   :model              (ai/get-model :openai "gpt-5.2-codex")
-   :thinking-level     :off
-   :tools              []
-   :messages           []
-   :stream-message     nil
-   :pending-tool-calls []
-   :error              nil
-   :steering-queue     sut/empty-queue
-   :follow-up-queue    sut/empty-queue
-   :steering-mode      :one-at-a-time
-   :follow-up-mode     :one-at-a-time})
+  {:llx.agent.loop/phase :llx.agent.loop/idle
+   :system-prompt        ""
+   :model                (ai/get-model :openai "gpt-5.2-codex")
+   :thinking-level       :off
+   :tools                []
+   :messages             []
+   :stream-message       nil
+   :pending-tool-calls   []
+   :error                nil
+   :steering-queue       sut/empty-queue
+   :follow-up-queue      sut/empty-queue
+   :steering-mode        :one-at-a-time
+   :follow-up-mode       :one-at-a-time})
 
 (defn- state-with
   [overrides]
@@ -31,19 +31,19 @@
   (mapv ::fx/type effects))
 
 (deftest initial-state-has-expected-shape-test
-  (is (= {:node               :node/idle
-          :system-prompt      ""
-          :model              (ai/get-model :openai "gpt-5.2-codex")
-          :thinking-level     :off
-          :tools              []
-          :messages           []
-          :stream-message     nil
-          :pending-tool-calls []
-          :error              nil
-          :steering-queue     sut/empty-queue
-          :follow-up-queue    sut/empty-queue
-          :steering-mode      :one-at-a-time
-          :follow-up-mode     :one-at-a-time}
+  (is (= {:llx.agent.loop/phase :llx.agent.loop/idle
+          :system-prompt        ""
+          :model                (ai/get-model :openai "gpt-5.2-codex")
+          :thinking-level       :off
+          :tools                []
+          :messages             []
+          :stream-message       nil
+          :pending-tool-calls   []
+          :error                nil
+          :steering-queue       sut/empty-queue
+          :follow-up-queue      sut/empty-queue
+          :steering-mode        :one-at-a-time
+          :follow-up-mode       :one-at-a-time}
          (initial-state))))
 
 (deftest command-predicate-test
@@ -57,7 +57,7 @@
     (is (false? (sut/command? {:type :signal/prompt-start}))))
 
   (testing "rejects events"
-    (is (false? (sut/command? {:type :event/agent-start})))))
+    (is (false? (sut/command? {:type :llx.agent.event/agent-start})))))
 
 (deftest handle-command-set-system-prompt-test
   (let [[state' sigs] (sut/handle-command (initial-state)
@@ -166,7 +166,7 @@
 
 (deftest handle-command-reset-test
   (let [state         (-> (initial-state)
-                          (assoc :node :node/streaming
+                          (assoc :llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages [{:role :user :content "x"}]
                                  :stream-message {:partial true}
                                  :pending-tool-calls ["tc-1"]
@@ -174,14 +174,14 @@
                           (update :steering-queue conj {:role :user :content "s"})
                           (update :follow-up-queue conj {:role :user :content "f"}))
         [state' sigs] (sut/handle-command state {:type :command/reset})]
-    (is (= {:node               :node/idle
-            :messages           []
-            :steering-queue     sut/empty-queue
-            :follow-up-queue    sut/empty-queue
-            :stream-message     nil
-            :pending-tool-calls []
-            :error              nil}
-           (select-keys state' [:node :messages :steering-queue :follow-up-queue
+    (is (= {:llx.agent.loop/phase :llx.agent.loop/idle
+            :messages             []
+            :steering-queue       sut/empty-queue
+            :follow-up-queue      sut/empty-queue
+            :stream-message       nil
+            :pending-tool-calls   []
+            :error                nil}
+           (select-keys state' [:llx.agent.loop/phase :messages :steering-queue :follow-up-queue
                                 :stream-message :pending-tool-calls :error])))
     (is (= [] sigs))))
 
@@ -193,7 +193,7 @@
     (is (= [{:type :signal/prompt-start :messages msgs}] sigs))))
 
 (deftest handle-command-prompt-when-not-idle-test
-  (let [state         (state-with {:node :node/streaming})
+  (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' sigs] (sut/handle-command state
                                           {:type     :command/prompt
                                            :messages [{:role :user :content "hi"}]})]
@@ -259,13 +259,13 @@
     (is (= [{:type :signal/rejected :reason :no-queued-messages}] sigs))))
 
 (deftest handle-command-continue-when-not-idle-test
-  (let [state         (state-with {:node :node/streaming})
+  (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' sigs] (sut/handle-command state {:type :command/continue})]
     (is (= state state'))
     (is (= [{:type :signal/rejected :reason :not-idle}] sigs))))
 
 (deftest handle-command-abort-when-streaming-test
-  (let [state         (state-with {:node :node/streaming})
+  (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' sigs] (sut/handle-command state {:type :command/abort})]
     (is (= state state'))
     (is (= [{:type :signal/abort}] sigs))))
@@ -277,22 +277,22 @@
     (is (= [{:type :signal/rejected :reason :idle}] sigs))))
 
 (deftest idle-transition-prompt-start-test
-  (let [state            (state-with {:node :node/idle :messages [{:role :user :content "old"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle :messages [{:role :user :content "old"}]})
         new-msgs         [{:role :user :content "hello"}]
         [state' effects] (sut/idle-transition state {:type     :signal/prompt-start
                                                      :messages new-msgs})]
     (testing "appends messages and transitions to streaming"
       (is (= [{:role :user :content "old"} {:role :user :content "hello"}]
              (:messages state')))
-      (is (= :node/streaming (:node state'))))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state'))))
 
     (testing "emits agent-start, turn-start, message events, and call-llm"
       (is (= [:emit-event :emit-event :emit-event :emit-event :call-llm]
              (fx-types effects)))
-      (is (= :event/agent-start (get-in effects [0 :event :type])))
-      (is (= :event/turn-start (get-in effects [1 :event :type])))
-      (is (= :event/message-start (get-in effects [2 :event :type])))
-      (is (= :event/message-end (get-in effects [3 :event :type]))))
+      (is (= :llx.agent.event/agent-start (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/turn-start (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/message-start (get-in effects [2 :event :type])))
+      (is (= :llx.agent.event/message-end (get-in effects [3 :event :type]))))
 
     (testing "call-llm receives the full message history including new messages"
       (let [call-llm-fx (last effects)]
@@ -300,19 +300,19 @@
                (:messages call-llm-fx)))))))
 
 (deftest idle-transition-continue-start-test
-  (let [state            (state-with {:node :node/idle :messages [{:role :user :content "old"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle :messages [{:role :user :content "old"}]})
         new-msgs         [{:role :user :content "continue"}]
         [state' effects] (sut/idle-transition state {:type     :signal/continue-start
                                                      :messages new-msgs})]
     (testing "appends messages and transitions to streaming"
       (is (= [{:role :user :content "old"} {:role :user :content "continue"}]
              (:messages state')))
-      (is (= :node/streaming (:node state'))))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state'))))
 
     (testing "emits turn-start (no agent-start), message events, and call-llm"
       (is (= [:emit-event :emit-event :emit-event :call-llm]
              (fx-types effects)))
-      (is (= :event/turn-start (get-in effects [0 :event :type]))))
+      (is (= :llx.agent.event/turn-start (get-in effects [0 :event :type]))))
 
     (testing "call-llm receives the full message history including new messages"
       (let [call-llm-fx (last effects)]
@@ -320,41 +320,41 @@
                (:messages call-llm-fx)))))))
 
 (deftest idle-transition-invalid-signal-test
-  (let [state            (state-with {:node :node/idle})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle})
         [state' effects] (sut/idle-transition state {:type :signal/llm-chunk})]
     (is (= state state'))
     (is (= [{::fx/type :reject :reason :invalid-signal}] effects))))
 
 (deftest streaming-transition-llm-start-test
   (let [msg              {:role :assistant :content "partial"}
-        state            (state-with {:node :node/streaming})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' effects] (sut/streaming-transition state {:type    :signal/llm-start
                                                           :message msg})]
     (is (= msg (:stream-message state')))
     (is (= [{::fx/type :emit-event
-             :event    {:type :event/message-start :message msg}}]
+             :event    {:type :llx.agent.event/message-start :message msg}}]
            effects))))
 
 (deftest streaming-transition-llm-chunk-test
   (let [chunk            {:role :assistant :content "more"}
-        state            (state-with {:node           :node/streaming
-                                      :stream-message {:role :assistant :content "partial"}})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :stream-message       {:role :assistant :content "partial"}})
         [state' effects] (sut/streaming-transition state {:type  :signal/llm-chunk
                                                           :chunk chunk})]
     (is (= chunk (:stream-message state')))
     (is (= [{::fx/type :emit-event
-             :event    {:type :event/message-update :chunk chunk}}]
+             :event    {:type :llx.agent.event/message-update :chunk chunk}}]
            effects))))
 
 (deftest streaming-transition-llm-done-no-tools-test
   (let [message          {:role :assistant :content "Hi!" :tool-calls []}
-        state            (state-with {:node           :node/streaming
-                                      :messages       [{:role :user :content "hello"}]
-                                      :stream-message {:role :assistant :content "partial"}})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "hello"}]
+                                      :stream-message       {:role :assistant :content "partial"}})
         [state' effects] (sut/streaming-transition state {:type    :signal/llm-done
                                                           :message message})]
     (testing "transitions to idle and clears stream-message"
-      (is (= :node/idle (:node state')))
+      (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
       (is (nil? (:stream-message state'))))
 
     (testing "appends the final message"
@@ -363,20 +363,20 @@
 
     (testing "emits message-end and turn-end"
       (is (= [:emit-event :emit-event] (fx-types effects)))
-      (is (= :event/message-end (get-in effects [0 :event :type])))
-      (is (= :event/turn-end (get-in effects [1 :event :type]))))))
+      (is (= :llx.agent.event/message-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/turn-end (get-in effects [1 :event :type]))))))
 
 (deftest streaming-transition-llm-done-with-tools-test
   (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}
                           {:id "tc-2" :name "write_file" :arguments {:path "/out"}}]
         message          {:role :assistant :content "" :tool-calls tool-calls}
-        state            (state-with {:node           :node/streaming
-                                      :messages       [{:role :user :content "do stuff"}]
-                                      :stream-message {:role :assistant :content "partial"}})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "do stuff"}]
+                                      :stream-message       {:role :assistant :content "partial"}})
         [state' effects] (sut/streaming-transition state {:type    :signal/llm-done
                                                           :message message})]
     (testing "transitions to tool-executing"
-      (is (= :node/tool-executing (:node state'))))
+      (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase state'))))
 
     (testing "sets pending-tool-calls and clears stream-message"
       (is (= tool-calls (:pending-tool-calls state')))
@@ -388,43 +388,43 @@
 
     (testing "emits message-end, tool-execution-start, and execute-tool"
       (is (= [:emit-event :emit-event :execute-tool] (fx-types effects)))
-      (is (= :event/message-end (get-in effects [0 :event :type])))
-      (is (= :event/tool-execution-start (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/message-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/tool-execution-start (get-in effects [1 :event :type])))
       (is (= "tc-1" (get-in effects [1 :event :tool-call-id])))
       (is (= (first tool-calls) (:tool-call (nth effects 2)))))))
 
 (deftest streaming-transition-llm-error-test
-  (let [state            (state-with {:node     :node/streaming
-                                      :messages [{:role :user :content "hello"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "hello"}]})
         [state' effects] (sut/streaming-transition state {:type  :signal/llm-error
                                                           :error "connection reset"})]
     (testing "transitions to idle and sets error"
-      (is (= :node/idle (:node state')))
+      (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
       (is (= "connection reset" (:error state'))))
 
     (testing "emits message-end, turn-end, and agent-end"
       (is (= [:emit-event :emit-event :emit-event] (fx-types effects)))
-      (is (= :event/message-end (get-in effects [0 :event :type])))
-      (is (= :event/turn-end (get-in effects [1 :event :type])))
-      (is (= :event/agent-end (get-in effects [2 :event :type]))))))
+      (is (= :llx.agent.event/message-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/turn-end (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/agent-end (get-in effects [2 :event :type]))))))
 
 (deftest streaming-transition-abort-test
-  (let [state            (state-with {:node           :node/streaming
-                                      :messages       [{:role :user :content "hello"}]
-                                      :stream-message {:role :assistant :content "partial"}})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "hello"}]
+                                      :stream-message       {:role :assistant :content "partial"}})
         [state' effects] (sut/streaming-transition state {:type :signal/abort})]
     (testing "transitions to closed and clears stream-message"
-      (is (= :node/closed (:node state')))
+      (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (nil? (:stream-message state'))))
 
     (testing "emits message-end, turn-end, and agent-end"
       (is (= [:emit-event :emit-event :emit-event] (fx-types effects)))
-      (is (= :event/message-end (get-in effects [0 :event :type])))
-      (is (= :event/turn-end (get-in effects [1 :event :type])))
-      (is (= :event/agent-end (get-in effects [2 :event :type]))))))
+      (is (= :llx.agent.event/message-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/turn-end (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/agent-end (get-in effects [2 :event :type]))))))
 
 (deftest streaming-transition-unknown-signal-test
-  (let [state            (state-with {:node :node/streaming})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' effects] (sut/streaming-transition state {:type :signal/tool-result})]
     (is (= state state'))
     (is (= [] effects))))
@@ -434,9 +434,9 @@
                           {:id "tc-2" :name "write_file" :arguments {:path "/b"}}]
         result           {:role :tool-result :tool-call-id "tc-1" :content "file contents"}
         tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :content "file contents"}
-        state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls tool-calls
-                                      :messages           [{:role :user :content "do stuff"}]})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   tool-calls
+                                      :messages             [{:role :user :content "do stuff"}]})
         [state' effects] (sut/tool-executing-transition
                           state
                           {:type                :signal/tool-result
@@ -453,19 +453,19 @@
     (testing "emits tool-execution-end, message events, and starts next tool"
       (is (= [:emit-event :emit-event :emit-event :emit-event :execute-tool]
              (fx-types effects)))
-      (is (= :event/tool-execution-end (get-in effects [0 :event :type])))
-      (is (= :event/message-start (get-in effects [1 :event :type])))
-      (is (= :event/message-end (get-in effects [2 :event :type])))
-      (is (= :event/tool-execution-start (get-in effects [3 :event :type])))
+      (is (= :llx.agent.event/tool-execution-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/message-start (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/message-end (get-in effects [2 :event :type])))
+      (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
       (is (= "tc-2" (get-in effects [3 :event :tool-call-id]))))))
 
 (deftest tool-executing-transition-tool-result-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "echo" :arguments {:text "hi"}}]
         result           {:role :tool-result :tool-call-id "tc-1" :content "echoed"}
         tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :content "echoed"}
-        state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls tool-calls
-                                      :messages           []})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   tool-calls
+                                      :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
                           {:type                :signal/tool-result
@@ -477,18 +477,18 @@
     (testing "emits tool-execution-end, message events, and turn-end"
       (is (= [:emit-event :emit-event :emit-event :emit-event]
              (fx-types effects)))
-      (is (= :event/tool-execution-end (get-in effects [0 :event :type])))
-      (is (= :event/message-start (get-in effects [1 :event :type])))
-      (is (= :event/message-end (get-in effects [2 :event :type])))
-      (is (= :event/turn-end (get-in effects [3 :event :type]))))))
+      (is (= :llx.agent.event/tool-execution-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/message-start (get-in effects [1 :event :type])))
+      (is (= :llx.agent.event/message-end (get-in effects [2 :event :type])))
+      (is (= :llx.agent.event/turn-end (get-in effects [3 :event :type]))))))
 
 (deftest tool-executing-transition-tool-error-with-remaining-test
   (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}
                           {:id "tc-2" :name "good_tool" :arguments {}}]
         tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :error "kaboom"}
-        state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls tool-calls
-                                      :messages           []})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   tool-calls
+                                      :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
                           {:type                :signal/tool-error
@@ -504,15 +504,15 @@
     (testing "emits tool-execution-end, message events, and starts next tool"
       (is (= [:emit-event :emit-event :emit-event :emit-event :execute-tool]
              (fx-types effects)))
-      (is (= :event/tool-execution-start (get-in effects [3 :event :type])))
+      (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
       (is (= "tc-2" (get-in effects [3 :event :tool-call-id]))))))
 
 (deftest tool-executing-transition-tool-error-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}]
         tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :error "kaboom"}
-        state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls tool-calls
-                                      :messages           []})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   tool-calls
+                                      :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
                           {:type                :signal/tool-error
@@ -525,11 +525,11 @@
     (testing "emits tool-execution-end, message events, and turn-end"
       (is (= [:emit-event :emit-event :emit-event :emit-event]
              (fx-types effects)))
-      (is (= :event/turn-end (get-in effects [3 :event :type]))))))
+      (is (= :llx.agent.event/turn-end (get-in effects [3 :event :type]))))))
 
 (deftest tool-executing-transition-tool-update-test
-  (let [state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls [{:id "tc-1" :name "slow_tool"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   [{:id "tc-1" :name "slow_tool"}]})
         [state' effects] (sut/tool-executing-transition
                           state
                           {:type           :signal/tool-update
@@ -538,146 +538,146 @@
                            :partial-result {:progress 50}})]
     (is (= state state'))
     (is (= [{::fx/type :emit-event
-             :event    {:type           :event/tool-execution-update
+             :event    {:type           :llx.agent.event/tool-execution-update
                         :tool-call-id   "tc-1"
                         :tool-name      "slow_tool"
                         :partial-result {:progress 50}}}]
            effects))))
 
 (deftest tool-executing-transition-abort-test
-  (let [state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls [{:id "tc-1"} {:id "tc-2"}]
-                                      :messages           [{:role :user :content "x"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   [{:id "tc-1"} {:id "tc-2"}]
+                                      :messages             [{:role :user :content "x"}]})
         [state' effects] (sut/tool-executing-transition state {:type :signal/abort})]
     (testing "transitions to closed and clears pending-tool-calls"
-      (is (= :node/closed (:node state')))
+      (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (= [] (:pending-tool-calls state'))))
 
     (testing "emits turn-end and agent-end"
       (is (= [:emit-event :emit-event] (fx-types effects)))
-      (is (= :event/turn-end (get-in effects [0 :event :type])))
-      (is (= :event/agent-end (get-in effects [1 :event :type]))))))
+      (is (= :llx.agent.event/turn-end (get-in effects [0 :event :type])))
+      (is (= :llx.agent.event/agent-end (get-in effects [1 :event :type]))))))
 
 (deftest tool-executing-transition-unknown-signal-test
-  (let [state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls [{:id "tc-1"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   [{:id "tc-1"}]})
         [state' effects] (sut/tool-executing-transition state {:type :signal/llm-start})]
     (is (= state state'))
     (is (= [] effects))))
 
 (deftest closed-transition-is-terminal-test
-  (let [state (state-with {:node :node/closed})]
+  (let [state (state-with {:llx.agent.loop/phase :llx.agent.loop/closed})]
     (testing "any signal returns state unchanged with no effects"
       (is (= [state []] (sut/closed-transition state {:type :signal/llm-done})))
       (is (= [state []] (sut/closed-transition state {:type :signal/abort})))
       (is (= [state []] (sut/closed-transition state {:type :signal/tool-result}))))))
 
 (deftest route-from-idle-test
-  (is (= :node/idle (sut/route-from-idle {:node :node/idle})))
-  (is (= :node/streaming (sut/route-from-idle {:node :node/streaming})))
-  (is (= :node/closed (sut/route-from-idle {:node :node/closed}))))
+  (is (= :llx.agent.loop/idle (sut/route-from-idle {:llx.agent.loop/phase :llx.agent.loop/idle})))
+  (is (= :llx.agent.loop/streaming (sut/route-from-idle {:llx.agent.loop/phase :llx.agent.loop/streaming})))
+  (is (= :llx.agent.loop/closed (sut/route-from-idle {:llx.agent.loop/phase :llx.agent.loop/closed}))))
 
 (deftest route-from-streaming-test
   (testing "idle with empty queues stays idle"
-    (is (= :node/idle
-           (sut/route-from-streaming {:node            :node/idle
-                                      :steering-queue  sut/empty-queue
-                                      :follow-up-queue sut/empty-queue}))))
+    (is (= :llx.agent.loop/idle
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/idle
+                                      :steering-queue       sut/empty-queue
+                                      :follow-up-queue      sut/empty-queue}))))
 
   (testing "idle with steering queue routes to streaming"
-    (is (= :node/streaming
-           (sut/route-from-streaming {:node            :node/idle
-                                      :steering-queue  (conj sut/empty-queue {:msg 1})
-                                      :follow-up-queue sut/empty-queue}))))
+    (is (= :llx.agent.loop/streaming
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/idle
+                                      :steering-queue       (conj sut/empty-queue {:msg 1})
+                                      :follow-up-queue      sut/empty-queue}))))
 
   (testing "idle with follow-up queue routes to streaming"
-    (is (= :node/streaming
-           (sut/route-from-streaming {:node            :node/idle
-                                      :steering-queue  sut/empty-queue
-                                      :follow-up-queue (conj sut/empty-queue {:msg 1})}))))
+    (is (= :llx.agent.loop/streaming
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/idle
+                                      :steering-queue       sut/empty-queue
+                                      :follow-up-queue      (conj sut/empty-queue {:msg 1})}))))
 
   (testing "tool-executing routes to tool-executing"
-    (is (= :node/tool-executing
-           (sut/route-from-streaming {:node :node/tool-executing}))))
+    (is (= :llx.agent.loop/tool-executing
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/tool-executing}))))
 
   (testing "closed routes to closed"
-    (is (= :node/closed
-           (sut/route-from-streaming {:node :node/closed}))))
+    (is (= :llx.agent.loop/closed
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/closed}))))
 
   (testing "streaming stays streaming"
-    (is (= :node/streaming
-           (sut/route-from-streaming {:node :node/streaming})))))
+    (is (= :llx.agent.loop/streaming
+           (sut/route-from-streaming {:llx.agent.loop/phase :llx.agent.loop/streaming})))))
 
 (deftest route-from-tool-executing-test
   (testing "with pending tool calls stays tool-executing"
-    (is (= :node/tool-executing
+    (is (= :llx.agent.loop/tool-executing
            (sut/route-from-tool-executing {:pending-tool-calls [{:id "tc-1"}]}))))
 
   (testing "without pending tool calls routes to streaming"
-    (is (= :node/streaming
+    (is (= :llx.agent.loop/streaming
            (sut/route-from-tool-executing {:pending-tool-calls []}))))
 
   (testing "closed routes to closed"
-    (is (= :node/closed
-           (sut/route-from-tool-executing {:node               :node/closed
-                                           :pending-tool-calls []})))))
+    (is (= :llx.agent.loop/closed
+           (sut/route-from-tool-executing {:llx.agent.loop/phase :llx.agent.loop/closed
+                                           :pending-tool-calls   []})))))
 
 (deftest step-prompt-from-idle-to-streaming-test
   (let [state            (initial-state)
         [state' effects] (sut/step state {:type     :command/prompt
                                           :messages [{:role :user :content "hello"}]})]
-    (is (= :node/streaming (:node state')))
+    (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state')))
     (is (= [{:role :user :content "hello"}] (:messages state')))
     (is (= :call-llm (::fx/type (last effects))))))
 
 (deftest step-prompt-when-streaming-is-rejected-test
-  (let [state            (state-with {:node :node/streaming})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' effects] (sut/step state {:type     :command/prompt
                                           :messages [{:role :user :content "hi"}]})]
-    (is (= :node/streaming (:node state')))
+    (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state')))
     (is (= [] effects))))
 
 (deftest step-signal-llm-done-no-tools-to-idle-test
   (let [message          {:role :assistant :content "Hi!" :tool-calls []}
-        state            (state-with {:node           :node/streaming
-                                      :messages       [{:role :user :content "hello"}]
-                                      :stream-message {:role :assistant :content "partial"}})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "hello"}]
+                                      :stream-message       {:role :assistant :content "partial"}})
         [state' effects] (sut/step state {:type :signal/llm-done :message message})]
-    (is (= :node/idle (:node state')))
-    (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
+    (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
+    (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest step-signal-llm-done-with-tools-test
   (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}]
         message          {:role :assistant :content "" :tool-calls tool-calls}
-        state            (state-with {:node     :node/streaming
-                                      :messages [{:role :user :content "do stuff"}]})
+        state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                      :messages             [{:role :user :content "do stuff"}]})
         [state' effects] (sut/step state {:type :signal/llm-done :message message})]
-    (is (= :node/tool-executing (:node state')))
+    (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase state')))
     (is (some #(= :execute-tool (::fx/type %)) effects))))
 
 (deftest step-abort-from-streaming-to-closed-test
   (testing "abort signal from streaming"
-    (let [state            (state-with {:node     :node/streaming
-                                        :messages [{:role :user :content "hello"}]})
+    (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                        :messages             [{:role :user :content "hello"}]})
           [state' effects] (sut/step state {:type :signal/abort})]
-      (is (= :node/closed (:node state')))
-      (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
+      (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
+      (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
   (testing "abort command from streaming"
-    (let [state            (state-with {:node     :node/streaming
-                                        :messages [{:role :user :content "hello"}]})
+    (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                        :messages             [{:role :user :content "hello"}]})
           [state' effects] (sut/step state {:type :command/abort})]
-      (is (= :node/closed (:node state')))
-      (is (some #(= :event/agent-end (get-in % [:event :type])) effects)))))
+      (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
+      (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
 
 (deftest step-abort-from-tool-executing-to-closed-test
-  (let [state            (state-with {:node               :node/tool-executing
-                                      :pending-tool-calls [{:id "tc-1"}]
-                                      :messages           [{:role :user :content "x"}]})
+  (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                      :pending-tool-calls   [{:id "tc-1"}]
+                                      :messages             [{:role :user :content "x"}]})
         [state' effects] (sut/step state {:type :command/abort})]
-    (is (= :node/closed (:node state')))
+    (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
     (is (= [] (:pending-tool-calls state')))
-    (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
+    (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest step-full-happy-path-test
   (let [state         (initial-state)
@@ -692,20 +692,20 @@
         [s4 fx4]      (sut/step s3 {:type :signal/llm-done :message assistant-msg})]
 
     (testing "state progression"
-      (is (= :node/streaming (:node s1)))
-      (is (= :node/streaming (:node s2)))
-      (is (= :node/streaming (:node s3)))
-      (is (= :node/idle (:node s4))))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s1)))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s2)))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s3)))
+      (is (= :llx.agent.loop/idle (:llx.agent.loop/phase s4))))
 
     (testing "final state has both messages"
       (is (= [user-msg assistant-msg] (:messages s4))))
 
     (testing "agent-end is emitted on final step"
-      (is (some #(= :event/agent-end (get-in % [:event :type])) fx4)))
+      (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) fx4)))
 
     (testing "agent-end is not emitted on intermediate steps"
-      (is (not (some #(= :event/agent-end (get-in % [:event :type])) fx2)))
-      (is (not (some #(= :event/agent-end (get-in % [:event :type])) fx3))))))
+      (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) fx2)))
+      (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) fx3))))))
 
 (deftest step-tool-loop-test
   (let [state               (initial-state)
@@ -724,42 +724,42 @@
         [s4 fx4]            (sut/step s3 {:type :signal/llm-done :message final-assistant})]
 
     (testing "state progression through tool loop"
-      (is (= :node/streaming (:node s1)))
-      (is (= :node/tool-executing (:node s2)))
-      (is (= :node/streaming (:node s3)))
-      (is (= :node/idle (:node s4))))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s1)))
+      (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase s2)))
+      (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s3)))
+      (is (= :llx.agent.loop/idle (:llx.agent.loop/phase s4))))
 
     (testing "final state has all messages"
       (is (= [user-msg assistant-with-tool tool-result final-assistant]
              (:messages s4))))
 
     (testing "agent-end emitted on final transition to idle"
-      (is (some #(= :event/agent-end (get-in % [:event :type])) fx4)))))
+      (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) fx4)))))
 
 (deftest agent-end-emitted-on-streaming-to-idle-test
-  (let [state       (state-with {:node     :node/streaming
-                                 :messages [{:role :user :content "hello"}]})
+  (let [state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                 :messages             [{:role :user :content "hello"}]})
         [_ effects] (sut/step state {:type    :signal/llm-done
                                      :message {:role       :assistant :content "Hi!"
                                                :tool-calls []}})]
-    (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
+    (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest agent-end-emitted-on-error-to-idle-test
-  (let [state       (state-with {:node     :node/streaming
-                                 :messages [{:role :user :content "hello"}]})
+  (let [state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                 :messages             [{:role :user :content "hello"}]})
         [_ effects] (sut/step state {:type :signal/llm-error :error "boom"})]
-    (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
+    (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest agent-end-not-emitted-when-staying-idle-test
   (let [state       (initial-state)
         [_ effects] (sut/step state {:type :command/set-model :model {:id "gpt-4o"}})]
-    (is (not (some #(= :event/agent-end (get-in % [:event :type])) effects)))))
+    (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
 
 (deftest agent-end-not-emitted-on-streaming-to-tool-executing-test
   (let [tool-calls  [{:id "tc-1" :name "echo" :arguments {}}]
-        state       (state-with {:node     :node/streaming
-                                 :messages [{:role :user :content "x"}]})
+        state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
+                                 :messages             [{:role :user :content "x"}]})
         [_ effects] (sut/step state {:type    :signal/llm-done
                                      :message {:role       :assistant :content ""
                                                :tool-calls tool-calls}})]
-    (is (not (some #(= :event/agent-end (get-in % [:event :type])) effects)))))
+    (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))

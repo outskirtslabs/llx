@@ -7,6 +7,7 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.agent.driver :as driver]
+   [llx.agent.loop :as loop]
    [llx.agent.schema :as schema]
    [malli.core :as m]
    [malli.transform :as mt]
@@ -188,7 +189,7 @@
   (dispatch-queued-messages! agent :command/follow-up messages))
 
 (defn wait-for-idle
-  "Waits until the agent reaches `:node/idle` or `:node/closed`.
+  "Waits until the agent reaches `:llx.agent.loop/idle` or `:llx.agent.loop/closed`.
 
    Resolves `true` when idle/closed, or `false` after the polling budget is
    exhausted."
@@ -196,9 +197,9 @@
    (wait-for-idle agent 6000))
   ([agent max-polls]
    (p/loop [remaining max-polls]
-     (let [node (:node (state agent))]
+     (let [phase (::loop/phase (state agent))]
        (cond
-         (or (= :node/idle node) (= :node/closed node))
+         (or (= ::loop/idle phase) (= ::loop/closed phase))
          true
 
          (<= remaining 0)
@@ -269,5 +270,5 @@
   [agent]
   (sp/close (:command> agent))
   (sp/close (:events-mx> agent))
-  (swap! (:state_ agent) assoc :node :node/closed)
+  (swap! (:state_ agent) assoc ::loop/phase ::loop/closed)
   (p/resolved true))

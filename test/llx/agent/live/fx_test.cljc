@@ -19,19 +19,19 @@
 
 (defn- agent-state
   [model]
-  {:node               :node/streaming
-   :system-prompt      "You are concise."
-   :model              model
-   :thinking-level     :off
-   :tools              []
-   :messages           []
-   :stream-message     nil
-   :pending-tool-calls []
-   :error              nil
-   :steering-queue     (empty-queue)
-   :follow-up-queue    (empty-queue)
-   :steering-mode      :one-at-a-time
-   :follow-up-mode     :one-at-a-time})
+  {:llx.agent.loop/phase :llx.agent.loop/streaming
+   :system-prompt        "You are concise."
+   :model                model
+   :thinking-level       :off
+   :tools                []
+   :messages             []
+   :stream-message       nil
+   :pending-tool-calls   []
+   :error                nil
+   :steering-queue       (empty-queue)
+   :follow-up-queue      (empty-queue)
+   :steering-mode        :one-at-a-time
+   :follow-up-mode       :one-at-a-time})
 
 (defn- collect-signals*
   [ch timeout-ms]

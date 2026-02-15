@@ -158,8 +158,8 @@
       [:tools :llx.agent/tools]
       [:abort-signal {:optional true} :any]]
 
-     :llx.agent.loop/node
-     [:enum :node/idle :node/streaming :node/tool-executing :node/closed]
+     :llx.agent.loop/phase
+     [:enum :llx.agent.loop/idle :llx.agent.loop/streaming :llx.agent.loop/tool-executing :llx.agent.loop/closed]
 
      :llx.agent.loop/thinking-level
      [:enum :off :minimal :low :medium :high :xhigh]
@@ -169,7 +169,7 @@
 
      :llx.agent.loop/state
      [:map
-      [:node {:default :node/idle} :llx.agent.loop/node]
+      [:llx.agent.loop/phase {:default :llx.agent.loop/idle} :llx.agent.loop/phase]
       [:system-prompt {:default ""} :string]
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :llx/model]
       [:thinking-level {:default :off} :llx.agent.loop/thinking-level]

@@ -8,10 +8,10 @@
 
 (def states
   "The agent's possible states"
-  #{:node/idle ;; no inference loop is running, awaiting prompt, continue, or abort
-    :node/streaming ;; actively streaming an llm inference response
-    :node/tool-executing ;; a tool call is in progress
-    :node/closed ;; terminal state
+  #{::idle ;; no inference loop is running, awaiting prompt, continue, or abort
+    ::streaming ;; actively streaming an llm inference response
+    ::tool-executing ;; a tool call is in progress
+    ::closed ;; terminal state
     })
 
 (def commands
@@ -54,16 +54,16 @@
 
 (def events
   "Lifecycle events emitted from the agent to subscribers."
-  #{:event/agent-start ;; agent begins processing
-    :event/agent-end ;; agent completes with all new messages
-    :event/turn-start ;; new turn begins (one LLM call + tool executions)
-    :event/turn-end ;; turn completes with assistant message and tool results
-    :event/message-start ;; any message begins (user, assistant, tool-result)
-    :event/message-update ;; assistant streaming chunk update
-    :event/message-end ;; message fully received/processed
-    :event/tool-execution-start ;; tool begins executing
-    :event/tool-execution-update ;; tool streams progress
-    :event/tool-execution-end ;; tool execution finished (success or error)
+  #{:llx.agent.event/agent-start ;; agent begins processing
+    :llx.agent.event/agent-end ;; agent completes with all new messages
+    :llx.agent.event/turn-start ;; new turn begins (one LLM call + tool executions)
+    :llx.agent.event/turn-end ;; turn completes with assistant message and tool results
+    :llx.agent.event/message-start ;; any message begins (user, assistant, tool-result)
+    :llx.agent.event/message-update ;; assistant streaming chunk update
+    :llx.agent.event/message-end ;; message fully received/processed
+    :llx.agent.event/tool-execution-start ;; tool begins executing
+    :llx.agent.event/tool-execution-update ;; tool streams progress
+    :llx.agent.event/tool-execution-end ;; tool execution finished (success or error)
     })
 
 (defn handle-command
@@ -77,12 +77,12 @@
   [state cmd]
   (case (:type cmd)
     :command/prompt
-    (if (not= :node/idle (:node state))
+    (if (not= ::idle (::phase state))
       [state [{:type :signal/rejected :reason :not-idle}]]
       [state [{:type :signal/prompt-start :messages (:messages cmd)}]])
 
     :command/continue
-    (if (not= :node/idle (:node state))
+    (if (not= ::idle (::phase state))
       [state [{:type :signal/rejected :reason :not-idle}]]
       (let [{:keys [steering-queue follow-up-queue
                     steering-mode follow-up-mode]}                                         state
@@ -105,7 +105,7 @@
           [state [{:type :signal/rejected :reason :no-queued-messages}]])))
 
     :command/abort
-    (if (= :node/idle (:node state))
+    (if (= ::idle (::phase state))
       [state [{:type :signal/rejected :reason :idle}]]
       [state [{:type :signal/abort}]])
 
@@ -169,7 +169,7 @@
 
     :command/reset
     [(-> state
-         (assoc :node :node/idle)
+         (assoc ::phase ::idle)
          (assoc :messages [])
          (assoc :steering-queue empty-queue)
          (assoc :follow-up-queue empty-queue)
@@ -179,19 +179,19 @@
      []]))
 
 (defn idle-transition
-  "Pure transition from :node/idle state. Returns [state' effects]."
+  "Pure transition from ::idle state. Returns [state' effects]."
   [state msg]
   (case (:type msg)
     :signal/prompt-start
     (let [messages' (into (:messages state) (:messages msg))]
       [(-> state
            (assoc :messages messages')
-           (assoc :node :node/streaming))
-       (into [{::fx/type :emit-event :event {:type :event/agent-start}}
-              {::fx/type :emit-event :event {:type :event/turn-start}}]
+           (assoc ::phase ::streaming))
+       (into [{::fx/type :emit-event :event {:type :llx.agent.event/agent-start}}
+              {::fx/type :emit-event :event {:type :llx.agent.event/turn-start}}]
              (concat
-              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :event/message-start :message m}}
-                               {::fx/type :emit-event :event {:type :event/message-end :message m}}])
+              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :llx.agent.event/message-start :message m}}
+                               {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message m}}])
                       (:messages msg))
               [{::fx/type :call-llm :messages messages'}]))])
 
@@ -199,29 +199,29 @@
     (let [messages' (into (:messages state) (:messages msg))]
       [(-> state
            (assoc :messages messages')
-           (assoc :node :node/streaming))
-       (into [{::fx/type :emit-event :event {:type :event/turn-start}}]
+           (assoc ::phase ::streaming))
+       (into [{::fx/type :emit-event :event {:type :llx.agent.event/turn-start}}]
              (concat
-              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :event/message-start :message m}}
-                               {::fx/type :emit-event :event {:type :event/message-end :message m}}])
+              (mapcat (fn [m] [{::fx/type :emit-event :event {:type :llx.agent.event/message-start :message m}}
+                               {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message m}}])
                       (:messages msg))
               [{::fx/type :call-llm :messages messages'}]))])
 
     [state [{::fx/type :reject :reason :invalid-signal}]]))
 
 (defn streaming-transition
-  "Pure transition from :node/streaming state. Returns [state' effects]."
+  "Pure transition from ::streaming state. Returns [state' effects]."
   [state msg]
   (case (:type msg)
     :signal/llm-start
     [(assoc state :stream-message (:message msg))
      [{::fx/type :emit-event
-       :event    {:type :event/message-start :message (:message msg)}}]]
+       :event    {:type :llx.agent.event/message-start :message (:message msg)}}]]
 
     :signal/llm-chunk
     [(assoc state :stream-message (:chunk msg))
      [{::fx/type :emit-event
-       :event    {:type :event/message-update :chunk (:chunk msg)}}]]
+       :event    {:type :llx.agent.event/message-update :chunk (:chunk msg)}}]]
 
     :signal/llm-done
     (let [message    (:message msg)
@@ -230,42 +230,42 @@
       (if (seq tool-calls)
         [(-> state
              (update :messages conj message)
-             (assoc :node :node/tool-executing)
+             (assoc ::phase ::tool-executing)
              (assoc :stream-message nil)
              (assoc :pending-tool-calls (vec tool-calls)))
-         [{::fx/type :emit-event :event {:type :event/message-end :message message}}
-          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+         [{::fx/type :emit-event :event {:type :llx.agent.event/message-end :message message}}
+          {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
                                          :tool-call-id (:id first-tool)
                                          :tool-name    (:name first-tool)
                                          :args         (:arguments first-tool)}}
           {::fx/type :execute-tool :tool-call first-tool}]]
         [(-> state
              (update :messages conj message)
-             (assoc :node :node/idle)
+             (assoc ::phase ::idle)
              (assoc :stream-message nil))
-         [{::fx/type :emit-event :event {:type :event/message-end :message message}}
-          {::fx/type :emit-event :event {:type :event/turn-end :message message}}]]))
+         [{::fx/type :emit-event :event {:type :llx.agent.event/message-end :message message}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/turn-end :message message}}]]))
 
     :signal/llm-error
     [(-> state
-         (assoc :node :node/idle)
+         (assoc ::phase ::idle)
          (assoc :error (:error msg)))
-     [{::fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :error}}}
-      {::fx/type :emit-event :event {:type :event/turn-end}}
-      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :llx.agent.event/message-end :message {:stop-reason :error}}}
+      {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}
+      {::fx/type :emit-event :event {:type :llx.agent.event/agent-end :messages (:messages state)}}]]
 
     :signal/abort
     [(-> state
-         (assoc :node :node/closed)
+         (assoc ::phase ::closed)
          (assoc :stream-message nil))
-     [{::fx/type :emit-event :event {:type :event/message-end :message {:stop-reason :aborted}}}
-      {::fx/type :emit-event :event {:type :event/turn-end}}
-      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :llx.agent.event/message-end :message {:stop-reason :aborted}}}
+      {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}
+      {::fx/type :emit-event :event {:type :llx.agent.event/agent-end :messages (:messages state)}}]]
 
     [state []]))
 
 (defn tool-executing-transition
-  "Pure transition from :node/tool-executing state. Returns [state' effects]."
+  "Pure transition from ::tool-executing state. Returns [state' effects]."
   [state msg]
   (case (:type msg)
     :signal/tool-result
@@ -278,19 +278,19 @@
                           (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
-          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
                                          :tool-call-id (:id next-tool)
                                          :tool-name    (:name next-tool)
                                          :args         (:arguments next-tool)}}
           {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result result}}
-          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/turn-end}}]]))
+         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}]]))
 
     :signal/tool-error
     (let [remaining    (rest (:pending-tool-calls state))
@@ -304,34 +304,34 @@
                            (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
-          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type         :event/tool-execution-start
+         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result error-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
                                          :tool-call-id (:id next-tool)
                                          :tool-name    (:name next-tool)
                                          :args         (:arguments next-tool)}}
           {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{::fx/type :emit-event :event {:type :event/tool-execution-end :result error-result}}
-          {::fx/type :emit-event :event {:type :event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type :event/turn-end}}]]))
+         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result error-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
+          {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}]]))
 
     :signal/tool-update
     [state
      [{::fx/type :emit-event
-       :event    {:type           :event/tool-execution-update
+       :event    {:type           :llx.agent.event/tool-execution-update
                   :tool-call-id   (:tool-call-id msg)
                   :tool-name      (:tool-name msg)
                   :partial-result (:partial-result msg)}}]]
 
     :signal/abort
     [(-> state
-         (assoc :node :node/closed)
+         (assoc ::phase ::closed)
          (assoc :pending-tool-calls []))
-     [{::fx/type :emit-event :event {:type :event/turn-end}}
-      {::fx/type :emit-event :event {:type :event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}
+      {::fx/type :emit-event :event {:type :llx.agent.event/agent-end :messages (:messages state)}}]]
 
     [state []]))
 
@@ -341,44 +341,44 @@
   [state []])
 
 (defn route-from-idle [state]
-  (:node state))
+  (::phase state))
 
 (defn route-from-streaming [state]
-  (case (:node state)
-    :node/idle (if (or (seq (:steering-queue state))
-                       (seq (:follow-up-queue state)))
-                 :node/streaming
-                 :node/idle)
-    :node/tool-executing :node/tool-executing
-    :node/closed :node/closed
-    :node/streaming))
+  (case (::phase state)
+    ::idle (if (or (seq (:steering-queue state))
+                   (seq (:follow-up-queue state)))
+             ::streaming
+             ::idle)
+    ::tool-executing ::tool-executing
+    ::closed ::closed
+    ::streaming))
 
 (defn route-from-tool-executing [state]
-  (case (:node state)
-    :node/closed :node/closed
+  (case (::phase state)
+    ::closed ::closed
     (if (seq (:pending-tool-calls state))
-      :node/tool-executing
-      :node/streaming)))
+      ::tool-executing
+      ::streaming)))
 
 (def graph
   "Agent state machine as data.
 
-   Nodes: `(state, msg) -> [state', effects]`
+   Transitions: `(state, msg) -> [state', effects]`
      Pure transition fns. Take current state and a signal, return
      new state and a vector of effect descriptions to execute.
 
-   Edges: `(state') -> node-key`
+   Routes: `(state') -> phase-key`
      Pure routing fns. Take the post-transition state and return
-     the keyword of the next node to enter."
-  {:nodes {:node/idle           idle-transition
-           :node/streaming      streaming-transition
-           :node/tool-executing tool-executing-transition
-           :node/closed         closed-transition}
+     the keyword of the next phase to enter."
+  {::transitions {::idle           idle-transition
+                  ::streaming      streaming-transition
+                  ::tool-executing tool-executing-transition
+                  ::closed         closed-transition}
 
-   :edges {:node/idle           route-from-idle
-           :node/streaming      route-from-streaming
-           :node/tool-executing route-from-tool-executing
-           :node/closed         (constantly :node/closed)}})
+   ::routes      {::idle           route-from-idle
+                  ::streaming      route-from-streaming
+                  ::tool-executing route-from-tool-executing
+                  ::closed         (constantly ::closed)}})
 
 (defn command?
   "Returns true if `input` is a command."
@@ -387,21 +387,21 @@
 
 (defn- step-signal
   "Process a single signal through the TEA graph. Pure.
-   Runs the transition fn for the current node, then the routing fn
-   to determine the next node. Returns `[state' effects]`."
+   Runs the transition fn for the current phase, then the routing fn
+   to determine the next phase. Returns `[state' effects]`."
   [g state sig]
-  (let [current-node     (:node state)
-        transition-fn    (get-in g [:nodes current-node])
-        routing-fn       (get-in g [:edges current-node])
+  (let [current-phase    (::phase state)
+        transition-fn    (get-in g [::transitions current-phase])
+        routing-fn       (get-in g [::routes current-phase])
         [state' effects] (transition-fn state sig)
-        next-node        (routing-fn state')
-        prev-node        current-node
-        state''          (assoc state' :node next-node)
-        agent-ended?     (and (not= :node/idle prev-node)
-                              (= :node/idle next-node))]
+        next-phase       (routing-fn state')
+        prev-phase       current-phase
+        state''          (assoc state' ::phase next-phase)
+        agent-ended?     (and (not= ::idle prev-phase)
+                              (= ::idle next-phase))]
     (if agent-ended?
       [state'' (conj effects {::fx/type :emit-event
-                              :event    {:type     :event/agent-end
+                              :event    {:type     :llx.agent.event/agent-end
                                          :messages (:messages state'')}})]
       [state'' effects])))
 
@@ -412,8 +412,8 @@
    Commands are processed by `handle-command` which may produce signals.
    Signals are processed by the graph transition + routing fns.
 
-   Emits `:event/agent-end` automatically when the agent transitions
-   from a non-idle node back to `:node/idle`."
+   Emits `:llx.agent.event/agent-end` automatically when the agent transitions
+   from a non-idle phase back to `::idle`."
   ([state input]
    (step graph state input))
   ([g state input]
