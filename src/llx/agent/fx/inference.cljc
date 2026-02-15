@@ -1,9 +1,21 @@
 (ns llx.agent.fx.inference
   (:require
-   [clojure.string :as str]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai :as ai]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
+
+(def PartialAssistantMessage
+  [:map
+   [:role [:= :assistant]]
+   [:content [:vector :llx/assistant-content-block]]
+   [:api {:optional true} :llx/api]
+   [:provider {:optional true} :llx/provider]
+   [:model {:optional true} :llx/id-string]
+   [:usage {:optional true} :llx/usage]
+   [:stop-reason {:optional true} :llx/stop-reason]
+   [:error-message {:optional true} :string]
+   [:timestamp {:optional true} :llx/timestamp-ms]])
 
 (defn- base-partial-assistant-message
   [model]
@@ -12,15 +24,19 @@
     (:provider model) (assoc :provider (:provider model))
     (:id model) (assoc :model (:id model))))
 
-(defn- normalize-event-type
-  [event]
-  (let [t (:type event)]
-    (cond
-      (keyword? t) t
-      (string? t) (-> t
-                      (str/replace "_" "-")
-                      keyword)
-      :else t)))
+(def LlmEventStepSignal
+  [:multi {:dispatch :type}
+   [:llx.agent.signal/rejected :llx.agent/signal-rejected]
+   [:llx.agent.signal/llm-start :llx.agent/signal-llm-start]
+   [:llx.agent.signal/llm-chunk :llx.agent/signal-llm-chunk]
+   [:llx.agent.signal/llm-done :llx.agent/signal-llm-done]
+   [:llx.agent.signal/llm-error :llx.agent/signal-llm-error]])
+
+(def LlmEventStep
+  [:map
+   [:partial PartialAssistantMessage]
+   [:signal [:maybe LlmEventStepSignal]]
+   [:done? :boolean]])
 
 (defn- ensure-text-block
   [partial]
@@ -66,100 +82,91 @@
       (assoc-in partial [:content idx] block)
       (update partial :content conj block))))
 
-(defn- llm-event->step
-  [model partial event]
-  (let [event-type (normalize-event-type event)
-        partial    (or partial
-                       (:partial event)
-                       (base-partial-assistant-message model))]
-    (case event-type
-      :start
-      {:partial partial
-       :signal  {:type :signal/llm-start :message partial}
-       :done?   false}
+(>defn llm-event->step
+       [model partial event]
+       [:llx/model [:maybe PartialAssistantMessage] :llx/event => LlmEventStep]
+       (let [event-type (:type event)
+             partial    (or partial
+                            (base-partial-assistant-message model))]
+         (case event-type
+           :start
+           {:partial partial
+            :signal  {:type :llx.agent.signal/llm-start :message partial}
+            :done?   false}
 
-      :text-start
-      (let [partial (or (:partial event)
-                        (ensure-text-block partial))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :text-start
+           (let [partial (ensure-text-block partial)]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :text-delta
-      (let [partial (or (:partial event)
-                        (update-last-text partial (or (:text event) (:delta event))))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :text-delta
+           (let [partial (update-last-text partial (:text event))]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :text-end
-      (let [partial (or (:partial event) partial)]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :text-end
+           {:partial partial
+            :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+            :done?   false}
 
-      :thinking-start
-      (let [partial (or (:partial event)
-                        (ensure-thinking-block partial))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :thinking-start
+           (let [partial (ensure-thinking-block partial)]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :thinking-delta
-      (let [partial (or (:partial event)
-                        (update-last-thinking partial (or (:thinking event) (:delta event))))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :thinking-delta
+           (let [partial (update-last-thinking partial (:thinking event))]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :thinking-end
-      (let [partial (or (:partial event) partial)]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :thinking-end
+           {:partial partial
+            :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+            :done?   false}
 
-      :toolcall-start
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :toolcall-start
+           (let [partial (upsert-tool-call partial {:id        (:id event)
+                                                    :name      (:name event)
+                                                    :arguments (:arguments event)})]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :toolcall-delta
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :toolcall-delta
+           (let [partial (upsert-tool-call partial {:id        (:id event)
+                                                    :name      (:name event)
+                                                    :arguments (:arguments event)})]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :toolcall-end
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
+           :toolcall-end
+           (let [partial (upsert-tool-call partial {:id        (:id event)
+                                                    :name      (:name event)
+                                                    :arguments (:arguments event)})]
+             {:partial partial
+              :signal  {:type :llx.agent.signal/llm-chunk :chunk partial}
+              :done?   false})
 
-      :done
-      {:partial partial
-       :signal  {:type    :signal/llm-done
-                 :message (or (:assistant-message event) (:message event) partial)}
-       :done?   true}
+           :done
+           {:partial partial
+            :signal  {:type    :llx.agent.signal/llm-done
+                      :message (:assistant-message event)}
+            :done?   true}
 
-      :error
-      {:partial partial
-       :signal  {:type  :signal/llm-error
-                 :error (or (:assistant-message event) (:error event) event)}
-       :done?   true}
+           :error
+           {:partial partial
+            :signal  {:type  :llx.agent.signal/llm-error
+                      :error (:assistant-message event)}
+            :done?   true}
 
-      {:partial partial
-       :signal  nil
-       :done?   false})))
+           {:partial partial
+            :signal  nil
+            :done?   false})))
 
 (defn- stream-options
   [{:keys [abort-signal] :as env}
@@ -220,7 +227,8 @@
                         (p/recur partial)))
                     (p/recur partial)))))))
         (p/catch (fn [error]
-                   (sp/put out {:type :signal/llm-error :error error})))
+                   (sp/put out {:type  :llx.agent.signal/llm-error
+                                :error error})))
         (p/finally (fn [_ _]
                      (sp/close out))))
     out))

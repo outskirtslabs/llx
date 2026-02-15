@@ -31,8 +31,8 @@
   [_env _effect]
   ;; TODO: look up tool from (:tools env), validate args, call execute
   ;; Returns a channel that emits signals:
-  ;;   {:type :signal/tool-update ...}  (zero or more, for streaming tools)
-  ;;   {:type :signal/tool-result ...}  or {:type :signal/tool-error ...}
+  ;;   {:type :llx.agent.signal/tool-update ...}  (zero or more, for streaming tools)
+  ;;   {:type :llx.agent.signal/tool-result ...}  or {:type :llx.agent.signal/tool-error ...}
   ;; Channel closes after the terminal result/error signal.
   ;; Check for steering messages after completion.
   (let [ch (sp/chan)]

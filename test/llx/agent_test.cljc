@@ -24,6 +24,12 @@
                         (closed-channel))
    :tool-defs         {}})
 
+(defn- merge-custom-message-guardrails-schemas!
+  [custom-message-schemas schema-registry]
+  (gr.reg/merge-schemas!
+   (merge (agent.schema/schemas {:custom-message-schemas custom-message-schemas})
+          schema-registry)))
+
 (defn- base-state
   [messages]
   {:llx.agent.loop/phase :llx.agent.loop/idle
@@ -189,6 +195,7 @@
 (deftest command-wrappers-dispatch-through-driver-run-test
   (let [seen*  (atom [])
         marker (p/resolved ::marker)
+        model  (ai/get-model :openai "gpt-4o")
         agent  (sut/create-agent required-env-opts)]
     (with-redefs [driver/run (fn [env input]
                                (swap! seen* conj [env input])
@@ -203,15 +210,15 @@
         (is (identical? marker (sut/abort agent))))
 
       (testing "state mutators dispatch commands"
-        (is (identical? marker (sut/set-model agent {:id "model-2"})))
+        (is (identical? marker (sut/set-model agent model)))
         (is (identical? marker (sut/set-system-prompt agent "new prompt"))))
 
-      (is (= [{:type     :command/prompt
+      (is (= [{:type     :llx.agent.command/prompt
                :messages [{:role :user :content "hello" :timestamp 1}]}
-              {:type :command/continue}
-              {:type :command/abort}
-              {:type :command/set-model :model {:id "model-2"}}
-              {:type :command/set-system-prompt :system-prompt "new prompt"}]
+              {:type :llx.agent.command/continue}
+              {:type :llx.agent.command/abort}
+              {:type :llx.agent.command/set-model :model model}
+              {:type :llx.agent.command/set-system-prompt :system-prompt "new prompt"}]
              (mapv second @seen*))))))
 
 (deftest prompt-validates-messages-test
@@ -228,8 +235,23 @@
                       :cljs js/Error)
                    (sut/prompt agent [nil {:role :user :content "ok" :timestamp 1}])))
       (is (identical? marker (sut/prompt agent [{:role :user :content "ok" :timestamp 2}])))
-      (is (= [{:type     :command/prompt
+      (is (= [{:type     :llx.agent.command/prompt
                :messages [{:role :user :content "ok" :timestamp 2}]}]
+             @seen*)))))
+
+(deftest set-model-validates-model-shape-test
+  (let [seen*       (atom [])
+        marker      (p/resolved ::marker)
+        valid-model (ai/get-model :openai "gpt-4o")
+        agent       (sut/create-agent required-env-opts)]
+    (with-redefs [driver/run (fn [_env input]
+                               (swap! seen* conj input)
+                               marker)]
+      (is (thrown? #?(:clj clojure.lang.ExceptionInfo
+                      :cljs js/Error)
+                   (sut/set-model agent {:id "model-2"})))
+      (is (identical? marker (sut/set-model agent valid-model)))
+      (is (= [{:type :llx.agent.command/set-model :model valid-model}]
              @seen*)))))
 
 (deftest custom-message-schemas-validate-message-and-messages-test
@@ -284,26 +306,31 @@
                                      canonical-user-message))))))
 
 (deftest custom-message-public-api-validation-test
-  (let [custom-message {:role :my-app/notification :text "Heads up" :timestamp 1}
-        agent          (sut/create-agent
-                        (merge required-env-opts
-                               {:custom-message-schemas {:my-app/notification :my/message-notification}
-                                :schema-registry        {:my/message-notification
-                                                         [:map
-                                                          [:role [:= :my-app/notification]]
-                                                          [:text :string]
-                                                          [:timestamp :int]]}}))
-        seen*          (atom [])
-        marker         (p/resolved ::ok)]
+  (let [custom-message-schemas {:my-app/notification :my/message-notification}
+        custom-schema-registry {:my/message-notification
+                                [:map
+                                 [:role [:= :my-app/notification]]
+                                 [:text :string]
+                                 [:timestamp :int]]}
+        _                      (merge-custom-message-guardrails-schemas!
+                                custom-message-schemas
+                                custom-schema-registry)
+        custom-message         {:role :my-app/notification :text "Heads up" :timestamp 1}
+        agent                  (sut/create-agent
+                                (merge required-env-opts
+                                       {:custom-message-schemas custom-message-schemas
+                                        :schema-registry        custom-schema-registry}))
+        seen*                  (atom [])
+        marker                 (p/resolved ::ok)]
     (with-redefs [driver/run (fn [_env command]
                                (swap! seen* conj command)
                                marker)]
       (is (identical? marker (sut/prompt agent [custom-message])))
       (is (identical? marker (sut/append-message agent custom-message)))
       (is (identical? marker (sut/replace-messages agent [custom-message]))))
-    (is (= [{:type :command/prompt :messages [custom-message]}
-            {:type :command/append-message :message custom-message}
-            {:type :command/replace-messages :messages [custom-message]}]
+    (is (= [{:type :llx.agent.command/prompt :messages [custom-message]}
+            {:type :llx.agent.command/append-message :message custom-message}
+            {:type :llx.agent.command/replace-messages :messages [custom-message]}]
            @seen*))))
 
 (deftest rehydrate-agent-custom-message-validation-test
@@ -329,25 +356,30 @@
                         :schema-registry        {:my/other-schema [:map [:x :int]]}})))))
 
 (deftest custom-message-schema-may-reference-provided-schemas-test
-  (let [valid-message   {:role      :my-app/rich-note
-                         :payload   {:text "hello"}
-                         :timestamp 1}
-        invalid-message (assoc valid-message :payload {})
-        agent           (sut/create-agent
-                         (merge required-env-opts
-                                {:custom-message-schemas {:my-app/rich-note :my/rich-note-message}
-                                 :schema-registry        {:my/rich-note-payload [:map [:text :string]]
-                                                          :my/rich-note-message [:map
-                                                                                 [:role [:= :my-app/rich-note]]
-                                                                                 [:payload :my/rich-note-payload]
-                                                                                 [:timestamp :int]]}}))
-        seen*           (atom [])
-        marker          (p/resolved ::ok)]
+  (let [custom-message-schemas {:my-app/rich-note :my/rich-note-message}
+        custom-schema-registry {:my/rich-note-payload [:map [:text :string]]
+                                :my/rich-note-message [:map
+                                                       [:role [:= :my-app/rich-note]]
+                                                       [:payload :my/rich-note-payload]
+                                                       [:timestamp :int]]}
+        _                      (merge-custom-message-guardrails-schemas!
+                                custom-message-schemas
+                                custom-schema-registry)
+        valid-message          {:role      :my-app/rich-note
+                                :payload   {:text "hello"}
+                                :timestamp 1}
+        invalid-message        (assoc valid-message :payload {})
+        agent                  (sut/create-agent
+                                (merge required-env-opts
+                                       {:custom-message-schemas custom-message-schemas
+                                        :schema-registry        custom-schema-registry}))
+        seen*                  (atom [])
+        marker                 (p/resolved ::ok)]
     (with-redefs [driver/run (fn [_env command]
                                (swap! seen* conj command)
                                marker)]
       (is (identical? marker (sut/prompt agent [valid-message])))
       (is (thrown? #?(:clj Exception :cljs js/Error)
                    (sut/prompt agent [invalid-message]))))
-    (is (= [{:type :command/prompt :messages [valid-message]}]
+    (is (= [{:type :llx.agent.command/prompt :messages [valid-message]}]
            @seen*))))

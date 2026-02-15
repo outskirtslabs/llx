@@ -48,34 +48,34 @@
 
 (deftest command-predicate-test
   (testing "recognizes commands"
-    (is (true? (sut/command? {:type :command/prompt})))
-    (is (true? (sut/command? {:type :command/abort})))
-    (is (true? (sut/command? {:type :command/steer}))))
+    (is (true? (sut/command? {:type :llx.agent.command/prompt})))
+    (is (true? (sut/command? {:type :llx.agent.command/abort})))
+    (is (true? (sut/command? {:type :llx.agent.command/steer}))))
 
   (testing "rejects signals"
-    (is (false? (sut/command? {:type :signal/llm-done})))
-    (is (false? (sut/command? {:type :signal/prompt-start}))))
+    (is (false? (sut/command? {:type :llx.agent.signal/llm-done})))
+    (is (false? (sut/command? {:type :llx.agent.signal/prompt-start}))))
 
   (testing "rejects events"
     (is (false? (sut/command? {:type :llx.agent.event/agent-start})))))
 
 (deftest handle-command-set-system-prompt-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type          :command/set-system-prompt
+                                          {:type          :llx.agent.command/set-system-prompt
                                            :system-prompt "You are helpful."})]
     (is (= "You are helpful." (:system-prompt state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-model-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type  :command/set-model
+                                          {:type  :llx.agent.command/set-model
                                            :model {:id "gpt-4o"}})]
     (is (= {:id "gpt-4o"} (:model state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-thinking-level-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type           :command/set-thinking-level
+                                          {:type           :llx.agent.command/set-thinking-level
                                            :thinking-level :high})]
     (is (= :high (:thinking-level state')))
     (is (= [] sigs))))
@@ -83,21 +83,21 @@
 (deftest handle-command-set-tools-test
   (let [tools         [{:name "read_file"}]
         [state' sigs] (sut/handle-command (initial-state)
-                                          {:type  :command/set-tools
+                                          {:type  :llx.agent.command/set-tools
                                            :tools tools})]
     (is (= tools (:tools state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-steering-mode-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/set-steering-mode
+                                          {:type :llx.agent.command/set-steering-mode
                                            :mode :all})]
     (is (= :all (:steering-mode state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-follow-up-mode-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/set-follow-up-mode
+                                          {:type :llx.agent.command/set-follow-up-mode
                                            :mode :all})]
     (is (= :all (:follow-up-mode state')))
     (is (= [] sigs))))
@@ -105,7 +105,7 @@
 (deftest handle-command-replace-messages-test
   (let [msgs          [{:role :user :content "a"} {:role :assistant :content "b"}]
         [state' sigs] (sut/handle-command (state-with {:messages [{:role :user :content "old"}]})
-                                          {:type     :command/replace-messages
+                                          {:type     :llx.agent.command/replace-messages
                                            :messages msgs})]
     (is (= msgs (:messages state')))
     (is (= [] sigs))))
@@ -114,7 +114,7 @@
   (let [existing      [{:role :user :content "first"}]
         new-msg       {:role :assistant :content "second"}
         [state' sigs] (sut/handle-command (state-with {:messages existing})
-                                          {:type    :command/append-message
+                                          {:type    :llx.agent.command/append-message
                                            :message new-msg})]
     (is (= [{:role :user :content "first"}
             {:role :assistant :content "second"}]
@@ -123,35 +123,35 @@
 
 (deftest handle-command-clear-messages-test
   (let [[state' sigs] (sut/handle-command (state-with {:messages [{:role :user :content "x"}]})
-                                          {:type :command/clear-messages})]
+                                          {:type :llx.agent.command/clear-messages})]
     (is (= [] (:messages state')))
     (is (= [] sigs))))
 
 (deftest handle-command-steer-test
   (let [msg           {:role :user :content "steer me"}
         [state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/steer :message msg})]
+                                          {:type :llx.agent.command/steer :message msg})]
     (is (= [msg] (vec (:steering-queue state'))))
     (is (= [] sigs))))
 
 (deftest handle-command-follow-up-test
   (let [msg           {:role :user :content "follow up"}
         [state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/follow-up :message msg})]
+                                          {:type :llx.agent.command/follow-up :message msg})]
     (is (= [msg] (vec (:follow-up-queue state'))))
     (is (= [] sigs))))
 
 (deftest handle-command-clear-steering-queue-test
   (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "a"}))
-        [state' sigs] (sut/handle-command state {:type :command/clear-steering-queue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/clear-steering-queue})]
     (is (empty? (:steering-queue state')))
     (is (= [] sigs))))
 
 (deftest handle-command-clear-follow-up-queue-test
   (let [state         (-> (initial-state)
                           (update :follow-up-queue conj {:role :user :content "a"}))
-        [state' sigs] (sut/handle-command state {:type :command/clear-follow-up-queue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/clear-follow-up-queue})]
     (is (empty? (:follow-up-queue state')))
     (is (= [] sigs))))
 
@@ -159,7 +159,7 @@
   (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "s"})
                           (update :follow-up-queue conj {:role :user :content "f"}))
-        [state' sigs] (sut/handle-command state {:type :command/clear-all-queues})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/clear-all-queues})]
     (is (empty? (:steering-queue state')))
     (is (empty? (:follow-up-queue state')))
     (is (= [] sigs))))
@@ -173,7 +173,7 @@
                                  :error "boom")
                           (update :steering-queue conj {:role :user :content "s"})
                           (update :follow-up-queue conj {:role :user :content "f"}))
-        [state' sigs] (sut/handle-command state {:type :command/reset})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/reset})]
     (is (= {:llx.agent.loop/phase :llx.agent.loop/idle
             :messages             []
             :steering-queue       sut/empty-queue
@@ -188,26 +188,26 @@
 (deftest handle-command-prompt-from-idle-test
   (let [msgs          [{:role :user :content "hello"}]
         [state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/prompt :messages msgs})]
+                                          {:type :llx.agent.command/prompt :messages msgs})]
     (is (= (initial-state) state'))
-    (is (= [{:type :signal/prompt-start :messages msgs}] sigs))))
+    (is (= [{:type :llx.agent.signal/prompt-start :messages msgs}] sigs))))
 
 (deftest handle-command-prompt-when-not-idle-test
   (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
         [state' sigs] (sut/handle-command state
-                                          {:type     :command/prompt
+                                          {:type     :llx.agent.command/prompt
                                            :messages [{:role :user :content "hi"}]})]
     (is (= state state'))
-    (is (= [{:type :signal/rejected :reason :not-idle}] sigs))))
+    (is (= [{:type :llx.agent.signal/rejected :reason :not-idle}] sigs))))
 
 (deftest handle-command-continue-with-steering-one-at-a-time-test
   (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "s1"})
                           (update :steering-queue conj {:role :user :content "s2"}))
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
     (is (= [{:role :user :content "s1"}]
            (:messages (first sigs))))
-    (is (= :signal/continue-start (:type (first sigs))))
+    (is (= :llx.agent.signal/continue-start (:type (first sigs))))
     (is (= [{:role :user :content "s2"}]
            (vec (:steering-queue state'))))))
 
@@ -216,7 +216,7 @@
                           (assoc :steering-mode :all)
                           (update :steering-queue conj {:role :user :content "s1"})
                           (update :steering-queue conj {:role :user :content "s2"}))
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
     (is (= [{:role :user :content "s1"} {:role :user :content "s2"}]
            (:messages (first sigs))))
     (is (empty? (:steering-queue state')))))
@@ -225,8 +225,8 @@
   (let [state         (-> (initial-state)
                           (update :follow-up-queue conj {:role :user :content "f1"})
                           (update :follow-up-queue conj {:role :user :content "f2"}))
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
-    (is (= :signal/continue-start (:type (first sigs))))
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
+    (is (= :llx.agent.signal/continue-start (:type (first sigs))))
     (is (= [{:role :user :content "f1"}]
            (:messages (first sigs))))
     (is (= [{:role :user :content "f2"}]
@@ -237,7 +237,7 @@
                           (assoc :follow-up-mode :all)
                           (update :follow-up-queue conj {:role :user :content "f1"})
                           (update :follow-up-queue conj {:role :user :content "f2"}))
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
     (is (= [{:role :user :content "f1"} {:role :user :content "f2"}]
            (:messages (first sigs))))
     (is (empty? (:follow-up-queue state')))))
@@ -246,7 +246,7 @@
   (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "steer"})
                           (update :follow-up-queue conj {:role :user :content "follow"}))
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
     (is (= [{:role :user :content "steer"}]
            (:messages (first sigs))))
     (is (= [{:role :user :content "follow"}]
@@ -254,32 +254,32 @@
 
 (deftest handle-command-continue-empty-queues-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/continue})]
+                                          {:type :llx.agent.command/continue})]
     (is (= (initial-state) state'))
-    (is (= [{:type :signal/rejected :reason :no-queued-messages}] sigs))))
+    (is (= [{:type :llx.agent.signal/rejected :reason :no-queued-messages}] sigs))))
 
 (deftest handle-command-continue-when-not-idle-test
   (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
-        [state' sigs] (sut/handle-command state {:type :command/continue})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/continue})]
     (is (= state state'))
-    (is (= [{:type :signal/rejected :reason :not-idle}] sigs))))
+    (is (= [{:type :llx.agent.signal/rejected :reason :not-idle}] sigs))))
 
 (deftest handle-command-abort-when-streaming-test
   (let [state         (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
-        [state' sigs] (sut/handle-command state {:type :command/abort})]
+        [state' sigs] (sut/handle-command state {:type :llx.agent.command/abort})]
     (is (= state state'))
-    (is (= [{:type :signal/abort}] sigs))))
+    (is (= [{:type :llx.agent.signal/abort}] sigs))))
 
 (deftest handle-command-abort-when-idle-test
   (let [[state' sigs] (sut/handle-command (initial-state)
-                                          {:type :command/abort})]
+                                          {:type :llx.agent.command/abort})]
     (is (= (initial-state) state'))
-    (is (= [{:type :signal/rejected :reason :idle}] sigs))))
+    (is (= [{:type :llx.agent.signal/rejected :reason :idle}] sigs))))
 
 (deftest idle-transition-prompt-start-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle :messages [{:role :user :content "old"}]})
         new-msgs         [{:role :user :content "hello"}]
-        [state' effects] (sut/idle-transition state {:type     :signal/prompt-start
+        [state' effects] (sut/idle-transition state {:type     :llx.agent.signal/prompt-start
                                                      :messages new-msgs})]
     (testing "appends messages and transitions to streaming"
       (is (= [{:role :user :content "old"} {:role :user :content "hello"}]
@@ -302,7 +302,7 @@
 (deftest idle-transition-continue-start-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle :messages [{:role :user :content "old"}]})
         new-msgs         [{:role :user :content "continue"}]
-        [state' effects] (sut/idle-transition state {:type     :signal/continue-start
+        [state' effects] (sut/idle-transition state {:type     :llx.agent.signal/continue-start
                                                      :messages new-msgs})]
     (testing "appends messages and transitions to streaming"
       (is (= [{:role :user :content "old"} {:role :user :content "continue"}]
@@ -321,14 +321,14 @@
 
 (deftest idle-transition-invalid-signal-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/idle})
-        [state' effects] (sut/idle-transition state {:type :signal/llm-chunk})]
+        [state' effects] (sut/idle-transition state {:type :llx.agent.signal/llm-chunk})]
     (is (= state state'))
     (is (= [{::fx/type :reject :reason :invalid-signal}] effects))))
 
 (deftest streaming-transition-llm-start-test
   (let [msg              {:role :assistant :content "partial"}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
-        [state' effects] (sut/streaming-transition state {:type    :signal/llm-start
+        [state' effects] (sut/streaming-transition state {:type    :llx.agent.signal/llm-start
                                                           :message msg})]
     (is (= msg (:stream-message state')))
     (is (= [{::fx/type :emit-event
@@ -339,7 +339,7 @@
   (let [chunk            {:role :assistant :content "more"}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :stream-message       {:role :assistant :content "partial"}})
-        [state' effects] (sut/streaming-transition state {:type  :signal/llm-chunk
+        [state' effects] (sut/streaming-transition state {:type  :llx.agent.signal/llm-chunk
                                                           :chunk chunk})]
     (is (= chunk (:stream-message state')))
     (is (= [{::fx/type :emit-event
@@ -351,7 +351,7 @@
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]
                                       :stream-message       {:role :assistant :content "partial"}})
-        [state' effects] (sut/streaming-transition state {:type    :signal/llm-done
+        [state' effects] (sut/streaming-transition state {:type    :llx.agent.signal/llm-done
                                                           :message message})]
     (testing "transitions to idle and clears stream-message"
       (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
@@ -373,7 +373,7 @@
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "do stuff"}]
                                       :stream-message       {:role :assistant :content "partial"}})
-        [state' effects] (sut/streaming-transition state {:type    :signal/llm-done
+        [state' effects] (sut/streaming-transition state {:type    :llx.agent.signal/llm-done
                                                           :message message})]
     (testing "transitions to tool-executing"
       (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase state'))))
@@ -396,7 +396,7 @@
 (deftest streaming-transition-llm-error-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]})
-        [state' effects] (sut/streaming-transition state {:type  :signal/llm-error
+        [state' effects] (sut/streaming-transition state {:type  :llx.agent.signal/llm-error
                                                           :error "connection reset"})]
     (testing "transitions to idle and sets error"
       (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
@@ -412,7 +412,7 @@
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]
                                       :stream-message       {:role :assistant :content "partial"}})
-        [state' effects] (sut/streaming-transition state {:type :signal/abort})]
+        [state' effects] (sut/streaming-transition state {:type :llx.agent.signal/abort})]
     (testing "transitions to closed and clears stream-message"
       (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (nil? (:stream-message state'))))
@@ -425,7 +425,7 @@
 
 (deftest streaming-transition-unknown-signal-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
-        [state' effects] (sut/streaming-transition state {:type :signal/tool-result})]
+        [state' effects] (sut/streaming-transition state {:type :llx.agent.signal/tool-result})]
     (is (= state state'))
     (is (= [] effects))))
 
@@ -439,7 +439,7 @@
                                       :messages             [{:role :user :content "do stuff"}]})
         [state' effects] (sut/tool-executing-transition
                           state
-                          {:type                :signal/tool-result
+                          {:type                :llx.agent.signal/tool-result
                            :result              result
                            :tool-result-message tool-result-msg})]
     (testing "processes result and keeps remaining tools"
@@ -468,7 +468,7 @@
                                       :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
-                          {:type                :signal/tool-result
+                          {:type                :llx.agent.signal/tool-result
                            :result              result
                            :tool-result-message tool-result-msg})]
     (testing "clears pending-tool-calls"
@@ -491,7 +491,7 @@
                                       :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
-                          {:type                :signal/tool-error
+                          {:type                :llx.agent.signal/tool-error
                            :tool-call-id        "tc-1"
                            :error               "kaboom"
                            :tool-result-message tool-result-msg})]
@@ -515,7 +515,7 @@
                                       :messages             []})
         [state' effects] (sut/tool-executing-transition
                           state
-                          {:type                :signal/tool-error
+                          {:type                :llx.agent.signal/tool-error
                            :tool-call-id        "tc-1"
                            :error               "kaboom"
                            :tool-result-message tool-result-msg})]
@@ -532,7 +532,7 @@
                                       :pending-tool-calls   [{:id "tc-1" :name "slow_tool"}]})
         [state' effects] (sut/tool-executing-transition
                           state
-                          {:type           :signal/tool-update
+                          {:type           :llx.agent.signal/tool-update
                            :tool-call-id   "tc-1"
                            :tool-name      "slow_tool"
                            :partial-result {:progress 50}})]
@@ -548,7 +548,7 @@
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   [{:id "tc-1"} {:id "tc-2"}]
                                       :messages             [{:role :user :content "x"}]})
-        [state' effects] (sut/tool-executing-transition state {:type :signal/abort})]
+        [state' effects] (sut/tool-executing-transition state {:type :llx.agent.signal/abort})]
     (testing "transitions to closed and clears pending-tool-calls"
       (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (= [] (:pending-tool-calls state'))))
@@ -561,16 +561,16 @@
 (deftest tool-executing-transition-unknown-signal-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   [{:id "tc-1"}]})
-        [state' effects] (sut/tool-executing-transition state {:type :signal/llm-start})]
+        [state' effects] (sut/tool-executing-transition state {:type :llx.agent.signal/llm-start})]
     (is (= state state'))
     (is (= [] effects))))
 
 (deftest closed-transition-is-terminal-test
   (let [state (state-with {:llx.agent.loop/phase :llx.agent.loop/closed})]
     (testing "any signal returns state unchanged with no effects"
-      (is (= [state []] (sut/closed-transition state {:type :signal/llm-done})))
-      (is (= [state []] (sut/closed-transition state {:type :signal/abort})))
-      (is (= [state []] (sut/closed-transition state {:type :signal/tool-result}))))))
+      (is (= [state []] (sut/closed-transition state {:type :llx.agent.signal/llm-done})))
+      (is (= [state []] (sut/closed-transition state {:type :llx.agent.signal/abort})))
+      (is (= [state []] (sut/closed-transition state {:type :llx.agent.signal/tool-result}))))))
 
 (deftest route-from-idle-test
   (is (= :llx.agent.loop/idle (sut/route-from-idle {:llx.agent.loop/phase :llx.agent.loop/idle})))
@@ -624,7 +624,7 @@
 
 (deftest step-prompt-from-idle-to-streaming-test
   (let [state            (initial-state)
-        [state' effects] (sut/step state {:type     :command/prompt
+        [state' effects] (sut/step state {:type     :llx.agent.command/prompt
                                           :messages [{:role :user :content "hello"}]})]
     (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state')))
     (is (= [{:role :user :content "hello"}] (:messages state')))
@@ -632,7 +632,7 @@
 
 (deftest step-prompt-when-streaming-is-rejected-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming})
-        [state' effects] (sut/step state {:type     :command/prompt
+        [state' effects] (sut/step state {:type     :llx.agent.command/prompt
                                           :messages [{:role :user :content "hi"}]})]
     (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase state')))
     (is (= [] effects))))
@@ -642,7 +642,7 @@
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]
                                       :stream-message       {:role :assistant :content "partial"}})
-        [state' effects] (sut/step state {:type :signal/llm-done :message message})]
+        [state' effects] (sut/step state {:type :llx.agent.signal/llm-done :message message})]
     (is (= :llx.agent.loop/idle (:llx.agent.loop/phase state')))
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
@@ -651,7 +651,7 @@
         message          {:role :assistant :content "" :tool-calls tool-calls}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "do stuff"}]})
-        [state' effects] (sut/step state {:type :signal/llm-done :message message})]
+        [state' effects] (sut/step state {:type :llx.agent.signal/llm-done :message message})]
     (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase state')))
     (is (some #(= :execute-tool (::fx/type %)) effects))))
 
@@ -659,14 +659,14 @@
   (testing "abort signal from streaming"
     (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                         :messages             [{:role :user :content "hello"}]})
-          [state' effects] (sut/step state {:type :signal/abort})]
+          [state' effects] (sut/step state {:type :llx.agent.signal/abort})]
       (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
   (testing "abort command from streaming"
     (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                         :messages             [{:role :user :content "hello"}]})
-          [state' effects] (sut/step state {:type :command/abort})]
+          [state' effects] (sut/step state {:type :llx.agent.command/abort})]
       (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
       (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
 
@@ -674,7 +674,7 @@
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   [{:id "tc-1"}]
                                       :messages             [{:role :user :content "x"}]})
-        [state' effects] (sut/step state {:type :command/abort})]
+        [state' effects] (sut/step state {:type :llx.agent.command/abort})]
     (is (= :llx.agent.loop/closed (:llx.agent.loop/phase state')))
     (is (= [] (:pending-tool-calls state')))
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
@@ -684,12 +684,12 @@
         user-msg      {:role :user :content "hello"}
         assistant-msg {:role :assistant :content "Hi!" :tool-calls []}
 
-        [s1 _]        (sut/step state {:type :command/prompt :messages [user-msg]})
-        [s2 fx2]      (sut/step s1 {:type    :signal/llm-start
+        [s1 _]        (sut/step state {:type :llx.agent.command/prompt :messages [user-msg]})
+        [s2 fx2]      (sut/step s1 {:type    :llx.agent.signal/llm-start
                                     :message {:role :assistant :content ""}})
-        [s3 fx3]      (sut/step s2 {:type  :signal/llm-chunk
+        [s3 fx3]      (sut/step s2 {:type  :llx.agent.signal/llm-chunk
                                     :chunk {:role :assistant :content "Hi"}})
-        [s4 fx4]      (sut/step s3 {:type :signal/llm-done :message assistant-msg})]
+        [s4 fx4]      (sut/step s3 {:type :llx.agent.signal/llm-done :message assistant-msg})]
 
     (testing "state progression"
       (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s1)))
@@ -716,12 +716,12 @@
         tool-result-msg     {:role :tool-result :tool-call-id "tc-1" :content "file data"}
         final-assistant     {:role :assistant :content "Here is the file." :tool-calls []}
 
-        [s1 _]              (sut/step state {:type :command/prompt :messages [user-msg]})
-        [s2 _]              (sut/step s1 {:type :signal/llm-done :message assistant-with-tool})
-        [s3 _]              (sut/step s2 {:type                :signal/tool-result
+        [s1 _]              (sut/step state {:type :llx.agent.command/prompt :messages [user-msg]})
+        [s2 _]              (sut/step s1 {:type :llx.agent.signal/llm-done :message assistant-with-tool})
+        [s3 _]              (sut/step s2 {:type                :llx.agent.signal/tool-result
                                           :result              tool-result
                                           :tool-result-message tool-result-msg})
-        [s4 fx4]            (sut/step s3 {:type :signal/llm-done :message final-assistant})]
+        [s4 fx4]            (sut/step s3 {:type :llx.agent.signal/llm-done :message final-assistant})]
 
     (testing "state progression through tool loop"
       (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s1)))
@@ -739,7 +739,7 @@
 (deftest agent-end-emitted-on-streaming-to-idle-test
   (let [state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages             [{:role :user :content "hello"}]})
-        [_ effects] (sut/step state {:type    :signal/llm-done
+        [_ effects] (sut/step state {:type    :llx.agent.signal/llm-done
                                      :message {:role       :assistant :content "Hi!"
                                                :tool-calls []}})]
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
@@ -747,19 +747,19 @@
 (deftest agent-end-emitted-on-error-to-idle-test
   (let [state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages             [{:role :user :content "hello"}]})
-        [_ effects] (sut/step state {:type :signal/llm-error :error "boom"})]
+        [_ effects] (sut/step state {:type :llx.agent.signal/llm-error :error "boom"})]
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest agent-end-not-emitted-when-staying-idle-test
   (let [state       (initial-state)
-        [_ effects] (sut/step state {:type :command/set-model :model {:id "gpt-4o"}})]
+        [_ effects] (sut/step state {:type :llx.agent.command/set-model :model {:id "gpt-4o"}})]
     (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
 
 (deftest agent-end-not-emitted-on-streaming-to-tool-executing-test
   (let [tool-calls  [{:id "tc-1" :name "echo" :arguments {}}]
         state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages             [{:role :user :content "x"}]})
-        [_ effects] (sut/step state {:type    :signal/llm-done
+        [_ effects] (sut/step state {:type    :llx.agent.signal/llm-done
                                      :message {:role       :assistant :content ""
                                                :tool-calls tool-calls}})]
     (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))

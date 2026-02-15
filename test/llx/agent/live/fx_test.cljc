@@ -69,12 +69,12 @@
                      (p/then (fn [signals]
                                (is (seq signals))
                                (let [terminal (last signals)]
-                                 (when (= :signal/llm-error (:type terminal))
-                                   (throw (ex-info "Live provider call returned :signal/llm-error"
+                                 (when (= :llx.agent.signal/llm-error (:type terminal))
+                                   (throw (ex-info "Live provider call returned :llx.agent.signal/llm-error"
                                                    {:signal-count (count signals)
                                                     :error        (:error terminal)}))))
-                               (is (= :signal/llm-start (:type (first signals))))
-                               (is (= :signal/llm-done (:type (last signals))))
+                               (is (= :llx.agent.signal/llm-start (:type (first signals))))
+                               (is (= :llx.agent.signal/llm-done (:type (last signals))))
                                (let [assistant-message (:message (last signals))]
                                  (is (= :assistant (:role assistant-message)))
                                  (is (#{:stop :length :tool-use} (:stop-reason assistant-message)))

@@ -165,28 +165,28 @@
 (defn prompt
   "Submits a prompt command to the TEA runtime."
   [agent messages]
-  (dispatch! agent {:type     :command/prompt
+  (dispatch! agent {:type     :llx.agent.command/prompt
                     :messages (validate-with-agent-registry! agent :llx.agent/messages (or messages []))}))
 
 (defn continue
   "Submits a continue command to the TEA runtime."
   [agent]
-  (dispatch! agent {:type :command/continue}))
+  (dispatch! agent {:type :llx.agent.command/continue}))
 
 (defn abort
   "Submits an abort command to the TEA runtime."
   [agent]
-  (dispatch! agent {:type :command/abort}))
+  (dispatch! agent {:type :llx.agent.command/abort}))
 
 (defn steer
   "Queues steering messages."
   [agent messages]
-  (dispatch-queued-messages! agent :command/steer messages))
+  (dispatch-queued-messages! agent :llx.agent.command/steer messages))
 
 (defn follow-up
   "Queues follow-up messages."
   [agent messages]
-  (dispatch-queued-messages! agent :command/follow-up messages))
+  (dispatch-queued-messages! agent :llx.agent.command/follow-up messages))
 
 (defn wait-for-idle
   "Waits until the agent reaches `:llx.agent.loop/idle` or `:llx.agent.loop/closed`.
@@ -211,59 +211,59 @@
 
 (defn set-system-prompt
   [agent system-prompt]
-  (dispatch! agent {:type          :command/set-system-prompt
+  (dispatch! agent {:type          :llx.agent.command/set-system-prompt
                     :system-prompt system-prompt}))
 
 (defn set-model
   [agent model]
-  (dispatch! agent {:type :command/set-model :model model}))
+  (dispatch! agent {:type :llx.agent.command/set-model :model model}))
 
 (defn set-thinking-level
   [agent thinking-level]
-  (dispatch! agent {:type           :command/set-thinking-level
+  (dispatch! agent {:type           :llx.agent.command/set-thinking-level
                     :thinking-level thinking-level}))
 
 (defn set-tools
   [agent tools]
-  (dispatch! agent {:type :command/set-tools :tools tools}))
+  (dispatch! agent {:type :llx.agent.command/set-tools :tools tools}))
 
 (defn set-steering-mode
   [agent mode]
-  (dispatch! agent {:type :command/set-steering-mode :mode mode}))
+  (dispatch! agent {:type :llx.agent.command/set-steering-mode :mode mode}))
 
 (defn set-follow-up-mode
   [agent mode]
-  (dispatch! agent {:type :command/set-follow-up-mode :mode mode}))
+  (dispatch! agent {:type :llx.agent.command/set-follow-up-mode :mode mode}))
 
 (defn replace-messages
   [agent messages]
-  (dispatch! agent {:type     :command/replace-messages
+  (dispatch! agent {:type     :llx.agent.command/replace-messages
                     :messages (validate-with-agent-registry! agent :llx.agent/messages messages)}))
 
 (defn append-message
   [agent message]
-  (dispatch! agent {:type    :command/append-message
+  (dispatch! agent {:type    :llx.agent.command/append-message
                     :message (validate-with-agent-registry! agent :llx.agent/message message)}))
 
 (defn clear-messages
   [agent]
-  (dispatch! agent {:type :command/clear-messages}))
+  (dispatch! agent {:type :llx.agent.command/clear-messages}))
 
 (defn clear-steering-queue
   [agent]
-  (dispatch! agent {:type :command/clear-steering-queue}))
+  (dispatch! agent {:type :llx.agent.command/clear-steering-queue}))
 
 (defn clear-follow-up-queue
   [agent]
-  (dispatch! agent {:type :command/clear-follow-up-queue}))
+  (dispatch! agent {:type :llx.agent.command/clear-follow-up-queue}))
 
 (defn clear-all-queues
   [agent]
-  (dispatch! agent {:type :command/clear-all-queues}))
+  (dispatch! agent {:type :llx.agent.command/clear-all-queues}))
 
 (defn reset
   [agent]
-  (dispatch! agent {:type :command/reset}))
+  (dispatch! agent {:type :llx.agent.command/reset}))
 
 (defn close
   "Closes the command channel and marks state as closed."

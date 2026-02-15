@@ -80,9 +80,220 @@
      :llx.agent/messages
      [:vector :llx.agent/message]
 
-     :llx.agent/command
+     :llx.agent/command-type
+     [:enum
+      :llx.agent.command/prompt
+      :llx.agent.command/continue
+      :llx.agent.command/abort
+      :llx.agent.command/steer
+      :llx.agent.command/follow-up
+      :llx.agent.command/set-system-prompt
+      :llx.agent.command/set-model
+      :llx.agent.command/set-thinking-level
+      :llx.agent.command/set-tools
+      :llx.agent.command/set-steering-mode
+      :llx.agent.command/set-follow-up-mode
+      :llx.agent.command/replace-messages
+      :llx.agent.command/append-message
+      :llx.agent.command/clear-messages
+      :llx.agent.command/clear-steering-queue
+      :llx.agent.command/clear-follow-up-queue
+      :llx.agent.command/clear-all-queues
+      :llx.agent.command/reset]
+
+     :llx.agent/command-prompt
      [:map
-      [:type :keyword]]
+      [:type [:= :llx.agent.command/prompt]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent/command-continue
+     [:map
+      [:type [:= :llx.agent.command/continue]]]
+
+     :llx.agent/command-abort
+     [:map
+      [:type [:= :llx.agent.command/abort]]]
+
+     :llx.agent/command-steer
+     [:map
+      [:type [:= :llx.agent.command/steer]]
+      [:message :llx.agent/message]]
+
+     :llx.agent/command-follow-up
+     [:map
+      [:type [:= :llx.agent.command/follow-up]]
+      [:message :llx.agent/message]]
+
+     :llx.agent/command-set-system-prompt
+     [:map
+      [:type [:= :llx.agent.command/set-system-prompt]]
+      [:system-prompt :string]]
+
+     :llx.agent/command-set-model
+     [:map
+      [:type [:= :llx.agent.command/set-model]]
+      [:model :llx/model]]
+
+     :llx.agent/command-set-thinking-level
+     [:map
+      [:type [:= :llx.agent.command/set-thinking-level]]
+      [:thinking-level :llx.agent.loop/thinking-level]]
+
+     :llx.agent/command-set-tools
+     [:map
+      [:type [:= :llx.agent.command/set-tools]]
+      [:tools [:vector :map]]]
+
+     :llx.agent/command-set-steering-mode
+     [:map
+      [:type [:= :llx.agent.command/set-steering-mode]]
+      [:mode :llx.agent.loop/dequeue-mode]]
+
+     :llx.agent/command-set-follow-up-mode
+     [:map
+      [:type [:= :llx.agent.command/set-follow-up-mode]]
+      [:mode :llx.agent.loop/dequeue-mode]]
+
+     :llx.agent/command-replace-messages
+     [:map
+      [:type [:= :llx.agent.command/replace-messages]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent/command-append-message
+     [:map
+      [:type [:= :llx.agent.command/append-message]]
+      [:message :llx.agent/message]]
+
+     :llx.agent/command-clear-messages
+     [:map
+      [:type [:= :llx.agent.command/clear-messages]]]
+
+     :llx.agent/command-clear-steering-queue
+     [:map
+      [:type [:= :llx.agent.command/clear-steering-queue]]]
+
+     :llx.agent/command-clear-follow-up-queue
+     [:map
+      [:type [:= :llx.agent.command/clear-follow-up-queue]]]
+
+     :llx.agent/command-clear-all-queues
+     [:map
+      [:type [:= :llx.agent.command/clear-all-queues]]]
+
+     :llx.agent/command-reset
+     [:map
+      [:type [:= :llx.agent.command/reset]]]
+
+     :llx.agent/command
+     [:multi {:dispatch :type}
+      [:llx.agent.command/prompt :llx.agent/command-prompt]
+      [:llx.agent.command/continue :llx.agent/command-continue]
+      [:llx.agent.command/abort :llx.agent/command-abort]
+      [:llx.agent.command/steer :llx.agent/command-steer]
+      [:llx.agent.command/follow-up :llx.agent/command-follow-up]
+      [:llx.agent.command/set-system-prompt :llx.agent/command-set-system-prompt]
+      [:llx.agent.command/set-model :llx.agent/command-set-model]
+      [:llx.agent.command/set-thinking-level :llx.agent/command-set-thinking-level]
+      [:llx.agent.command/set-tools :llx.agent/command-set-tools]
+      [:llx.agent.command/set-steering-mode :llx.agent/command-set-steering-mode]
+      [:llx.agent.command/set-follow-up-mode :llx.agent/command-set-follow-up-mode]
+      [:llx.agent.command/replace-messages :llx.agent/command-replace-messages]
+      [:llx.agent.command/append-message :llx.agent/command-append-message]
+      [:llx.agent.command/clear-messages :llx.agent/command-clear-messages]
+      [:llx.agent.command/clear-steering-queue :llx.agent/command-clear-steering-queue]
+      [:llx.agent.command/clear-follow-up-queue :llx.agent/command-clear-follow-up-queue]
+      [:llx.agent.command/clear-all-queues :llx.agent/command-clear-all-queues]
+      [:llx.agent.command/reset :llx.agent/command-reset]]
+
+     :llx.agent/signal-type
+     [:enum
+      :llx.agent.signal/prompt-start
+      :llx.agent.signal/continue-start
+      :llx.agent.signal/abort
+      :llx.agent.signal/rejected
+      :llx.agent.signal/llm-start
+      :llx.agent.signal/llm-chunk
+      :llx.agent.signal/llm-done
+      :llx.agent.signal/llm-error
+      :llx.agent.signal/tool-result
+      :llx.agent.signal/tool-error
+      :llx.agent.signal/tool-update]
+
+     :llx.agent/signal-prompt-start
+     [:map
+      [:type [:= :llx.agent.signal/prompt-start]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent/signal-continue-start
+     [:map
+      [:type [:= :llx.agent.signal/continue-start]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent/signal-abort
+     [:map
+      [:type [:= :llx.agent.signal/abort]]]
+
+     :llx.agent/signal-rejected
+     [:map
+      [:type [:= :llx.agent.signal/rejected]]
+      [:reason :keyword]]
+
+     :llx.agent/signal-llm-start
+     [:map
+      [:type [:= :llx.agent.signal/llm-start]]
+      [:message :map]]
+
+     :llx.agent/signal-llm-chunk
+     [:map
+      [:type [:= :llx.agent.signal/llm-chunk]]
+      [:chunk :map]]
+
+     :llx.agent/signal-llm-done
+     [:map
+      [:type [:= :llx.agent.signal/llm-done]]
+      [:message :map]]
+
+     :llx.agent/signal-llm-error
+     [:map
+      [:type [:= :llx.agent.signal/llm-error]]
+      [:error :any]]
+
+     :llx.agent/signal-tool-result
+     [:map
+      [:type [:= :llx.agent.signal/tool-result]]
+      [:result :map]
+      [:tool-result-message :map]]
+
+     :llx.agent/signal-tool-error
+     [:map
+      [:type [:= :llx.agent.signal/tool-error]]
+      [:tool-call-id :string]
+      [:error :any]
+      [:tool-result-message :map]]
+
+     :llx.agent/signal-tool-update
+     [:map
+      [:type [:= :llx.agent.signal/tool-update]]
+      [:tool-call-id :string]
+      [:tool-name :string]
+      [:partial-result :map]]
+
+     :llx.agent/signal
+     [:multi {:dispatch :type}
+      [:llx.agent.signal/prompt-start :llx.agent/signal-prompt-start]
+      [:llx.agent.signal/continue-start :llx.agent/signal-continue-start]
+      [:llx.agent.signal/abort :llx.agent/signal-abort]
+      [:llx.agent.signal/rejected :llx.agent/signal-rejected]
+      [:llx.agent.signal/llm-start :llx.agent/signal-llm-start]
+      [:llx.agent.signal/llm-chunk :llx.agent/signal-llm-chunk]
+      [:llx.agent.signal/llm-done :llx.agent/signal-llm-done]
+      [:llx.agent.signal/llm-error :llx.agent/signal-llm-error]
+      [:llx.agent.signal/tool-result :llx.agent/signal-tool-result]
+      [:llx.agent.signal/tool-error :llx.agent/signal-tool-error]
+      [:llx.agent.signal/tool-update :llx.agent/signal-tool-update]]
+
+     :llx.agent/signals
+     [:vector :llx.agent/signal]
 
      :llx.agent/event-type
      [:enum
@@ -96,6 +307,11 @@
       :llx.agent.event/tool-execution-start
       :llx.agent.event/tool-execution-update
       :llx.agent.event/tool-execution-end]
+
+     :llx.agent/event-message-payload
+     [:or
+      [:map [:role :keyword]]
+      [:map [:stop-reason :llx/stop-reason]]]
 
      :llx.agent/event-agent-start
      [:map
@@ -113,22 +329,22 @@
      :llx.agent/event-turn-end
      [:map
       [:type [:= :llx.agent.event/turn-end]]
-      [:message {:optional true} :map]]
+      [:message {:optional true} :llx.agent/event-message-payload]]
 
      :llx.agent/event-message-start
      [:map
       [:type [:= :llx.agent.event/message-start]]
-      [:message :map]]
+      [:message :llx.agent/event-message-payload]]
 
      :llx.agent/event-message-update
      [:map
       [:type [:= :llx.agent.event/message-update]]
-      [:chunk :map]]
+      [:chunk :llx.agent/event-message-payload]]
 
      :llx.agent/event-message-end
      [:map
       [:type [:= :llx.agent.event/message-end]]
-      [:message :map]]
+      [:message :llx.agent/event-message-payload]]
 
      :llx.agent/event-tool-execution-start
      [:map
