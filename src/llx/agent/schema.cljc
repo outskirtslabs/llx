@@ -84,6 +84,37 @@
      [:map
       [:type :keyword]]
 
+     :llx.agent.fx/effect-emit-event
+     [:map
+      [:fx/type [:= :emit-event]]
+      [:event :map] ;; TODO spec the events
+      ]
+
+     :llx.agent.fx/effect-call-llm
+     [:map
+      [:fx/type [:= :call-llm]]
+      [:messages :llx.agent/messages]]
+
+     :llx.agent.fx/effect-execute-tool
+     [:map
+      [:fx/type [:= :execute-tool]]
+      [:tool-call :map]]
+
+     :llx.agent.fx/effect-reject
+     [:map
+      [:fx/type [:= :reject]]
+      [:reason :keyword]]
+
+     :llx.agent.fx/effect
+     [:multi {:dispatch :fx/type}
+      [:emit-event :llx.agent.fx/effect-emit-event]
+      [:call-llm :llx.agent.fx/effect-call-llm]
+      [:execute-tool :llx.agent.fx/effect-execute-tool]
+      [:reject :llx.agent.fx/effect-reject]]
+
+     :llx.agent.fx/result
+     [:or :llx.agent/channel :nil]
+
      :llx.agent/create-agent-opts
      [:map
       [:convert-to-llm {:optional true} :llx/fn]

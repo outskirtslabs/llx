@@ -5,7 +5,7 @@
    and subscription management around `llx.agent.loop` + `llx.agent.fx`."
   (:refer-clojure :exclude [reset!])
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [=> >defn >defn-]]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
    [llx.agent.fx :as fx]
    [llx.agent.schema :as schema]
    [malli.core :as m]

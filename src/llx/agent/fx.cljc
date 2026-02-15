@@ -62,11 +62,12 @@
                            loop/step → [state', more effects]
                               ↓
                            ... continues until active set empty
-   ```"
+  ```"
   (:require
-   [clojure.string :as str]
-   [llx.ai :as ai]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
+   [llx.agent.fx.inference :as inference]
    [llx.agent.loop :as loop]
+   [llx.agent.schema :as schema]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -74,226 +75,6 @@
   [env effect]
   (sp/offer (:events-mx> env) (:event effect))
   nil)
-
-(defn- base-partial-assistant-message
-  [model]
-  (cond-> {:role :assistant :content []}
-    (:api model) (assoc :api (:api model))
-    (:provider model) (assoc :provider (:provider model))
-    (:id model) (assoc :model (:id model))))
-
-(defn- normalize-event-type
-  [event]
-  (let [t (:type event)]
-    (cond
-      (keyword? t) t
-      (string? t) (-> t
-                      (str/replace "_" "-")
-                      keyword)
-      :else t)))
-
-(defn- ensure-text-block
-  [partial]
-  (let [content (:content partial)]
-    (if (and (seq content) (= :text (:type (peek content))))
-      partial
-      (update partial :content conj {:type :text :text ""}))))
-
-(defn- ensure-thinking-block
-  [partial]
-  (let [content (:content partial)]
-    (if (and (seq content) (= :thinking (:type (peek content))))
-      partial
-      (update partial :content conj {:type :thinking :thinking ""}))))
-
-(defn- update-last-text
-  [partial text-delta]
-  (let [partial (ensure-text-block partial)]
-    (update-in partial [:content (dec (count (:content partial))) :text]
-               (fnil str "")
-               (or text-delta ""))))
-
-(defn- update-last-thinking
-  [partial thinking-delta]
-  (let [partial (ensure-thinking-block partial)]
-    (update-in partial [:content (dec (count (:content partial))) :thinking]
-               (fnil str "")
-               (or thinking-delta ""))))
-
-(defn- upsert-tool-call
-  [partial {:keys [id name arguments]}]
-  (let [content (:content partial)
-        idx     (first (keep-indexed (fn [i block]
-                                       (when (and (= :tool-call (:type block))
-                                                  (= id (:id block)))
-                                         i))
-                                     content))
-        block   {:type      :tool-call
-                 :id        id
-                 :name      name
-                 :arguments (or arguments {})}]
-    (if (some? idx)
-      (assoc-in partial [:content idx] block)
-      (update partial :content conj block))))
-
-(defn- llm-event->step
-  [model partial event]
-  (let [event-type (normalize-event-type event)
-        partial    (or partial
-                       (:partial event)
-                       (base-partial-assistant-message model))]
-    (case event-type
-      :start
-      {:partial partial
-       :signal  {:type :signal/llm-start :message partial}
-       :done?   false}
-
-      :text-start
-      (let [partial (or (:partial event)
-                        (ensure-text-block partial))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :text-delta
-      (let [partial (or (:partial event)
-                        (update-last-text partial (or (:text event) (:delta event))))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :text-end
-      (let [partial (or (:partial event) partial)]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :thinking-start
-      (let [partial (or (:partial event)
-                        (ensure-thinking-block partial))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :thinking-delta
-      (let [partial (or (:partial event)
-                        (update-last-thinking partial (or (:thinking event) (:delta event))))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :thinking-end
-      (let [partial (or (:partial event) partial)]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :toolcall-start
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :toolcall-delta
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :toolcall-end
-      (let [partial (or (:partial event)
-                        (upsert-tool-call partial {:id        (:id event)
-                                                   :name      (:name event)
-                                                   :arguments (:arguments event)}))]
-        {:partial partial
-         :signal  {:type :signal/llm-chunk :chunk partial}
-         :done?   false})
-
-      :done
-      {:partial partial
-       :signal  {:type    :signal/llm-done
-                 :message (or (:assistant-message event) (:message event) partial)}
-       :done?   true}
-
-      :error
-      {:partial partial
-       :signal  {:type  :signal/llm-error
-                 :error (or (:assistant-message event) (:error event) event)}
-       :done?   true}
-
-      {:partial partial
-       :signal  nil
-       :done?   false})))
-
-(defn- stream-options
-  [{:keys [abort-signal] :as env}
-   {:keys [thinking-level] :as _state}
-   use-custom-stream-fn?
-   resolved-api-key]
-  (let [reasoning (when-not (= :off thinking-level)
-                    thinking-level)
-        base      (cond-> {}
-                    reasoning (assoc :reasoning reasoning)
-                    abort-signal (assoc :signal abort-signal))
-        parity    (->> (select-keys env [:session-id
-                                         :thinking-budgets
-                                         :max-retry-delay-ms])
-                       (remove (comp nil? val))
-                       (into {}))]
-    (cond-> (merge base parity)
-      (some? resolved-api-key)
-      (assoc :api-key resolved-api-key)
-
-      (and use-custom-stream-fn?
-           (some? (:get-api-key env)))
-      (assoc :get-api-key (:get-api-key env)))))
-
-(defn- default-stream-fn
-  [model context options]
-  (ai/stream (ai/default-env) model context options))
-
-(defn- fx-call-llm
-  [{:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect]
-  (let [out                                           (sp/chan)
-        {:keys [model system-prompt tools] :as state} @state_
-        use-custom-stream-fn?                         (fn? stream-fn)
-        stream-fn                                     (or stream-fn default-stream-fn)
-        context                                       (fn [llm-messages]
-                                                        {:system-prompt system-prompt
-                                                         :messages      llm-messages
-                                                         :tools         tools})]
-    (-> (p/let [messages         (if transform-context
-                                   (transform-context (:messages effect) abort-signal)
-                                   (:messages effect))
-                llm-messages     (convert-to-llm messages)
-                resolved-api-key (if get-api-key
-                                   (get-api-key (name (:provider model)))
-                                   nil)
-                options          (stream-options env state use-custom-stream-fn? resolved-api-key)
-                llm-context      (context llm-messages)
-                stream-ch        (stream-fn model llm-context options)]
-          (p/loop [partial nil]
-            (p/let [event (sp/take stream-ch)]
-              (if (nil? event)
-                nil
-                (let [{:keys [partial signal done?]} (llm-event->step model partial event)]
-                  (if signal
-                    (p/let [_ (sp/put out signal)]
-                      (if done?
-                        nil
-                        (p/recur partial)))
-                    (p/recur partial)))))))
-        (p/catch (fn [error]
-                   (sp/put out {:type :signal/llm-error :error error})))
-        (p/finally (fn [_ _]
-                     (sp/close out))))
-    out))
 
 (defn- fx-execute-tool
   [_env _effect]
@@ -312,8 +93,8 @@
   ;; TODO: log warning with (:reason effect)
   nil)
 
-(defn execute-fx
-  "Interpret a single effect description. Dispatches on `:fx/type`.
+(>defn execute-fx
+       "Interpret a single effect description. Dispatches on `:fx/type`.
 
    Fire-and-forget effects (`:emit-event`, `:reject`):
    Execute the side effect synchronously. Return `nil`.
@@ -333,13 +114,17 @@
      - `:stream-fn`          — `(fn [model context opts])` LLM streaming fn
      - `:tools`              — map of tool-name → tool-def with `:execute` fn
      - `:abort-signal`       — abort token for cancellation"
-  [env effect]
-  (case (:fx/type effect)
-    :emit-event (fx-emit-event env effect)
-    :call-llm (fx-call-llm env effect)
-    :execute-tool (fx-execute-tool env effect)
-    :reject (fx-reject env effect)
-    nil))
+       [env effect]
+       [:llx.agent/env :llx.agent.fx/effect => :llx.agent.fx/result]
+       (let [schema-registry (:schema-registry env)]
+         (schema/validate! schema-registry :llx.agent/env env)
+         (schema/validate! schema-registry :llx.agent.fx/effect effect)
+         (case (:fx/type effect)
+           :emit-event (fx-emit-event env effect)
+           :call-llm (inference/fx-call-llm env effect)
+           :execute-tool (fx-execute-tool env effect)
+           :reject (fx-reject env effect)
+           nil)))
 
 (defn- step-and-collect!
   "Run `loop/step` against the current state atom, update the atom,
