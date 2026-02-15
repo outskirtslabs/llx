@@ -26,8 +26,6 @@
           ];
           # https://numtide.github.io/devshell
           commands = [
-            { package = pkgs.cfssl; }
-            { package = pkgs.pebble; }
           ];
 
         };

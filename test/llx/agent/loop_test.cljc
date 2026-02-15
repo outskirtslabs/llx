@@ -2,21 +2,37 @@
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
+   [llx.ai :as ai]
    [llx.agent.loop :as sut]))
+
+(defn- initial-state
+  []
+  {:node               :node/idle
+   :system-prompt      ""
+   :model              (ai/get-model :openai "gpt-5.2-codex")
+   :thinking-level     :off
+   :tools              []
+   :messages           []
+   :stream-message     nil
+   :pending-tool-calls []
+   :error              nil
+   :steering-queue     sut/empty-queue
+   :follow-up-queue    sut/empty-queue
+   :steering-mode      :one-at-a-time
+   :follow-up-mode     :one-at-a-time})
 
 (defn- state-with
   [overrides]
-  (merge (sut/initial-state) overrides))
+  (merge (initial-state) overrides))
 
 (defn- fx-types
   [effects]
   (mapv :fx/type effects))
 
-
 (deftest initial-state-has-expected-shape-test
   (is (= {:node               :node/idle
           :system-prompt      ""
-          :model              nil
+          :model              (ai/get-model :openai "gpt-5.2-codex")
           :thinking-level     :off
           :tools              []
           :messages           []
@@ -27,7 +43,7 @@
           :follow-up-queue    sut/empty-queue
           :steering-mode      :one-at-a-time
           :follow-up-mode     :one-at-a-time}
-         (sut/initial-state))))
+         (initial-state))))
 
 (deftest command-predicate-test
   (testing "recognizes commands"
@@ -43,21 +59,21 @@
     (is (false? (sut/command? {:type :event/agent-start})))))
 
 (deftest handle-command-set-system-prompt-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type          :command/set-system-prompt
                                            :system-prompt "You are helpful."})]
     (is (= "You are helpful." (:system-prompt state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-model-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type  :command/set-model
                                            :model {:id "gpt-4o"}})]
     (is (= {:id "gpt-4o"} (:model state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-thinking-level-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type           :command/set-thinking-level
                                            :thinking-level :high})]
     (is (= :high (:thinking-level state')))
@@ -65,21 +81,21 @@
 
 (deftest handle-command-set-tools-test
   (let [tools         [{:name "read_file"}]
-        [state' sigs] (sut/handle-command (sut/initial-state)
+        [state' sigs] (sut/handle-command (initial-state)
                                           {:type  :command/set-tools
                                            :tools tools})]
     (is (= tools (:tools state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-steering-mode-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/set-steering-mode
                                            :mode :all})]
     (is (= :all (:steering-mode state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-follow-up-mode-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/set-follow-up-mode
                                            :mode :all})]
     (is (= :all (:follow-up-mode state')))
@@ -112,34 +128,34 @@
 
 (deftest handle-command-steer-test
   (let [msg           {:role :user :content "steer me"}
-        [state' sigs] (sut/handle-command (sut/initial-state)
+        [state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/steer :message msg})]
     (is (= [msg] (vec (:steering-queue state'))))
     (is (= [] sigs))))
 
 (deftest handle-command-follow-up-test
   (let [msg           {:role :user :content "follow up"}
-        [state' sigs] (sut/handle-command (sut/initial-state)
+        [state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/follow-up :message msg})]
     (is (= [msg] (vec (:follow-up-queue state'))))
     (is (= [] sigs))))
 
 (deftest handle-command-clear-steering-queue-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "a"}))
         [state' sigs] (sut/handle-command state {:type :command/clear-steering-queue})]
     (is (empty? (:steering-queue state')))
     (is (= [] sigs))))
 
 (deftest handle-command-clear-follow-up-queue-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :follow-up-queue conj {:role :user :content "a"}))
         [state' sigs] (sut/handle-command state {:type :command/clear-follow-up-queue})]
     (is (empty? (:follow-up-queue state')))
     (is (= [] sigs))))
 
 (deftest handle-command-clear-all-queues-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "s"})
                           (update :follow-up-queue conj {:role :user :content "f"}))
         [state' sigs] (sut/handle-command state {:type :command/clear-all-queues})]
@@ -148,7 +164,7 @@
     (is (= [] sigs))))
 
 (deftest handle-command-reset-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (assoc :node :node/streaming
                                  :messages [{:role :user :content "x"}]
                                  :stream-message {:partial true}
@@ -170,9 +186,9 @@
 
 (deftest handle-command-prompt-from-idle-test
   (let [msgs          [{:role :user :content "hello"}]
-        [state' sigs] (sut/handle-command (sut/initial-state)
+        [state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/prompt :messages msgs})]
-    (is (= (sut/initial-state) state'))
+    (is (= (initial-state) state'))
     (is (= [{:type :signal/prompt-start :messages msgs}] sigs))))
 
 (deftest handle-command-prompt-when-not-idle-test
@@ -184,7 +200,7 @@
     (is (= [{:type :signal/rejected :reason :not-idle}] sigs))))
 
 (deftest handle-command-continue-with-steering-one-at-a-time-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "s1"})
                           (update :steering-queue conj {:role :user :content "s2"}))
         [state' sigs] (sut/handle-command state {:type :command/continue})]
@@ -195,7 +211,7 @@
            (vec (:steering-queue state'))))))
 
 (deftest handle-command-continue-with-steering-all-mode-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (assoc :steering-mode :all)
                           (update :steering-queue conj {:role :user :content "s1"})
                           (update :steering-queue conj {:role :user :content "s2"}))
@@ -205,7 +221,7 @@
     (is (empty? (:steering-queue state')))))
 
 (deftest handle-command-continue-with-follow-up-one-at-a-time-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :follow-up-queue conj {:role :user :content "f1"})
                           (update :follow-up-queue conj {:role :user :content "f2"}))
         [state' sigs] (sut/handle-command state {:type :command/continue})]
@@ -216,7 +232,7 @@
            (vec (:follow-up-queue state'))))))
 
 (deftest handle-command-continue-with-follow-up-all-mode-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (assoc :follow-up-mode :all)
                           (update :follow-up-queue conj {:role :user :content "f1"})
                           (update :follow-up-queue conj {:role :user :content "f2"}))
@@ -226,7 +242,7 @@
     (is (empty? (:follow-up-queue state')))))
 
 (deftest handle-command-continue-steering-before-follow-up-test
-  (let [state         (-> (sut/initial-state)
+  (let [state         (-> (initial-state)
                           (update :steering-queue conj {:role :user :content "steer"})
                           (update :follow-up-queue conj {:role :user :content "follow"}))
         [state' sigs] (sut/handle-command state {:type :command/continue})]
@@ -236,9 +252,9 @@
            (vec (:follow-up-queue state'))))))
 
 (deftest handle-command-continue-empty-queues-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/continue})]
-    (is (= (sut/initial-state) state'))
+    (is (= (initial-state) state'))
     (is (= [{:type :signal/rejected :reason :no-queued-messages}] sigs))))
 
 (deftest handle-command-continue-when-not-idle-test
@@ -254,9 +270,9 @@
     (is (= [{:type :signal/abort}] sigs))))
 
 (deftest handle-command-abort-when-idle-test
-  (let [[state' sigs] (sut/handle-command (sut/initial-state)
+  (let [[state' sigs] (sut/handle-command (initial-state)
                                           {:type :command/abort})]
-    (is (= (sut/initial-state) state'))
+    (is (= (initial-state) state'))
     (is (= [{:type :signal/rejected :reason :idle}] sigs))))
 
 (deftest idle-transition-prompt-start-test
@@ -606,7 +622,7 @@
                                            :pending-tool-calls []})))))
 
 (deftest step-prompt-from-idle-to-streaming-test
-  (let [state            (sut/initial-state)
+  (let [state            (initial-state)
         [state' effects] (sut/step state {:type     :command/prompt
                                           :messages [{:role :user :content "hello"}]})]
     (is (= :node/streaming (:node state')))
@@ -663,7 +679,7 @@
     (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest step-full-happy-path-test
-  (let [state         (sut/initial-state)
+  (let [state         (initial-state)
         user-msg      {:role :user :content "hello"}
         assistant-msg {:role :assistant :content "Hi!" :tool-calls []}
 
@@ -691,7 +707,7 @@
       (is (not (some #(= :event/agent-end (get-in % [:event :type])) fx3))))))
 
 (deftest step-tool-loop-test
-  (let [state               (sut/initial-state)
+  (let [state               (initial-state)
         user-msg            {:role :user :content "read file"}
         tool-calls          [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}]
         assistant-with-tool {:role :assistant :content "" :tool-calls tool-calls}
@@ -734,7 +750,7 @@
     (is (some #(= :event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest agent-end-not-emitted-when-staying-idle-test
-  (let [state       (sut/initial-state)
+  (let [state       (initial-state)
         [_ effects] (sut/step state {:type :command/set-model :model {:id "gpt-4o"}})]
     (is (not (some #(= :event/agent-end (get-in % [:event :type])) effects)))))
 

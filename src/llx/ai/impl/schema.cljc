@@ -196,7 +196,13 @@
     [:timestamp :llx/timestamp-ms]]
 
    :llx/message
-   [:or :llx/message-user :llx/message-assistant :llx/message-tool-result]
+   [:multi {:dispatch :role}
+    [:user :llx/message-user]
+    [:assistant :llx/message-assistant]
+    [:tool-result :llx/message-tool-result]]
+
+   :llx/messages
+   [:vector :llx/message]
 
    :llx/context
    [:vector :llx/message]

@@ -7,77 +7,6 @@
   #?(:clj  clojure.lang.PersistentQueue/EMPTY
      :cljs #queue []))
 
-(defn initial-state
-  "Returns the initial pure TEA state map."
-  []
-  {:node               :node/idle
-   :system-prompt      ""
-   :model              nil
-   :thinking-level     :off
-   :tools              []
-   :messages           []
-   :stream-message     nil
-   :pending-tool-calls []
-   :error              nil
-   :steering-queue     empty-queue
-   :follow-up-queue    empty-queue
-   :steering-mode      :one-at-a-time
-   :follow-up-mode     :one-at-a-time})
-
-(defn create []
-  {:state_   (atom (initial-state))
-   :control> (sp/chan)
-   :inbox>   (sp/chan)
-   :outbox>  (sp/chan)})
-
-(defn control-pause [state_]
-  (swap! state_ assoc :paused? true))
-
-(defn control-resume [state_]
-  (swap! state_ assoc :paused? false))
-
-(defn control-abort [ctx]
-  (let [{:keys [state_ control> inbox> outbox>]} ctx]
-    (swap! state_ assoc :closed? true)
-    (sp/close control>)
-    (sp/close inbox>)
-    (sp/close outbox>)))
-
-(defn wait-while-paused [ctx]
-  (p/loop [ctx ctx]
-    (p/let [msg (sp/take (:control> ctx))]
-      (case msg
-        (:abort nil) (do (control-abort ctx)
-                         false)
-        :resume (do (control-resume (:state_ ctx))
-                    true)
-        (p/recur ctx)))))
-
-(defn run-agent [ctx]
-  (p/loop [{:keys [control> inbox> state_] :as ctx} ctx]
-    (if (:paused? @state_)
-      (if (wait-while-paused ctx)
-        (p/recur ctx)
-        nil)
-
-      (p/let [[v ch] (sp/alts [control> inbox>])]
-        (cond
-          (= ch control>)
-          (case v
-            (:abort nil) (do (control-abort ctx)
-                             nil?
-                             :pause (do (control-pause state_)
-                                        (p/recur ctx))
-                             :resume (do (control-resume state_)
-                                         (p/recur ctx)))
-
-            (= ch inbox>)
-            (do
-            ;; process inbox message
-              (p/recur ctx))))))))
-
-;; -- Start TEA style or fsm exploration
-
 (def states
   "The agent's possible states"
   #{:node/idle ;; no inference loop is running, awaiting prompt, continue, or abort
@@ -498,4 +427,3 @@
         [state' []]
         sigs))
      (step-signal g state input))))
-
