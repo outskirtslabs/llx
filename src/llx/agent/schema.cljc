@@ -80,6 +80,22 @@
      :llx.agent/messages
      [:vector :llx.agent/message]
 
+     :llx.agent/partial-assistant-message
+     [:map
+      [:role [:= :assistant]]
+      [:content [:vector :llx/assistant-content-block]]
+      [:api {:optional true} :llx/api]
+      [:provider {:optional true} :llx/provider]
+      [:model {:optional true} :llx/id-string]
+      [:usage {:optional true} :llx/usage]
+      [:stop-reason {:optional true} :llx/stop-reason]
+      [:error-message {:optional true} :string]
+      [:timestamp {:optional true} :llx/timestamp-ms]]
+
+     :llx.agent/event-stop-message
+     [:map
+      [:stop-reason :llx/stop-reason]]
+
      :llx.agent/command-type
      [:enum
       :llx.agent.command/prompt
@@ -140,6 +156,7 @@
       [:thinking-level :llx.agent.loop/thinking-level]]
 
      :llx.agent/command-set-tools
+     ;; TODO: tighten schema when implementing tool calling.
      [:map
       [:type [:= :llx.agent.command/set-tools]]
       [:tools [:vector :map]]]
@@ -241,17 +258,17 @@
      :llx.agent/signal-llm-start
      [:map
       [:type [:= :llx.agent.signal/llm-start]]
-      [:message :map]]
+      [:message :llx.agent/partial-assistant-message]]
 
      :llx.agent/signal-llm-chunk
      [:map
       [:type [:= :llx.agent.signal/llm-chunk]]
-      [:chunk :map]]
+      [:chunk :llx.agent/partial-assistant-message]]
 
      :llx.agent/signal-llm-done
      [:map
       [:type [:= :llx.agent.signal/llm-done]]
-      [:message :map]]
+      [:message :llx/message-assistant]]
 
      :llx.agent/signal-llm-error
      [:map
@@ -267,15 +284,15 @@
      :llx.agent/signal-tool-error
      [:map
       [:type [:= :llx.agent.signal/tool-error]]
-      [:tool-call-id :string]
+      [:tool-call-id :llx/id-string]
       [:error :any]
       [:tool-result-message :map]]
 
      :llx.agent/signal-tool-update
      [:map
       [:type [:= :llx.agent.signal/tool-update]]
-      [:tool-call-id :string]
-      [:tool-name :string]
+      [:tool-call-id :llx/id-string]
+      [:tool-name :llx/id-string]
       [:partial-result :map]]
 
      :llx.agent/signal
@@ -310,8 +327,9 @@
 
      :llx.agent/event-message-payload
      [:or
-      [:map [:role :keyword]]
-      [:map [:stop-reason :llx/stop-reason]]]
+      :llx.agent/message
+      :llx.agent/partial-assistant-message
+      :llx.agent/event-stop-message]
 
      :llx.agent/event-agent-start
      [:map
@@ -349,15 +367,15 @@
      :llx.agent/event-tool-execution-start
      [:map
       [:type [:= :llx.agent.event/tool-execution-start]]
-      [:tool-call-id :string]
-      [:tool-name :string]
+      [:tool-call-id :llx/id-string]
+      [:tool-name :llx/id-string]
       [:args :map]]
 
      :llx.agent/event-tool-execution-update
      [:map
       [:type [:= :llx.agent.event/tool-execution-update]]
-      [:tool-call-id :string]
-      [:tool-name :string]
+      [:tool-call-id :llx/id-string]
+      [:tool-name :llx/id-string]
       [:partial-result :map]]
 
      :llx.agent/event-tool-execution-end
@@ -423,6 +441,7 @@
       [:system-prompt {:optional true} :string]
       [:model {:optional true} :llx/model]
       [:thinking-level {:optional true} :llx.agent.loop/thinking-level]
+      ;; TODO: tighten schema when implementing tool calling.
       [:tools {:optional true} [:vector :map]]
       [:steering-mode {:optional true} :llx.agent.loop/dequeue-mode]
       [:follow-up-mode {:optional true} :llx.agent.loop/dequeue-mode]
@@ -466,6 +485,7 @@
       [:system-prompt {:default ""} :string]
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :llx/model]
       [:thinking-level {:default :off} :llx.agent.loop/thinking-level]
+      ;; TODO: tighten schema when implementing tool calling.
       [:tools {:default []} [:vector :map]]
       [:messages {:default []} :llx.agent/messages]
       [:stream-message {:default nil} [:maybe :llx.agent/message]]

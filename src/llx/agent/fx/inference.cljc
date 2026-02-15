@@ -5,18 +5,6 @@
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
-(def PartialAssistantMessage
-  [:map
-   [:role [:= :assistant]]
-   [:content [:vector :llx/assistant-content-block]]
-   [:api {:optional true} :llx/api]
-   [:provider {:optional true} :llx/provider]
-   [:model {:optional true} :llx/id-string]
-   [:usage {:optional true} :llx/usage]
-   [:stop-reason {:optional true} :llx/stop-reason]
-   [:error-message {:optional true} :string]
-   [:timestamp {:optional true} :llx/timestamp-ms]])
-
 (defn- base-partial-assistant-message
   [model]
   (cond-> {:role :assistant :content []}
@@ -34,7 +22,7 @@
 
 (def LlmEventStep
   [:map
-   [:partial PartialAssistantMessage]
+   [:partial :llx.agent/partial-assistant-message]
    [:signal [:maybe LlmEventStepSignal]]
    [:done? :boolean]])
 
@@ -84,7 +72,7 @@
 
 (>defn llm-event->step
        [model partial event]
-       [:llx/model [:maybe PartialAssistantMessage] :llx/event => LlmEventStep]
+       [:llx/model [:maybe :llx.agent/partial-assistant-message] :llx/event => LlmEventStep]
        (let [event-type (:type event)
              partial    (or partial
                             (base-partial-assistant-message model))]
