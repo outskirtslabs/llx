@@ -124,8 +124,12 @@
 
 (defn retry-delay-exceeded
   [provider requested-delay-ms max-delay-ms & {:keys [request-id]}]
-  (let [requested-seconds (double (/ (long requested-delay-ms) 1000.0))
-        max-seconds       (double (/ (long max-delay-ms) 1000.0))
+  (let [format-seconds    (fn [milliseconds]
+                            (let [seconds (/ (double milliseconds) 1000.0)]
+                              #?(:clj (format "%.1f" seconds)
+                                 :cljs (.toFixed seconds 1))))
+        requested-seconds (format-seconds requested-delay-ms)
+        max-seconds       (format-seconds max-delay-ms)
         message           (str "Server requested " requested-seconds
                                "s retry delay (max: " max-seconds "s).")]
     (ex-info message

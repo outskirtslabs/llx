@@ -6,6 +6,7 @@
               [llx.ai.test-util :as util :include-macros true]])
    [llx.ai :as ai]
    [llx.agent.fx :as fx]
+   [llx.agent.schema :as schema]
    [llx.ai.live.models :as models]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
@@ -54,7 +55,11 @@
   (util/async done
               (util/run-live-async!
                (let [env    {:state_         (atom (agent-state models/openai-completions))
+                             :command>       (sp/chan)
+                             :events-mx>     (sp/mult :buf (sp/sliding-buffer 16))
+                             :schema-registry (schema/registry {})
                              :convert-to-llm identity
+                             :tools          {}
                              :stream-fn      (fn [model context options]
                                                (ai/stream (ai/default-env)
                                                           model
