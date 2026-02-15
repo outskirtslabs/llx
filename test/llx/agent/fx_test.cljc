@@ -136,7 +136,7 @@
        (is (= "session-1" (get-in @seen* [:stream-input :options :session-id])))
        (is (= {:high 1234} (get-in @seen* [:stream-input :options :thinking-budgets])))
        (is (= 2500 (get-in @seen* [:stream-input :options :max-retry-delay-ms])))
-       (is (fn? (get-in @seen* [:stream-input :options :get-api-key]))))
+       (is (nil? (get-in @seen* [:stream-input :options :get-api-key]))))
      :cljs
      (util/async done
                  (let [model                (ai/get-model :openai "gpt-4o")
@@ -201,7 +201,7 @@
                                  (is (= "session-1" (get-in @seen* [:stream-input :options :session-id])))
                                  (is (= {:high 1234} (get-in @seen* [:stream-input :options :thinking-budgets])))
                                  (is (= 2500 (get-in @seen* [:stream-input :options :max-retry-delay-ms])))
-                                 (is (fn? (get-in @seen* [:stream-input :options :get-api-key])))))
+                                 (is (nil? (get-in @seen* [:stream-input :options :get-api-key])))))
                        (p/then (fn [_] (done)))
                        (p/catch (partial util/fail-and-done! done)))))))
 

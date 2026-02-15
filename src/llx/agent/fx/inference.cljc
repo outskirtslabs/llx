@@ -157,37 +157,32 @@
             :done?   false})))
 
 (defn- stream-options
-  [{:keys [abort-signal] :as env}
-   {:keys [thinking-level] :as _state}
-   use-custom-stream-fn?
-   resolved-api-key]
-  (let [reasoning (when-not (= :off thinking-level)
-                    thinking-level)
-        base      (cond-> {}
-                    reasoning (assoc :reasoning reasoning)
-                    abort-signal (assoc :signal abort-signal))
-        parity    (->> (select-keys env [:session-id
-                                         :thinking-budgets
-                                         :max-retry-delay-ms])
-                       (remove (comp nil? val))
-                       (into {}))]
-    (cond-> (merge base parity)
-      (some? resolved-api-key)
-      (assoc :api-key resolved-api-key)
-
-      (and use-custom-stream-fn?
-           (some? (:get-api-key env)))
-      (assoc :get-api-key (:get-api-key env)))))
-
-(defn- default-stream-fn
-  [model context options]
-  (ai/stream (ai/default-env) model context options))
+  [{:keys [abort-signal
+           session-id
+           thinking-budgets
+           max-retry-delay-ms]} {:keys [thinking-level]} resolved-api-key]
+  (cond-> (merge
+           (when-not (= :off thinking-level)
+             {:reasoning thinking-level})
+           (when abort-signal
+             {:signal abort-signal})
+           (when session-id
+             {:session-id session-id})
+           (when thinking-budgets
+             {:thinking-budgets thinking-budgets})
+           (when max-retry-delay-ms
+             {:max-retry-delay-ms max-retry-delay-ms}))
+    (some? resolved-api-key)
+    (assoc :api-key resolved-api-key)))
 
 (defn fx-call-llm
   [{:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect]
   (let [out                                           (sp/chan)
         {:keys [model system-prompt tools] :as state} @state_
-        use-custom-stream-fn?                         (fn? stream-fn)
+        default-env-fn                                ai/default-env
+        ai-stream-fn                                  ai/stream
+        default-stream-fn                             (fn [stream-model context options]
+                                                        (ai-stream-fn (default-env-fn) stream-model context options))
         stream-fn                                     (or stream-fn default-stream-fn)
         context                                       (fn [llm-messages]
                                                         {:system-prompt system-prompt
@@ -200,7 +195,7 @@
                 resolved-api-key (if get-api-key
                                    (get-api-key (name (:provider model)))
                                    nil)
-                options          (stream-options env state use-custom-stream-fn? resolved-api-key)
+                options          (stream-options env state resolved-api-key)
                 llm-context      (context llm-messages)
                 stream-ch        (stream-fn model llm-context options)]
           (p/loop [partial nil]
