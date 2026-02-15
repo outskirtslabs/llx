@@ -8,47 +8,60 @@
 
          :init
          (do
-           (def paths ["src" "test"]))
+           (def paths ["src" "test"])
+           (defn clojure*
+             [& args]
+             (let [dotenv-extra-env (live-env/clojure-extra-env)
+                   [opts cmd]       (if (map? (first args))
+                                      [(first args) (rest args)]
+                                      [nil args])
+                   opts             (cond-> (or opts {})
+                                      (seq dotenv-extra-env)
+                                      (update :extra-env (fn [extra-env]
+                                                           (merge dotenv-extra-env (or extra-env {})))))]
+               (if (seq opts)
+                 (apply clojure opts cmd)
+                 (apply clojure cmd)))))
 
          dev
          {:doc  "Start a local development REPL"
-          :task (apply clojure "-M:repl/dev:dev" *command-line-args*)}
+          :task (apply clojure* "-M:repl/dev:dev" *command-line-args*)}
 
          test:jvm
          {:doc  "Run all tests or specific test suites"
-          :task (apply clojure "-M:dev:kaocha"
+          :task (apply clojure* "-M:dev:kaocha"
                        (concat [":unit"] *command-line-args*))}
 
          test:jvm-live
          {:doc  "Run all tests or specific test suites"
           :task (let [disabled (live-env/provider-skip-meta-flags)
                       suites   (concat [":live"] *command-line-args*)]
-                  (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
+                  (apply clojure* "-M:dev:kaocha" (concat suites disabled)))}
 
          funnel
          {:doc  "Run Funnel websocket relay for Kaocha CLJS"
-          :task (apply clojure "-M:funnel" *command-line-args*)}
+          :task (apply clojure* "-M:funnel" *command-line-args*)}
 
          test:watch-cljs
          {:doc  "Watch CLJS Kaocha test build with shadow-cljs"
-          :task (apply clojure "-M:dev:shadow-cljs" "watch" "kaocha-test" *command-line-args*)}
+          :task (apply clojure* "-M:dev:shadow-cljs" "watch" "kaocha-test" *command-line-args*)}
 
          test:cljs-build
          {:doc  "Compile both CLJS Kaocha builds (unit + live)"
           :task (do
-                  (clojure "-M:dev:shadow-cljs" "compile" "kaocha-test")
-                  (clojure "-M:dev:shadow-cljs" "compile" "kaocha-test-live"))}
+                  (clojure* "-M:dev:shadow-cljs" "compile" "kaocha-test")
+                  (clojure* "-M:dev:shadow-cljs" "compile" "kaocha-test-live"))}
 
          test:cljs
          {:doc  "Run CLJS unit tests through Kaocha + kaocha-cljs2"
-          :task (apply clojure "-M:dev:kaocha"
+          :task (apply clojure* "-M:dev:kaocha"
                        (concat [":cljs"] *command-line-args*))}
 
          test:cljs-live
          {:doc  "Run CLJS live tests through Kaocha + kaocha-cljs2"
           :task (let [disabled (live-env/provider-skip-meta-flags)
                       suites   (concat [":cljs-live"] *command-line-args*)]
-                  (apply clojure "-M:dev:kaocha" (concat suites disabled)))}
+                  (apply clojure* "-M:dev:kaocha" (concat suites disabled)))}
 
          test
          {:doc     "Run JVM + CLJS unit test suites"
@@ -60,7 +73,7 @@
 
          generate-models
          {:doc  "Generate built-in model catalog artifact"
-          :task (do (clojure "-M:dev" "-m" "llx.ai.impl.model-catalog.generate")
+          :task (do (clojure* "-M:dev" "-m" "llx.ai.impl.model-catalog.generate")
                     (shell "cljfmt --quiet fix src/llx/ai/impl/models_generated.cljc"))}
 
          fmt
@@ -73,11 +86,11 @@
 
          prep
          {:doc  "Prepare Clojure dependencies"
-          :task (apply clojure "-X:deps prep :aliases '[:dev :kaocha]'")}
+          :task (apply clojure* "-X:deps prep :aliases '[:dev :kaocha]'")}
 
          deps-tree
          {:doc  "Show dependency tree"
-          :task (clojure "-X:deps tree :aliases '[:dev]'")}
+          :task (clojure* "-X:deps tree :aliases '[:dev]'")}
 
          lint:copy-configs
          {:doc  "Copy clj-kondo configs from dependencies"
@@ -137,4 +150,4 @@
          publish
          {:doc     "Publish the clojure sdk libs to clojars"
           :depends [jar]
-          :task    (clojure "-T:build deploy")}}}
+          :task    (clojure* "-T:build deploy")}}}

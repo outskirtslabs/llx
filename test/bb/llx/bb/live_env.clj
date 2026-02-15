@@ -45,6 +45,19 @@
                 (line-seq reader)))
       {})))
 
+(defn clojure-extra-env
+  "Returns dotenv vars that are not already present in the current process env.
+   Intended for babashka.tasks/clojure `:extra-env` so subprocesses get dotenv
+   values without overwriting exported environment variables."
+  []
+  (let [dotenv-values (read-dotenv)]
+    (reduce-kv (fn [acc k v]
+                 (if (some? (System/getenv k))
+                   acc
+                   (assoc acc k v)))
+               {}
+               dotenv-values)))
+
 (defn provider-skip-meta-flags
   []
   (let [dotenv-values (read-dotenv)
