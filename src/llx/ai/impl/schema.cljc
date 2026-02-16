@@ -83,20 +83,20 @@
    [:map-of :llx/metadata-key :any]
 
    :llx/cost-table
-   [:map {:closed true}
+   [:map
     [:input :llx/non-neg-number]
     [:output :llx/non-neg-number]
     [:cache-read :llx/non-neg-number]
     [:cache-write :llx/non-neg-number]]
 
    :llx/model-capabilities
-   [:map {:closed true}
+   [:map
     [:reasoning? :boolean]
     [:input [:set {:min 1} [:enum :text :image]]]
     [:supports-xhigh? {:optional true} :boolean]]
 
    :llx/model-compat
-   [:map {:closed true}
+   [:map
     [:store? {:optional true} :boolean]
     [:supports-developer-role? {:optional true} :boolean]
     [:supports-strict-tools? {:optional true} :boolean]
@@ -111,7 +111,7 @@
     [:tool-id-format {:optional true} [:enum :any :mistral-9-alnum]]]
 
    :llx/model
-   [:map {:closed true}
+   [:map
     [:id :llx/id-string]
     [:name :llx/id-string]
     [:provider :llx/provider]
@@ -125,24 +125,24 @@
     [:compat {:optional true} :llx/model-compat]]
 
    :llx/content-text
-   [:map {:closed true}
+   [:map
     [:type [:= :text]]
     [:text :string]]
 
    :llx/content-thinking
-   [:map {:closed true}
+   [:map
     [:type [:= :thinking]]
     [:thinking :string]
     [:signature {:optional true} :string]]
 
    :llx/content-image
-   [:map {:closed true}
+   [:map
     [:type [:= :image]]
     [:data :string]
     [:mime-type :string]]
 
    :llx/content-tool-call
-   [:map {:closed true}
+   [:map
     [:type [:= :tool-call]]
     [:id :llx/id-string]
     [:name :llx/id-string]
@@ -159,7 +159,7 @@
    [:or :llx/content-text :llx/content-image]
 
    :llx/usage-cost
-   [:map {:closed true}
+   [:map
     [:input :llx/non-neg-number]
     [:output :llx/non-neg-number]
     [:cache-read :llx/non-neg-number]
@@ -167,7 +167,7 @@
     [:total :llx/non-neg-number]]
 
    :llx/usage
-   [:map {:closed true}
+   [:map
     [:input :llx/non-neg-int]
     [:output :llx/non-neg-int]
     [:cache-read :llx/non-neg-int]
@@ -176,13 +176,13 @@
     [:cost :llx/usage-cost]]
 
    :llx/message-user
-   [:map {:closed true}
+   [:map
     [:role [:= :user]]
     [:content [:or :string [:vector :llx/user-content-block]]]
     [:timestamp :llx/timestamp-ms]]
 
    :llx/message-assistant
-   [:map {:closed true}
+   [:map
     [:role [:= :assistant]]
     [:content [:vector :llx/assistant-content-block]]
     [:api :llx/api]
@@ -194,7 +194,7 @@
     [:timestamp :llx/timestamp-ms]]
 
    :llx/message-tool-result
-   [:map {:closed true}
+   [:map
     [:role [:= :tool-result]]
     [:tool-call-id :llx/id-string]
     [:tool-name :llx/id-string]
@@ -215,69 +215,69 @@
    [:vector :llx/message]
 
    :llx/context-map
-   [:map {:closed true}
+   [:map
     [:messages :llx/context]
     [:system-prompt {:optional true} :string]
     [:tools {:optional true} [:vector :llx/tool]]]
 
    :llx/event-start
-   [:map {:closed true}
+   [:map
     [:type [:= :start]]
     [:meta {:optional true} :map]]
 
    :llx/event-text-start
-   [:map {:closed true}
+   [:map
     [:type [:= :text-start]]]
 
    :llx/event-text-delta
-   [:map {:closed true}
+   [:map
     [:type [:= :text-delta]]
     [:text :string]]
 
    :llx/event-text-end
-   [:map {:closed true}
+   [:map
     [:type [:= :text-end]]]
 
    :llx/event-thinking-start
-   [:map {:closed true}
+   [:map
     [:type [:= :thinking-start]]]
 
    :llx/event-thinking-delta
-   [:map {:closed true}
+   [:map
     [:type [:= :thinking-delta]]
     [:thinking :string]]
 
    :llx/event-thinking-end
-   [:map {:closed true}
+   [:map
     [:type [:= :thinking-end]]]
 
    :llx/event-toolcall-start
-   [:map {:closed true}
+   [:map
     [:type [:= :toolcall-start]]
     [:id :llx/id-string]
     [:name :llx/id-string]]
 
    :llx/event-toolcall-delta
-   [:map {:closed true}
+   [:map
     [:type [:= :toolcall-delta]]
     [:id :llx/id-string]
     [:name :llx/id-string]
     [:arguments :map]]
 
    :llx/event-toolcall-end
-   [:map {:closed true}
+   [:map
     [:type [:= :toolcall-end]]
     [:id :llx/id-string]
     [:name :llx/id-string]
     [:arguments :map]]
 
    :llx/event-done
-   [:map {:closed true}
+   [:map
     [:type [:= :done]]
     [:assistant-message :llx/message-assistant]]
 
    :llx/event-error
-   [:map {:closed true}
+   [:map
     [:type [:= :error]]
     [:assistant-message :llx/message-assistant]]
 
@@ -297,13 +297,13 @@
     :llx/event-error]
 
    :llx/tool
-   [:map {:closed true}
+   [:map
     [:name :llx/id-string]
     [:description :llx/id-string]
     [:input-schema [:fn schema-form?]]]
 
    :llx/unified-request-options
-   [:map {:closed true}
+   [:map
     [:max-tokens {:optional true} :llx/non-neg-int]
     [:reasoning {:optional true} :llx/reasoning-level]
     [:reasoning-effort {:optional true} :llx/reasoning-level]
@@ -347,7 +347,7 @@
     [:tools {:optional true} [:vector :llx/tool]]
     [:tool-choice {:optional true} [:or [:enum :auto :none :required] :llx/id-string]]
     [:reasoning {:optional true}
-     [:map {:closed true}
+     [:map
       [:level {:optional true} :llx/reasoning-level]]]
     [:cache-control {:optional true} :llx/cache-control]
     [:session-id {:optional true} :llx/id-string]
@@ -366,7 +366,7 @@
     [:tools {:optional true} [:vector :llx/tool]]
     [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
     [:reasoning {:optional true}
-     [:map {:closed true}
+     [:map
       [:effort {:optional true} :llx/reasoning-level]
       [:summary {:optional true} [:or [:enum :auto :detailed :concise :none] :nil]]]]
     [:cache-control {:optional true} :llx/cache-control]
@@ -386,7 +386,7 @@
     [:tools {:optional true} [:vector :llx/tool]]
     [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
     [:reasoning {:optional true}
-     [:map {:closed true}
+     [:map
       [:level {:optional true} :llx/reasoning-level]]]
     [:cache-control {:optional true} :llx/cache-control]
     [:session-id {:optional true} :llx/id-string]
@@ -405,7 +405,7 @@
     [:tools {:optional true} [:vector :llx/tool]]
     [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
     [:reasoning {:optional true}
-     [:map {:closed true}
+     [:map
       [:level {:optional true} :llx/reasoning-level]
       [:effort {:optional true} :llx/reasoning-level]]]
     [:cache-control {:optional true} :llx/cache-control]
@@ -421,7 +421,7 @@
     [:max-retries {:optional true} :llx/non-neg-int]]
 
    :llx/provider-config
-   [:map {:closed true}
+   [:map
     [:api-key :llx/id-string]
     [:base-url {:optional true} :llx/id-string]
     [:headers {:optional true} [:map-of :string :string]]
@@ -430,7 +430,7 @@
     [:location {:optional true} :llx/id-string]]
 
    :llx/providers-config
-   [:map {:closed true}
+   [:map
     [:openai {:optional true} :llx/provider-config]
     [:anthropic {:optional true} :llx/provider-config]
     [:google {:optional true} :llx/provider-config]
@@ -438,7 +438,7 @@
     [:openai-compatible {:optional true} :llx/provider-config]]
 
    :llx/library-config
-   [:map {:closed true}
+   [:map
     [:providers :llx/providers-config]
     [:models {:optional true} [:vector :llx/model]]
     [:default-provider {:optional true} :llx/provider]]})

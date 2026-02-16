@@ -80,6 +80,12 @@
      :llx.agent/messages
      [:vector :llx.agent/message]
 
+     :llx.agent/tool-call
+     [:map
+      [:id :llx/id-string]
+      [:name :llx/id-string]
+      [:arguments :map]]
+
      :llx.agent/partial-assistant-message
      [:map
       [:role [:= :assistant]]
@@ -156,10 +162,9 @@
       [:thinking-level :llx.agent.loop/thinking-level]]
 
      :llx.agent/command-set-tools
-     ;; TODO: tighten schema when implementing tool calling.
      [:map
       [:type [:= :llx.agent.command/set-tools]]
-      [:tools [:vector :map]]]
+      [:tools [:vector :llx/tool]]]
 
      :llx.agent/command-set-steering-mode
      [:map
@@ -278,15 +283,15 @@
      :llx.agent/signal-tool-result
      [:map
       [:type [:= :llx.agent.signal/tool-result]]
-      [:result :map]
-      [:tool-result-message :map]]
+      [:result :llx/message-tool-result]
+      [:tool-result-message :llx/message-tool-result]]
 
      :llx.agent/signal-tool-error
      [:map
       [:type [:= :llx.agent.signal/tool-error]]
       [:tool-call-id :llx/id-string]
       [:error :any]
-      [:tool-result-message :map]]
+      [:tool-result-message :llx/message-tool-result]]
 
      :llx.agent/signal-tool-update
      [:map
@@ -381,7 +386,10 @@
      :llx.agent/event-tool-execution-end
      [:map
       [:type [:= :llx.agent.event/tool-execution-end]]
-      [:result :map]]
+      [:tool-call-id :llx/id-string]
+      [:tool-name :llx/id-string]
+      [:result :llx/message-tool-result]
+      [:is-error? :boolean]]
 
      :llx.agent/event
      [:multi {:dispatch :type}
@@ -409,7 +417,7 @@
      :llx.agent.fx/effect-execute-tool
      [:map
       [:llx.agent.fx/type [:= :execute-tool]]
-      [:tool-call :map]]
+      [:tool-call :llx.agent/tool-call]]
 
      :llx.agent.fx/effect-reject
      [:map
@@ -441,14 +449,14 @@
       [:system-prompt {:optional true} :string]
       [:model {:optional true} :llx/model]
       [:thinking-level {:optional true} :llx.agent.loop/thinking-level]
-      ;; TODO: tighten schema when implementing tool calling.
-      [:tools {:optional true} [:vector :map]]
+      [:tools {:optional true} [:vector :llx/tool]]
       [:steering-mode {:optional true} :llx.agent.loop/dequeue-mode]
       [:follow-up-mode {:optional true} :llx.agent.loop/dequeue-mode]
       [:abort-signal {:optional true} :any]]
 
      :llx.agent/tool-def
      [:map
+      [:tool :llx/tool]
       [:execute :llx/fn]]
 
      :llx.agent/tools
@@ -485,11 +493,10 @@
       [:system-prompt {:default ""} :string]
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :llx/model]
       [:thinking-level {:default :off} :llx.agent.loop/thinking-level]
-      ;; TODO: tighten schema when implementing tool calling.
-      [:tools {:default []} [:vector :map]]
+      [:tools {:default []} [:vector :llx/tool]]
       [:messages {:default []} :llx.agent/messages]
       [:stream-message {:default nil} [:maybe :llx.agent/message]]
-      [:pending-tool-calls {:default []} [:vector :map]]
+      [:pending-tool-calls {:default []} [:vector :llx.agent/tool-call]]
       [:error {:default nil} [:maybe :any]]
       [:steering-queue {:default #?(:clj clojure.lang.PersistentQueue/EMPTY
                                     :cljs #queue [])} [:fn queue?]]

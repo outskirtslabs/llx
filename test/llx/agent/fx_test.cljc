@@ -73,6 +73,143 @@
           :abort-signal    nil}
          overrides))
 
+(defn- tool-call
+  ([]
+   (tool-call {:path "/tmp/input.txt"}))
+  ([arguments]
+   {:id        "tc-1"
+    :name      "read_file"
+    :arguments arguments}))
+
+(defn- tool-spec
+  []
+  {:name         "read_file"
+   :description  "Read a file from disk"
+   :input-schema [:map [:path :string]]})
+
+(defn- tool-env
+  [model tool-defs overrides]
+  (test-env
+   (base-state model [] :off (mapv :tool (vals tool-defs)))
+   (merge {:tools        tool-defs
+           :abort-signal ::abort-signal}
+          overrides)))
+
+(defn- execute-tool-behaviors*
+  [model]
+  (let [success-seen*      (atom nil)
+        validation-called* (atom false)
+        success-call       (tool-call)
+        missing-call       {:id "tc-1" :name "missing_tool" :arguments {:path "/tmp/input.txt"}}
+        invalid-call       (tool-call {:path 123})
+        success-env        (tool-env model
+                                     {"read_file"
+                                      {:tool    (tool-spec)
+                                       :execute (fn [tool-call-id args abort-signal on-update]
+                                                  (reset! success-seen* {:tool-call-id tool-call-id
+                                                                         :args         args
+                                                                         :abort-signal abort-signal})
+                                                  (p/let [_ (on-update {:progress 50})]
+                                                    {:content [{:type :text
+                                                                :text (str "read " (:path args))}]}))}}
+                                     {})
+        missing-env        (tool-env model {} {})
+        validation-env     (tool-env model
+                                     {"read_file"
+                                      {:tool    (tool-spec)
+                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                  (reset! validation-called* true)
+                                                  {:content [{:type :text :text "never"}]})}}
+                                     {})
+        throw-env          (tool-env model
+                                     {"read_file"
+                                      {:tool    (tool-spec)
+                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                  (throw (ex-info "read failed" {:type :test/tool-failed})))}}
+                                     {})
+        malformed-env      (tool-env model
+                                     {"read_file"
+                                      {:tool    (tool-spec)
+                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                  {:content "not-a-vector"})}}
+                                     {})]
+    (p/let [success-signals    (read-signals* (fx/execute-fx success-env {:llx.agent.fx/type :execute-tool
+                                                                          :tool-call         success-call}))
+            missing-signals    (read-signals* (fx/execute-fx missing-env {:llx.agent.fx/type :execute-tool
+                                                                          :tool-call         missing-call}))
+            validation-signals (read-signals* (fx/execute-fx validation-env {:llx.agent.fx/type :execute-tool
+                                                                             :tool-call         invalid-call}))
+            throw-signals      (read-signals* (fx/execute-fx throw-env {:llx.agent.fx/type :execute-tool
+                                                                        :tool-call         success-call}))
+            malformed-signals  (read-signals* (fx/execute-fx malformed-env {:llx.agent.fx/type :execute-tool
+                                                                            :tool-call         success-call}))]
+      {:success-seen       @success-seen*
+       :validation-called? @validation-called*
+       :success-signals    success-signals
+       :missing-signals    missing-signals
+       :validation-signals validation-signals
+       :throw-signals      throw-signals
+       :malformed-signals  malformed-signals})))
+
+(defn- assert-execute-tool-behaviors!
+  [{:keys [success-seen
+           validation-called?
+           success-signals
+           missing-signals
+           validation-signals
+           throw-signals
+           malformed-signals]}]
+  (is (not (util/timeout-result? success-signals)))
+  (is (not (util/timeout-result? missing-signals)))
+  (is (not (util/timeout-result? validation-signals)))
+  (is (not (util/timeout-result? throw-signals)))
+  (is (not (util/timeout-result? malformed-signals)))
+
+  (is (= [:llx.agent.signal/tool-update
+          :llx.agent.signal/tool-result]
+         (mapv :type success-signals)))
+  (is (= "tc-1" (get-in success-signals [0 :tool-call-id])))
+  (is (= "read_file" (get-in success-signals [0 :tool-name])))
+  (is (= {:progress 50} (get-in success-signals [0 :partial-result])))
+  (is (= {:tool-call-id "tc-1"
+          :args         {:path "/tmp/input.txt"}
+          :abort-signal ::abort-signal}
+         success-seen))
+  (let [result-message (get-in success-signals [1 :tool-result-message])]
+    (is (= result-message (get-in success-signals [1 :result])))
+    (is (= :tool-result (:role result-message)))
+    (is (= "tc-1" (:tool-call-id result-message)))
+    (is (= "read_file" (:tool-name result-message)))
+    (is (= [{:type :text :text "read /tmp/input.txt"}]
+           (:content result-message)))
+    (is (false? (:is-error? result-message)))
+    (is (number? (:timestamp result-message))))
+
+  (is (= [:llx.agent.signal/tool-error] (mapv :type missing-signals)))
+  (is (= :llx/tool-not-found
+         (-> missing-signals first :error ex-data :type)))
+  (is (= "tc-1" (-> missing-signals first :tool-call-id)))
+  (is (= "missing_tool" (-> missing-signals first :tool-result-message :tool-name)))
+  (is (true? (-> missing-signals first :tool-result-message :is-error?)))
+  (is (= (ex-message (-> missing-signals first :error))
+         (get-in missing-signals [0 :tool-result-message :content 0 :text])))
+
+  (is (= [:llx.agent.signal/tool-error] (mapv :type validation-signals)))
+  (is (= :llx/validation-error
+         (-> validation-signals first :error ex-data :type)))
+  (is (false? validation-called?))
+  (is (true? (-> validation-signals first :tool-result-message :is-error?)))
+
+  (is (= [:llx.agent.signal/tool-error] (mapv :type throw-signals)))
+  (is (= :test/tool-failed (-> throw-signals first :error ex-data :type)))
+  (is (= "read failed"
+         (get-in throw-signals [0 :tool-result-message :content 0 :text])))
+
+  (is (= [:llx.agent.signal/tool-error] (mapv :type malformed-signals)))
+  (is (= :llx/invalid-tool-result
+         (-> malformed-signals first :error ex-data :type)))
+  (is (true? (-> malformed-signals first :tool-result-message :is-error?))))
+
 (deftest fx-call-llm-runs-hooks-and-maps-events-test
   #?(:clj
      (let [model                (ai/get-model :openai "gpt-4o")
@@ -351,13 +488,35 @@
                        (p/catch (partial util/fail-and-done! done)))))))
 
 (deftest execute-fx-validates-effect-shape-test
-  (let [model (ai/get-model :openai "gpt-4o")
-        env   (test-env (base-state model [] :off []) {})]
-    (is (thrown? #?(:clj Exception :cljs js/Error)
-                 (fx/execute-fx env {:llx.agent.fx/type :call-llm})))
-    (is (thrown? #?(:clj Exception :cljs js/Error)
-                 (fx/execute-fx env {:llx.agent.fx/type :unknown})))
-    (is (thrown? #?(:clj Exception :cljs js/Error)
-                 (fx/execute-fx env
-                                {:llx.agent.fx/type :emit-event
-                                 :event             {:type :llx.agent.event/message-update}})))))
+  #?(:clj
+     (let [model (ai/get-model :openai "gpt-4o")
+           env   (test-env (base-state model [] :off []) {})]
+       (is (thrown? Exception
+                    (fx/execute-fx env {:llx.agent.fx/type :call-llm})))
+       (is (thrown? Exception
+                    (fx/execute-fx env {:llx.agent.fx/type :unknown})))
+       (is (thrown? Exception
+                    (fx/execute-fx env
+                                   {:llx.agent.fx/type :emit-event
+                                    :event             {:type :llx.agent.event/message-update}})))
+       (let [results (util/await! (execute-tool-behaviors* model) 15000 ::timeout)]
+         (is (not (util/timeout-result? results)))
+         (assert-execute-tool-behaviors! results)))
+     :cljs
+     (util/async done
+                 (let [model (ai/get-model :openai "gpt-4o")
+                       env   (test-env (base-state model [] :off []) {})]
+                   (is (thrown? js/Error
+                                (fx/execute-fx env {:llx.agent.fx/type :call-llm})))
+                   (is (thrown? js/Error
+                                (fx/execute-fx env {:llx.agent.fx/type :unknown})))
+                   (is (thrown? js/Error
+                                (fx/execute-fx env
+                                               {:llx.agent.fx/type :emit-event
+                                                :event             {:type :llx.agent.event/message-update}})))
+                   (-> (execute-tool-behaviors* model)
+                       (p/then (fn [results]
+                                 (is (not (util/timeout-result? results)))
+                                 (assert-execute-tool-behaviors! results)))
+                       (p/then (fn [_] (done)))
+                       (p/catch (partial util/fail-and-done! done)))))))

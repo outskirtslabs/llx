@@ -30,6 +30,19 @@
   [effects]
   (mapv ::fx/type effects))
 
+(defn- tool-call-block
+  [id name arguments]
+  {:type :tool-call :id id :name name :arguments arguments})
+
+(defn- tool-result-message
+  [tool-call-id tool-name text is-error?]
+  {:role         :tool-result
+   :tool-call-id tool-call-id
+   :tool-name    tool-name
+   :content      [{:type :text :text text}]
+   :is-error?    is-error?
+   :timestamp    1})
+
 (deftest initial-state-has-expected-shape-test
   (is (= {:llx.agent.loop/phase :llx.agent.loop/idle
           :system-prompt        ""
@@ -347,7 +360,7 @@
            effects))))
 
 (deftest streaming-transition-llm-done-no-tools-test
-  (let [message          {:role :assistant :content "Hi!" :tool-calls []}
+  (let [message          {:role :assistant :content [{:type :text :text "Hi!"}]}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]
                                       :stream-message       {:role :assistant :content "partial"}})
@@ -367,9 +380,12 @@
       (is (= :llx.agent.event/turn-end (get-in effects [1 :event :type]))))))
 
 (deftest streaming-transition-llm-done-with-tools-test
-  (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}
-                          {:id "tc-2" :name "write_file" :arguments {:path "/out"}}]
-        message          {:role :assistant :content "" :tool-calls tool-calls}
+  (let [tool-calls       [(tool-call-block "tc-1" "read_file" {:path "/tmp"})
+                          (tool-call-block "tc-2" "write_file" {:path "/out"})]
+        message          {:role    :assistant
+                          :content [{:type :text :text "Working..."}
+                                    (first tool-calls)
+                                    (second tool-calls)]}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "do stuff"}]
                                       :stream-message       {:role :assistant :content "partial"}})
@@ -379,7 +395,9 @@
       (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase state'))))
 
     (testing "sets pending-tool-calls and clears stream-message"
-      (is (= tool-calls (:pending-tool-calls state')))
+      (is (= [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}
+              {:id "tc-2" :name "write_file" :arguments {:path "/out"}}]
+             (:pending-tool-calls state')))
       (is (nil? (:stream-message state'))))
 
     (testing "appends the message"
@@ -391,7 +409,8 @@
       (is (= :llx.agent.event/message-end (get-in effects [0 :event :type])))
       (is (= :llx.agent.event/tool-execution-start (get-in effects [1 :event :type])))
       (is (= "tc-1" (get-in effects [1 :event :tool-call-id])))
-      (is (= (first tool-calls) (:tool-call (nth effects 2)))))))
+      (is (= {:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}
+             (:tool-call (nth effects 2)))))))
 
 (deftest streaming-transition-llm-error-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
@@ -432,8 +451,8 @@
 (deftest tool-executing-transition-tool-result-with-remaining-test
   (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/a"}}
                           {:id "tc-2" :name "write_file" :arguments {:path "/b"}}]
-        result           {:role :tool-result :tool-call-id "tc-1" :content "file contents"}
-        tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :content "file contents"}
+        result           (tool-result-message "tc-1" "read_file" "file contents" false)
+        tool-result-msg  result
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   tool-calls
                                       :messages             [{:role :user :content "do stuff"}]})
@@ -454,6 +473,10 @@
       (is (= [:emit-event :emit-event :emit-event :emit-event :execute-tool]
              (fx-types effects)))
       (is (= :llx.agent.event/tool-execution-end (get-in effects [0 :event :type])))
+      (is (= "tc-1" (get-in effects [0 :event :tool-call-id])))
+      (is (= "read_file" (get-in effects [0 :event :tool-name])))
+      (is (= result (get-in effects [0 :event :result])))
+      (is (false? (get-in effects [0 :event :is-error?])))
       (is (= :llx.agent.event/message-start (get-in effects [1 :event :type])))
       (is (= :llx.agent.event/message-end (get-in effects [2 :event :type])))
       (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
@@ -461,8 +484,8 @@
 
 (deftest tool-executing-transition-tool-result-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "echo" :arguments {:text "hi"}}]
-        result           {:role :tool-result :tool-call-id "tc-1" :content "echoed"}
-        tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :content "echoed"}
+        result           (tool-result-message "tc-1" "echo" "echoed" false)
+        tool-result-msg  result
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   tool-calls
                                       :messages             []})
@@ -474,18 +497,19 @@
     (testing "clears pending-tool-calls"
       (is (= [] (:pending-tool-calls state'))))
 
-    (testing "emits tool-execution-end, message events, and turn-end"
-      (is (= [:emit-event :emit-event :emit-event :emit-event]
+    (testing "appends result to messages and resumes llm"
+      (is (= [result] (:messages state')))
+      (is (= [:emit-event :emit-event :emit-event :call-llm]
              (fx-types effects)))
       (is (= :llx.agent.event/tool-execution-end (get-in effects [0 :event :type])))
       (is (= :llx.agent.event/message-start (get-in effects [1 :event :type])))
       (is (= :llx.agent.event/message-end (get-in effects [2 :event :type])))
-      (is (= :llx.agent.event/turn-end (get-in effects [3 :event :type]))))))
+      (is (= [result] (:messages (nth effects 3)))))))
 
 (deftest tool-executing-transition-tool-error-with-remaining-test
   (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}
                           {:id "tc-2" :name "good_tool" :arguments {}}]
-        tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :error "kaboom"}
+        tool-result-msg  (tool-result-message "tc-1" "bad_tool" "kaboom" true)
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   tool-calls
                                       :messages             []})
@@ -498,18 +522,19 @@
     (testing "records error result and keeps remaining tools"
       (is (= [{:id "tc-2" :name "good_tool" :arguments {}}]
              (:pending-tool-calls state')))
-      (is (= [{:role :tool-result :tool-call-id "tc-1" :error "kaboom"}]
+      (is (= [tool-result-msg]
              (:messages state'))))
 
     (testing "emits tool-execution-end, message events, and starts next tool"
       (is (= [:emit-event :emit-event :emit-event :emit-event :execute-tool]
              (fx-types effects)))
+      (is (= true (get-in effects [0 :event :is-error?])))
       (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
       (is (= "tc-2" (get-in effects [3 :event :tool-call-id]))))))
 
 (deftest tool-executing-transition-tool-error-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}]
-        tool-result-msg  {:role :tool-result :tool-call-id "tc-1" :error "kaboom"}
+        tool-result-msg  (tool-result-message "tc-1" "bad_tool" "kaboom" true)
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
                                       :pending-tool-calls   tool-calls
                                       :messages             []})
@@ -522,10 +547,11 @@
     (testing "clears pending-tool-calls"
       (is (= [] (:pending-tool-calls state'))))
 
-    (testing "emits tool-execution-end, message events, and turn-end"
-      (is (= [:emit-event :emit-event :emit-event :emit-event]
+    (testing "records error result and resumes llm"
+      (is (= [tool-result-msg] (:messages state')))
+      (is (= [:emit-event :emit-event :emit-event :call-llm]
              (fx-types effects)))
-      (is (= :llx.agent.event/turn-end (get-in effects [3 :event :type]))))))
+      (is (= [tool-result-msg] (:messages (nth effects 3)))))))
 
 (deftest tool-executing-transition-tool-update-test
   (let [state            (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
@@ -638,7 +664,7 @@
     (is (= [] effects))))
 
 (deftest step-signal-llm-done-no-tools-to-idle-test
-  (let [message          {:role :assistant :content "Hi!" :tool-calls []}
+  (let [message          {:role :assistant :content [{:type :text :text "Hi!"}]}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "hello"}]
                                       :stream-message       {:role :assistant :content "partial"}})
@@ -647,8 +673,8 @@
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest step-signal-llm-done-with-tools-test
-  (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}]
-        message          {:role :assistant :content "" :tool-calls tool-calls}
+  (let [tool-call        (tool-call-block "tc-1" "read_file" {:path "/tmp"})
+        message          {:role :assistant :content [{:type :text :text "Let me check."} tool-call]}
         state            (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                       :messages             [{:role :user :content "do stuff"}]})
         [state' effects] (sut/step state {:type :llx.agent.signal/llm-done :message message})]
@@ -682,13 +708,13 @@
 (deftest step-full-happy-path-test
   (let [state         (initial-state)
         user-msg      {:role :user :content "hello"}
-        assistant-msg {:role :assistant :content "Hi!" :tool-calls []}
+        assistant-msg {:role :assistant :content [{:type :text :text "Hi!"}]}
 
         [s1 _]        (sut/step state {:type :llx.agent.command/prompt :messages [user-msg]})
         [s2 fx2]      (sut/step s1 {:type    :llx.agent.signal/llm-start
-                                    :message {:role :assistant :content ""}})
+                                    :message {:role :assistant :content [{:type :text :text ""}]}})
         [s3 fx3]      (sut/step s2 {:type  :llx.agent.signal/llm-chunk
-                                    :chunk {:role :assistant :content "Hi"}})
+                                    :chunk {:role :assistant :content [{:type :text :text "Hi"}]}})
         [s4 fx4]      (sut/step s3 {:type :llx.agent.signal/llm-done :message assistant-msg})]
 
     (testing "state progression"
@@ -710,15 +736,15 @@
 (deftest step-tool-loop-test
   (let [state               (initial-state)
         user-msg            {:role :user :content "read file"}
-        tool-calls          [{:id "tc-1" :name "read_file" :arguments {:path "/tmp"}}]
-        assistant-with-tool {:role :assistant :content "" :tool-calls tool-calls}
-        tool-result         {:role :tool-result :tool-call-id "tc-1" :content "file data"}
-        tool-result-msg     {:role :tool-result :tool-call-id "tc-1" :content "file data"}
-        final-assistant     {:role :assistant :content "Here is the file." :tool-calls []}
+        tool-call           (tool-call-block "tc-1" "read_file" {:path "/tmp"})
+        assistant-with-tool {:role :assistant :content [{:type :text :text "Reading..."} tool-call]}
+        tool-result         (tool-result-message "tc-1" "read_file" "file data" false)
+        tool-result-msg     tool-result
+        final-assistant     {:role :assistant :content [{:type :text :text "Here is the file."}]}
 
         [s1 _]              (sut/step state {:type :llx.agent.command/prompt :messages [user-msg]})
         [s2 _]              (sut/step s1 {:type :llx.agent.signal/llm-done :message assistant-with-tool})
-        [s3 _]              (sut/step s2 {:type                :llx.agent.signal/tool-result
+        [s3 fx3b]           (sut/step s2 {:type                :llx.agent.signal/tool-result
                                           :result              tool-result
                                           :tool-result-message tool-result-msg})
         [s4 fx4]            (sut/step s3 {:type :llx.agent.signal/llm-done :message final-assistant})]
@@ -728,6 +754,9 @@
       (is (= :llx.agent.loop/tool-executing (:llx.agent.loop/phase s2)))
       (is (= :llx.agent.loop/streaming (:llx.agent.loop/phase s3)))
       (is (= :llx.agent.loop/idle (:llx.agent.loop/phase s4))))
+
+    (testing "tool completion resumes llm"
+      (is (some #(= :call-llm (::fx/type %)) fx3b)))
 
     (testing "final state has all messages"
       (is (= [user-msg assistant-with-tool tool-result final-assistant]
@@ -740,8 +769,7 @@
   (let [state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages             [{:role :user :content "hello"}]})
         [_ effects] (sut/step state {:type    :llx.agent.signal/llm-done
-                                     :message {:role       :assistant :content "Hi!"
-                                               :tool-calls []}})]
+                                     :message {:role :assistant :content [{:type :text :text "Hi!"}]}})]
     (is (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects))))
 
 (deftest agent-end-emitted-on-error-to-idle-test
@@ -756,10 +784,9 @@
     (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
 
 (deftest agent-end-not-emitted-on-streaming-to-tool-executing-test
-  (let [tool-calls  [{:id "tc-1" :name "echo" :arguments {}}]
+  (let [tool-call   (tool-call-block "tc-1" "echo" {})
         state       (state-with {:llx.agent.loop/phase :llx.agent.loop/streaming
                                  :messages             [{:role :user :content "x"}]})
         [_ effects] (sut/step state {:type    :llx.agent.signal/llm-done
-                                     :message {:role       :assistant :content ""
-                                               :tool-calls tool-calls}})]
+                                     :message {:role :assistant :content [tool-call]}})]
     (is (not (some #(= :llx.agent.event/agent-end (get-in % [:event :type])) effects)))))

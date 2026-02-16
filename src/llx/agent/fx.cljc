@@ -19,6 +19,7 @@
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.agent.fx.inference :as inference]
+   [llx.agent.fx.tools :as tools]
    [llx.agent.schema :as schema]
    [promesa.exec.csp :as sp]))
 
@@ -26,18 +27,6 @@
   [env effect]
   (sp/offer (:events-mx> env) (:event effect))
   nil)
-
-(defn- fx-execute-tool
-  [_env _effect]
-  ;; TODO: look up tool from (:tools env), validate args, call execute
-  ;; Returns a channel that emits signals:
-  ;;   {:type :llx.agent.signal/tool-update ...}  (zero or more, for streaming tools)
-  ;;   {:type :llx.agent.signal/tool-result ...}  or {:type :llx.agent.signal/tool-error ...}
-  ;; Channel closes after the terminal result/error signal.
-  ;; Check for steering messages after completion.
-  (let [ch (sp/chan)]
-    (sp/close ch)
-    ch))
 
 (defn- fx-reject
   [_env _effect]
@@ -73,6 +62,6 @@
          (case (::type effect)
            :emit-event (fx-emit-event env effect)
            :call-llm (inference/fx-call-llm env effect)
-           :execute-tool (fx-execute-tool env effect)
+           :execute-tool (tools/fx-execute-tool env effect)
            :reject (fx-reject env effect)
            nil)))

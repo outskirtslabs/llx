@@ -66,6 +66,23 @@
     :llx.agent.event/tool-execution-end ;; tool execution finished (success or error)
     })
 
+(defn- assistant-tool-calls
+  [message]
+  (if (vector? (:content message))
+    (->> (:content message)
+         (filter #(= :tool-call (:type %)))
+         (mapv (fn [{:keys [id name arguments]}]
+                 {:id id :name name :arguments arguments})))
+    []))
+
+(defn- tool-execution-end-event
+  [tool-result]
+  {:type         :llx.agent.event/tool-execution-end
+   :tool-call-id (:tool-call-id tool-result)
+   :tool-name    (:tool-name tool-result)
+   :result       tool-result
+   :is-error?    (:is-error? tool-result)})
+
 (defn handle-command
   "Pure command handler. Takes state + command, returns `[state' signals]`.
    Handles global state mutations directly and translates FSM-driving
@@ -225,7 +242,7 @@
 
     :llx.agent.signal/llm-done
     (let [message    (:message msg)
-          tool-calls (:tool-calls message)
+          tool-calls (assistant-tool-calls message)
           first-tool (first tool-calls)]
       (if (seq tool-calls)
         [(-> state
@@ -269,16 +286,15 @@
   [state msg]
   (case (:type msg)
     :llx.agent.signal/tool-result
-    (let [result      (:result msg)
-          tool-result (:tool-result-message msg)
+    (let [tool-result (:tool-result-message msg)
           remaining   (rest (:pending-tool-calls state))
           next-tool   (first remaining)
           state'      (-> state
-                          (update :messages conj result)
+                          (update :messages conj tool-result)
                           (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result result}}
+         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
           {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
@@ -287,24 +303,21 @@
                                          :args         (:arguments next-tool)}}
           {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result result}}
+         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}]]))
+          {::fx/type :call-llm :messages (:messages state')}]]))
 
     :llx.agent.signal/tool-error
-    (let [remaining    (rest (:pending-tool-calls state))
-          next-tool    (first remaining)
-          error-result {:role         :tool-result
-                        :tool-call-id (:tool-call-id msg)
-                        :error        (:error msg)}
-          tool-result  (:tool-result-message msg)
-          state'       (-> state
-                           (update :messages conj error-result)
-                           (assoc :pending-tool-calls (vec remaining)))]
+    (let [remaining   (rest (:pending-tool-calls state))
+          next-tool   (first remaining)
+          tool-result (:tool-result-message msg)
+          state'      (-> state
+                          (update :messages conj tool-result)
+                          (assoc :pending-tool-calls (vec remaining)))]
       (if (seq remaining)
         [state'
-         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result error-result}}
+         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
           {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
@@ -313,10 +326,10 @@
                                          :args         (:arguments next-tool)}}
           {::fx/type :execute-tool :tool-call next-tool}]]
         [state'
-         [{::fx/type :emit-event :event {:type :llx.agent.event/tool-execution-end :result error-result}}
+         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
           {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/turn-end}}]]))
+          {::fx/type :call-llm :messages (:messages state')}]]))
 
     :llx.agent.signal/tool-update
     [state

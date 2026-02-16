@@ -101,8 +101,8 @@
                                     :requires-assistant-after-tool-result? false
                                     :requires-thinking-as-text?            true}))))
 
-  (testing "rejects unknown model keys"
-    (is (not (sut/valid? :llx/model (assoc valid-model :unknown true))))))
+  (testing "accepts unknown model keys"
+    (is (sut/valid? :llx/model (assoc valid-model :unknown true)))))
 
 (deftest usage-schema
   (testing "accepts usage where total-tokens equals component sum"
@@ -117,9 +117,9 @@
     (is (sut/valid? :llx/message valid-assistant))
     (is (sut/valid? :llx/message valid-tool-result)))
 
-  (testing "assistant message rejects unknown keys"
-    (is (not (sut/valid? :llx/message-assistant
-                         (assoc valid-assistant :extra "nope"))))))
+  (testing "assistant message accepts unknown keys"
+    (is (sut/valid? :llx/message-assistant
+                    (assoc valid-assistant :extra "nope")))))
 
 (deftest context-schema
   (testing "context is an ordered vector of canonical messages"
@@ -130,7 +130,7 @@
                     {:messages      [valid-user valid-assistant]
                      :system-prompt "You are helpful."
                      :tools         [valid-tool]}))
-    (is (not (sut/valid? :llx/context-map {:messages [valid-user] :unknown true})))
+    (is (sut/valid? :llx/context-map {:messages [valid-user] :unknown true}))
     (is (not (sut/valid? :llx/context-map {:system-prompt "missing messages"})))))
 
 (deftest event-schemas
@@ -171,15 +171,26 @@
                        :max-output-tokens 1024
                        :signal            ::sig
                        :metadata          {:request-id "abc"}
-                       :provider-extra    true}]
+                       :provider-extra    true}
+        input-schema  [:map
+                       [:path {:description "File path"} :string]
+                       [:limit {:optional true :description "Maximum number of results"} :int]]
+        json-schema   (sut/malli->json-schema input-schema)]
     (testing "accepts valid unified request options"
       (is (sut/valid? :llx/unified-request-options unified-opts)))
 
-    (testing "rejects unknown unified request option keys"
-      (is (not (sut/valid? :llx/unified-request-options (assoc unified-opts :unknown 1)))))
+    (testing "accepts unknown unified request option keys"
+      (is (sut/valid? :llx/unified-request-options (assoc unified-opts :unknown 1))))
 
     (testing "accepts valid provider request options including provider-specific keys"
-      (is (sut/valid? :llx/provider-request-options provider-opts)))))
+      (is (sut/valid? :llx/provider-request-options provider-opts)))
+
+    (testing "tool input schema field descriptions survive json schema conversion"
+      (is (= "File path" (get-in json-schema [:properties :path :description])))
+      (is (= "Maximum number of results"
+             (get-in json-schema [:properties :limit :description])))
+      (is (some #{:path} (:required json-schema)))
+      (is (not (some #{:limit} (:required json-schema)))))))
 
 (deftest options-schema-allows-provider-specific-option-keys
   (is (sut/valid? :llx/provider-request-options {:provider-flag true})))
@@ -188,7 +199,7 @@
   (with-redefs [sut/schemas
                 (assoc sut/schemas
                        :llx/unified-request-options
-                       [:map {:closed true}
+                       [:map
                         [:foo :string]])]
     (is (sut/valid? :llx/unified-request-options {:foo "bar"}))
     (is (not (sut/valid? :llx/unified-request-options {:session-id "still-old"})))))
@@ -204,9 +215,9 @@
     (testing "accepts known provider config"
       (is (sut/valid? :llx/library-config cfg)))
 
-    (testing "rejects unknown provider keys"
-      (is (not (sut/valid? :llx/library-config
-                           (assoc-in cfg [:providers :bogus] {:api-key "x"})))))))
+    (testing "accepts unknown provider keys"
+      (is (sut/valid? :llx/library-config
+                      (assoc-in cfg [:providers :bogus] {:api-key "x"}))))))
 
 (deftest adapter-and-env-schema
   (testing "accepts valid adapter and runtime env"
