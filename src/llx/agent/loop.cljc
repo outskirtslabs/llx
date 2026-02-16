@@ -6,66 +6,6 @@
   #?(:clj  clojure.lang.PersistentQueue/EMPTY
      :cljs #queue []))
 
-(def states
-  "The agent's possible states"
-  #{::idle ;; no inference loop is running, awaiting prompt, continue, or abort
-    ::streaming ;; actively streaming an llm inference response
-    ::tool-executing ;; a tool call is in progress
-    ::closed ;; terminal state
-    })
-
-(def commands
-  "Commands from the caller into the agent."
-  #{:llx.agent.command/prompt ;; start inference with new messages
-    :llx.agent.command/continue ;; resume with queued steering or follow-up messages
-    :llx.agent.command/abort ;; cancel the running loop
-    :llx.agent.command/steer ;; inject a steering message mid-run
-    :llx.agent.command/follow-up ;; queue a message for after the agent finishes
-    :llx.agent.command/set-system-prompt ;; replace the system prompt
-    :llx.agent.command/set-model ;; change the LLM model
-    :llx.agent.command/set-thinking-level ;; set reasoning level (off, low, medium, high, etc.)
-    :llx.agent.command/set-tools ;; replace the available tool set
-    :llx.agent.command/set-steering-mode ;; set steering dequeue mode (all or one-at-a-time)
-    :llx.agent.command/set-follow-up-mode ;; set follow-up dequeue mode (all or one-at-a-time)
-    :llx.agent.command/replace-messages ;; replace the entire message history
-    :llx.agent.command/append-message ;; append a single message to history
-    :llx.agent.command/clear-messages ;; clear the message history
-    :llx.agent.command/clear-steering-queue ;; drop all queued steering messages
-    :llx.agent.command/clear-follow-up-queue ;; drop all queued follow-up messages
-    :llx.agent.command/clear-all-queues ;; drop all queued steering and follow-up messages
-    :llx.agent.command/reset ;; clear all state (messages, queues, errors)
-    })
-
-(def signals
-  "Internal signals fed back into the TEA loop by the effect interpreter
-   or produced by the command handler."
-  #{:llx.agent.signal/prompt-start ;; command/prompt accepted, begin inference
-    :llx.agent.signal/continue-start ;; command/continue accepted with dequeued messages
-    :llx.agent.signal/abort ;; command/abort accepted, cancel running loop
-    :llx.agent.signal/rejected ;; command was rejected (carries :reason)
-    :llx.agent.signal/llm-start ;; LLM stream begun, initial partial message available
-    :llx.agent.signal/llm-chunk ;; streaming chunk received from LLM
-    :llx.agent.signal/llm-done ;; LLM inference completed
-    :llx.agent.signal/llm-error ;; LLM inference failed
-    :llx.agent.signal/tool-result ;; tool execution completed successfully
-    :llx.agent.signal/tool-error ;; tool execution failed
-    :llx.agent.signal/tool-update ;; tool execution progress update
-    })
-
-(def events
-  "Lifecycle events emitted from the agent to subscribers."
-  #{:llx.agent.event/agent-start ;; agent begins processing
-    :llx.agent.event/agent-end ;; agent completes with all new messages
-    :llx.agent.event/turn-start ;; new turn begins (one LLM call + tool executions)
-    :llx.agent.event/turn-end ;; turn completes with assistant message and tool results
-    :llx.agent.event/message-start ;; any message begins (user, assistant, tool-result)
-    :llx.agent.event/message-update ;; assistant streaming chunk update
-    :llx.agent.event/message-end ;; message fully received/processed
-    :llx.agent.event/tool-execution-start ;; tool begins executing
-    :llx.agent.event/tool-execution-update ;; tool streams progress
-    :llx.agent.event/tool-execution-end ;; tool execution finished (success or error)
-    })
-
 (defn- assistant-tool-calls
   [message]
   (if (vector? (:content message))
@@ -75,6 +15,44 @@
                  {:id id :name name :arguments arguments})))
     []))
 
+(defn- now-ms [] #?(:clj (System/currentTimeMillis) :cljs (.now js/Date)))
+
+(defn- dequeue-by-mode
+  [state queue-key mode-key]
+  (let [queue (get state queue-key)
+        mode  (get state mode-key)]
+    (if-not (seq queue)
+      [nil state]
+      (if (= mode :all)
+        [(vec queue) (assoc state queue-key empty-queue)]
+        [[(peek queue)] (assoc state queue-key (pop queue))]))))
+
+(defn- message-lifecycle-effects
+  [message]
+  [{::fx/type :emit-event :event {:type :llx.agent.event/message-start :message message}}
+   {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message message}}])
+
+(defn- tool-start-effect
+  [tool-call]
+  {::fx/type :emit-event
+   :event    {:type         :llx.agent.event/tool-execution-start
+              :tool-call-id (:id tool-call)
+              :tool-name    (:name tool-call)
+              :args         (:arguments tool-call)}})
+
+(def ^:private skipped-tool-result-text
+  "Skipped due to queued user message.")
+
+(defn- skipped-tool-result-message
+  [tool-call]
+  {:role         :tool-result
+   :tool-call-id (:id tool-call)
+   :tool-name    (:name tool-call)
+   :content      [{:type :text
+                   :text skipped-tool-result-text}]
+   :is-error?    true
+   :timestamp    (now-ms)})
+
 (defn- tool-execution-end-event
   [tool-result]
   {:type         :llx.agent.event/tool-execution-end
@@ -83,10 +61,61 @@
    :result       tool-result
    :is-error?    (:is-error? tool-result)})
 
+(defn- tool-result-lifecycle-effects
+  [tool-result]
+  (into [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}]
+        (message-lifecycle-effects tool-result)))
+
+(defn- skip-tool-call-effects
+  [tool-call]
+  (let [tool-result (skipped-tool-result-message tool-call)]
+    {:tool-result tool-result
+     :effects     (into [(tool-start-effect tool-call)]
+                        (tool-result-lifecycle-effects tool-result))}))
+
+(defn- tool-complete-transition
+  [state tool-result]
+  (let [remaining                   (rest (:pending-tool-calls state))
+        next-tool                   (first remaining)
+        state'                      (-> state
+                                        (update :messages conj tool-result)
+                                        (assoc :pending-tool-calls (vec remaining)))
+        [steering-messages state''] (dequeue-by-mode state' :steering-queue :steering-mode)]
+    (cond
+      (seq steering-messages)
+      (let [skipped              (mapv skip-tool-call-effects remaining)
+            skipped-tool-results (mapv :tool-result skipped)
+            skipped-effects      (mapcat :effects skipped)
+            steering-effects     (mapcat message-lifecycle-effects steering-messages)
+            state'''             (-> state''
+                                     (update :messages into skipped-tool-results)
+                                     (update :messages into steering-messages)
+                                     (assoc :pending-tool-calls []))
+            completion-effects   (tool-result-lifecycle-effects tool-result)]
+        [state'''
+         (into []
+               (concat completion-effects
+                       skipped-effects
+                       steering-effects
+                       [{::fx/type :call-llm :messages (:messages state''')}]))])
+
+      (seq remaining)
+      [state'
+       (into []
+             (concat (tool-result-lifecycle-effects tool-result)
+                     [(tool-start-effect next-tool)
+                      {::fx/type :execute-tool :tool-call next-tool}]))]
+
+      :else
+      [state'
+       (into []
+             (concat (tool-result-lifecycle-effects tool-result)
+                     [{::fx/type :call-llm :messages (:messages state')}]))])))
+
 (defn handle-command
   "Pure command handler. Takes state + command, returns `[state' signals]`.
    Handles global state mutations directly and translates FSM-driving
-   commands into signals for the TEA engine.
+   commands into signals for the graph.
 
    Commands that only mutate state (e.g. `:llx.agent.command/steer`) return an empty
    signals vector. Commands that drive the FSM (e.g. `:llx.agent.command/prompt`)
@@ -101,25 +130,15 @@
     :llx.agent.command/continue
     (if (not= ::idle (::phase state))
       [state [{:type :llx.agent.signal/rejected :reason :not-idle}]]
-      (let [{:keys [steering-queue follow-up-queue
-                    steering-mode follow-up-mode]}                                         state
-            [msgs queue-key updated-queue]
-            (cond
-              (seq steering-queue)
-              [(if (= steering-mode :all) (vec steering-queue) [(peek steering-queue)])
-               :steering-queue
-               (if (= steering-mode :all) empty-queue (pop steering-queue))]
-
-              (seq follow-up-queue)
-              [(if (= follow-up-mode :all) (vec follow-up-queue) [(peek follow-up-queue)])
-               :follow-up-queue
-               (if (= follow-up-mode :all) empty-queue (pop follow-up-queue))]
-
-              :else nil)]
-        (if msgs
-          [(assoc state queue-key updated-queue)
-           [{:type :llx.agent.signal/continue-start :messages msgs}]]
-          [state [{:type :llx.agent.signal/rejected :reason :no-queued-messages}]])))
+      (let [[steering state-with-steering] (dequeue-by-mode state :steering-queue :steering-mode)]
+        (if (seq steering)
+          [state-with-steering
+           [{:type :llx.agent.signal/continue-start :messages steering}]]
+          (let [[follow-up state-with-follow-up] (dequeue-by-mode state :follow-up-queue :follow-up-mode)]
+            (if (seq follow-up)
+              [state-with-follow-up
+               [{:type :llx.agent.signal/continue-start :messages follow-up}]]
+              [state [{:type :llx.agent.signal/rejected :reason :no-queued-messages}]])))))
 
     :llx.agent.command/abort
     (if (= ::idle (::phase state))
@@ -127,62 +146,48 @@
       [state [{:type :llx.agent.signal/abort}]])
 
     :llx.agent.command/steer
-    [(update state :steering-queue conj (:message cmd))
-     []]
+    [(update state :steering-queue conj (:message cmd)) []]
 
     :llx.agent.command/follow-up
-    [(update state :follow-up-queue conj (:message cmd))
-     []]
+    [(update state :follow-up-queue conj (:message cmd)) []]
 
     :llx.agent.command/set-system-prompt
-    [(assoc state :system-prompt (:system-prompt cmd))
-     []]
+    [(assoc state :system-prompt (:system-prompt cmd)) []]
 
     :llx.agent.command/set-model
-    [(assoc state :model (:model cmd))
-     []]
+    [(assoc state :model (:model cmd)) []]
 
     :llx.agent.command/set-thinking-level
-    [(assoc state :thinking-level (:thinking-level cmd))
-     []]
+    [(assoc state :thinking-level (:thinking-level cmd)) []]
 
     :llx.agent.command/set-tools
-    [(assoc state :tools (:tools cmd))
-     []]
+    [(assoc state :tools (:tools cmd)) []]
 
     :llx.agent.command/set-steering-mode
-    [(assoc state :steering-mode (:mode cmd))
-     []]
+    [(assoc state :steering-mode (:mode cmd)) []]
 
     :llx.agent.command/set-follow-up-mode
-    [(assoc state :follow-up-mode (:mode cmd))
-     []]
+    [(assoc state :follow-up-mode (:mode cmd)) []]
 
     :llx.agent.command/replace-messages
-    [(assoc state :messages (:messages cmd))
-     []]
+    [(assoc state :messages (:messages cmd)) []]
 
     :llx.agent.command/append-message
-    [(update state :messages conj (:message cmd))
-     []]
+    [(update state :messages conj (:message cmd)) []]
 
     :llx.agent.command/clear-messages
-    [(assoc state :messages [])
-     []]
+    [(assoc state :messages []) []]
 
     :llx.agent.command/clear-steering-queue
-    [(assoc state :steering-queue empty-queue)
-     []]
+    [(assoc state :steering-queue empty-queue) []]
 
     :llx.agent.command/clear-follow-up-queue
-    [(assoc state :follow-up-queue empty-queue)
-     []]
+    [(assoc state :follow-up-queue empty-queue) []]
 
     :llx.agent.command/clear-all-queues
     [(-> state
          (assoc :steering-queue empty-queue)
-         (assoc :follow-up-queue empty-queue))
-     []]
+         (assoc :follow-up-queue empty-queue)) []]
 
     :llx.agent.command/reset
     [(-> state
@@ -192,8 +197,7 @@
          (assoc :follow-up-queue empty-queue)
          (assoc :stream-message nil)
          (assoc :pending-tool-calls [])
-         (assoc :error nil))
-     []]))
+         (assoc :error nil)) []]))
 
 (defn idle-transition
   "Pure transition from ::idle state. Returns [state' effects]."
@@ -286,50 +290,10 @@
   [state msg]
   (case (:type msg)
     :llx.agent.signal/tool-result
-    (let [tool-result (:tool-result-message msg)
-          remaining   (rest (:pending-tool-calls state))
-          next-tool   (first remaining)
-          state'      (-> state
-                          (update :messages conj tool-result)
-                          (assoc :pending-tool-calls (vec remaining)))]
-      (if (seq remaining)
-        [state'
-         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
-                                         :tool-call-id (:id next-tool)
-                                         :tool-name    (:name next-tool)
-                                         :args         (:arguments next-tool)}}
-          {::fx/type :execute-tool :tool-call next-tool}]]
-        [state'
-         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :call-llm :messages (:messages state')}]]))
+    (tool-complete-transition state (:tool-result-message msg))
 
     :llx.agent.signal/tool-error
-    (let [remaining   (rest (:pending-tool-calls state))
-          next-tool   (first remaining)
-          tool-result (:tool-result-message msg)
-          state'      (-> state
-                          (update :messages conj tool-result)
-                          (assoc :pending-tool-calls (vec remaining)))]
-      (if (seq remaining)
-        [state'
-         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :emit-event :event {:type         :llx.agent.event/tool-execution-start
-                                         :tool-call-id (:id next-tool)
-                                         :tool-name    (:name next-tool)
-                                         :args         (:arguments next-tool)}}
-          {::fx/type :execute-tool :tool-call next-tool}]]
-        [state'
-         [{::fx/type :emit-event :event (tool-execution-end-event tool-result)}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-start :message tool-result}}
-          {::fx/type :emit-event :event {:type :llx.agent.event/message-end :message tool-result}}
-          {::fx/type :call-llm :messages (:messages state')}]]))
+    (tool-complete-transition state (:tool-result-message msg))
 
     :llx.agent.signal/tool-update
     [state
@@ -373,6 +337,30 @@
       ::tool-executing
       ::streaming)))
 
+(defn command?
+  [input]
+  (= "llx.agent.command" (namespace (:type input))))
+
+(defn- step-signal
+  "Process a single signal through the graph. Pure.
+   Runs the transition fn for the current phase, then the routing fn
+   to determine the next phase. Returns `[state' effects]`."
+  [g state sig]
+  (let [current-phase    (::phase state)
+        transition-fn    (get-in g [::transitions current-phase])
+        routing-fn       (get-in g [::routes current-phase])
+        [state' effects] (transition-fn state sig)
+        next-phase       (routing-fn state')
+        prev-phase       current-phase
+        state''          (assoc state' ::phase next-phase)
+        agent-ended?     (and (not= ::idle prev-phase)
+                              (= ::idle next-phase))]
+    (if agent-ended?
+      [state'' (conj effects {::fx/type :emit-event
+                              :event    {:type     :llx.agent.event/agent-end
+                                         :messages (:messages state'')}})]
+      [state'' effects])))
+
 (def graph
   "Agent state machine as data.
 
@@ -393,40 +381,13 @@
                   ::tool-executing route-from-tool-executing
                   ::closed         (constantly ::closed)}})
 
-(defn command?
-  "Returns true if `input` is a command."
-  [input]
-  (= "llx.agent.command" (namespace (:type input))))
-
-(defn- step-signal
-  "Process a single signal through the TEA graph. Pure.
-   Runs the transition fn for the current phase, then the routing fn
-   to determine the next phase. Returns `[state' effects]`."
-  [g state sig]
-  (let [current-phase    (::phase state)
-        transition-fn    (get-in g [::transitions current-phase])
-        routing-fn       (get-in g [::routes current-phase])
-        [state' effects] (transition-fn state sig)
-        next-phase       (routing-fn state')
-        prev-phase       current-phase
-        state''          (assoc state' ::phase next-phase)
-        agent-ended?     (and (not= ::idle prev-phase)
-                              (= ::idle next-phase))]
-    (if agent-ended?
-      [state'' (conj effects {::fx/type :emit-event
-                              :event    {:type     :llx.agent.event/agent-end
-                                         :messages (:messages state'')}})]
-      [state'' effects])))
-
 (defn step
-  "Pure TEA step function. Takes state + input (command or signal),
-   returns `[state' effects]`.
+  "Pure step function. Takes state + input (command or signal), returns `[state' effects]`.
 
    Commands are processed by `handle-command` which may produce signals.
    Signals are processed by the graph transition + routing fns.
 
-  Emits `:llx.agent.event/agent-end` automatically when the agent transitions
-   from a non-idle phase back to `::idle`."
+   Emits `:llx.agent.event/agent-end` automatically when the agent transitions from a non-idle phase back to `::idle`."
   ([state input]
    (step graph state input))
   ([g state input]

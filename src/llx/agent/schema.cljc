@@ -105,24 +105,25 @@
 
      :llx.agent/command-type
      [:enum
-      :llx.agent.command/prompt
-      :llx.agent.command/continue
-      :llx.agent.command/abort
-      :llx.agent.command/steer
-      :llx.agent.command/follow-up
-      :llx.agent.command/set-system-prompt
-      :llx.agent.command/set-model
-      :llx.agent.command/set-thinking-level
-      :llx.agent.command/set-tools
-      :llx.agent.command/set-steering-mode
-      :llx.agent.command/set-follow-up-mode
-      :llx.agent.command/replace-messages
-      :llx.agent.command/append-message
-      :llx.agent.command/clear-messages
-      :llx.agent.command/clear-steering-queue
-      :llx.agent.command/clear-follow-up-queue
-      :llx.agent.command/clear-all-queues
-      :llx.agent.command/reset]
+      :llx.agent.command/prompt ;; start inference with new messages
+      :llx.agent.command/continue ;; resume with queued steering or follow-up messages
+      :llx.agent.command/abort ;; cancel the running loop
+      :llx.agent.command/steer ;; inject a steering message mid-run
+      :llx.agent.command/follow-up ;; queue a message for after the agent finishes
+      :llx.agent.command/set-system-prompt ;; replace the system prompt
+      :llx.agent.command/set-model ;; change the LLM model
+      :llx.agent.command/set-thinking-level ;; set reasoning level (off, low, medium, high, etc.)
+      :llx.agent.command/set-tools ;; replace the available tool set
+      :llx.agent.command/set-steering-mode ;; set steering dequeue mode (all or one-at-a-time)
+      :llx.agent.command/set-follow-up-mode ;; set follow-up dequeue mode (all or one-at-a-time)
+      :llx.agent.command/replace-messages ;; replace the entire message history
+      :llx.agent.command/append-message ;; append a single message to history
+      :llx.agent.command/clear-messages ;; clear the message history
+      :llx.agent.command/clear-steering-queue ;; drop all queued steering messages
+      :llx.agent.command/clear-follow-up-queue ;; drop all queued follow-up messages
+      :llx.agent.command/clear-all-queues ;; drop all queued steering and follow-up messages
+      :llx.agent.command/reset ;; clear all state (messages, queues, errors)
+      ]
 
      :llx.agent/command-prompt
      [:map
@@ -230,17 +231,18 @@
 
      :llx.agent/signal-type
      [:enum
-      :llx.agent.signal/prompt-start
-      :llx.agent.signal/continue-start
-      :llx.agent.signal/abort
-      :llx.agent.signal/rejected
-      :llx.agent.signal/llm-start
-      :llx.agent.signal/llm-chunk
-      :llx.agent.signal/llm-done
-      :llx.agent.signal/llm-error
-      :llx.agent.signal/tool-result
-      :llx.agent.signal/tool-error
-      :llx.agent.signal/tool-update]
+      :llx.agent.signal/prompt-start ;; command/prompt accepted, begin inference
+      :llx.agent.signal/continue-start ;; command/continue accepted with dequeued messages
+      :llx.agent.signal/abort ;; command/abort accepted, cancel running loop
+      :llx.agent.signal/rejected ;; command was rejected (carries :reason)
+      :llx.agent.signal/llm-start ;; LLM stream begun, initial partial message available
+      :llx.agent.signal/llm-chunk ;; streaming chunk received from LLM
+      :llx.agent.signal/llm-done ;; LLM inference completed
+      :llx.agent.signal/llm-error ;; LLM inference failed
+      :llx.agent.signal/tool-result ;; tool execution completed successfully
+      :llx.agent.signal/tool-error ;; tool execution failed
+      :llx.agent.signal/tool-update ;; tool execution progress update
+      ]
 
      :llx.agent/signal-prompt-start
      [:map
@@ -320,16 +322,17 @@
 
      :llx.agent/event-type
      [:enum
-      :llx.agent.event/agent-start
-      :llx.agent.event/agent-end
-      :llx.agent.event/turn-start
-      :llx.agent.event/turn-end
-      :llx.agent.event/message-start
-      :llx.agent.event/message-update
-      :llx.agent.event/message-end
-      :llx.agent.event/tool-execution-start
-      :llx.agent.event/tool-execution-update
-      :llx.agent.event/tool-execution-end]
+      :llx.agent.event/agent-start ;; agent begins processing
+      :llx.agent.event/agent-end ;; agent completes with all new messages
+      :llx.agent.event/turn-start ;; new turn begins (one LLM call + tool executions)
+      :llx.agent.event/turn-end ;; turn completes with assistant message and tool results
+      :llx.agent.event/message-start ;; any message begins (user, assistant, tool-result)
+      :llx.agent.event/message-update ;; assistant streaming chunk update
+      :llx.agent.event/message-end ;; message fully received/processed
+      :llx.agent.event/tool-execution-start ;; tool begins executing
+      :llx.agent.event/tool-execution-update ;; tool streams progress
+      :llx.agent.event/tool-execution-end ;; tool execution finished (success or error)
+      ]
 
      :llx.agent/event-message-payload
      [:or
@@ -478,7 +481,12 @@
       [:abort-signal {:optional true} :any]]
 
      :llx.agent.loop/phase
-     [:enum :llx.agent.loop/idle :llx.agent.loop/streaming :llx.agent.loop/tool-executing :llx.agent.loop/closed]
+     [:enum
+      :llx.agent.loop/idle ;; no inference loop is running, awaiting prompt, continue, or abort
+      :llx.agent.loop/streaming ;; actively streaming an llm inference response
+      :llx.agent.loop/tool-executing ;; a tool call is in progress
+      :llx.agent.loop/closed ;; terminal state
+      ]
 
      :llx.agent.loop/thinking-level
      [:enum :off :minimal :low :medium :high :xhigh]

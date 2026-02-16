@@ -482,6 +482,82 @@
       (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
       (is (= "tc-2" (get-in effects [3 :event :tool-call-id]))))))
 
+(deftest tool-executing-transition-tool-result-with-steering-interrupts-remaining-tools-test
+  (let [tool-calls       [{:id "tc-1" :name "read_file" :arguments {:path "/a"}}
+                          {:id "tc-2" :name "write_file" :arguments {:path "/b"}}
+                          {:id "tc-3" :name "echo" :arguments {:text "c"}}]
+        steering-msg-1   {:role :user :content "interrupt-1"}
+        steering-msg-2   {:role :user :content "interrupt-2"}
+        result           (tool-result-message "tc-1" "read_file" "file contents" false)
+        state            (-> (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                          :pending-tool-calls   tool-calls
+                                          :messages             [{:role :user :content "do stuff"}]})
+                             (update :steering-queue conj steering-msg-1)
+                             (update :steering-queue conj steering-msg-2))
+        [state' effects] (sut/tool-executing-transition
+                          state
+                          {:type                :llx.agent.signal/tool-result
+                           :result              result
+                           :tool-result-message result})]
+    (testing "clears pending tool calls and keeps remaining steering queued in one-at-a-time mode"
+      (is (= [] (:pending-tool-calls state')))
+      (is (= [steering-msg-2] (vec (:steering-queue state')))))
+
+    (testing "appends current tool result, synthetic skipped results, and dequeued steering message"
+      (is (= [{:role :user :content "do stuff"}
+              (dissoc result :timestamp)
+              {:role         :tool-result
+               :tool-call-id "tc-2"
+               :tool-name    "write_file"
+               :content      [{:type :text :text "Skipped due to queued user message."}]
+               :is-error?    true}
+              {:role         :tool-result
+               :tool-call-id "tc-3"
+               :tool-name    "echo"
+               :content      [{:type :text :text "Skipped due to queued user message."}]
+               :is-error?    true}
+              steering-msg-1]
+             (mapv #(dissoc % :timestamp) (:messages state')))))
+
+    (testing "emits current result events, skipped tool lifecycle events, steering message events, and resumes llm"
+      (is (= [:emit-event :emit-event :emit-event
+              :emit-event :emit-event :emit-event :emit-event
+              :emit-event :emit-event :emit-event :emit-event
+              :emit-event :emit-event
+              :call-llm]
+             (fx-types effects)))
+      (is (= :llx.agent.event/tool-execution-end (get-in effects [0 :event :type])))
+      (is (= "tc-2" (get-in effects [3 :event :tool-call-id])))
+      (is (= true (get-in effects [4 :event :is-error?])))
+      (is (= "tc-3" (get-in effects [7 :event :tool-call-id])))
+      (is (= true (get-in effects [8 :event :is-error?])))
+      (is (= :llx.agent.event/message-start (get-in effects [11 :event :type])))
+      (is (= steering-msg-1 (get-in effects [11 :event :message])))
+      (is (= :llx.agent.event/message-end (get-in effects [12 :event :type])))
+      (is (= (:messages state') (:messages (last effects)))))))
+
+(deftest tool-executing-transition-tool-result-with-steering-all-mode-dequeues-all-test
+  (let [tool-calls        [{:id "tc-1" :name "read_file" :arguments {:path "/a"}}
+                           {:id "tc-2" :name "write_file" :arguments {:path "/b"}}]
+        steering-msg-1    {:role :user :content "interrupt-1"}
+        steering-msg-2    {:role :user :content "interrupt-2"}
+        result            (tool-result-message "tc-1" "read_file" "file contents" false)
+        state             (-> (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                           :pending-tool-calls   tool-calls
+                                           :messages             [{:role :user :content "do stuff"}]
+                                           :steering-mode        :all})
+                              (update :steering-queue conj steering-msg-1)
+                              (update :steering-queue conj steering-msg-2))
+        [state' _effects] (sut/tool-executing-transition
+                           state
+                           {:type                :llx.agent.signal/tool-result
+                            :result              result
+                            :tool-result-message result})]
+    (testing "dequeues all steering messages in :all mode"
+      (is (empty? (:steering-queue state')))
+      (is (= [steering-msg-1 steering-msg-2]
+             (take-last 2 (:messages state')))))))
+
 (deftest tool-executing-transition-tool-result-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "echo" :arguments {:text "hi"}}]
         result           (tool-result-message "tc-1" "echo" "echoed" false)
@@ -531,6 +607,47 @@
       (is (= true (get-in effects [0 :event :is-error?])))
       (is (= :llx.agent.event/tool-execution-start (get-in effects [3 :event :type])))
       (is (= "tc-2" (get-in effects [3 :event :tool-call-id]))))))
+
+(deftest tool-executing-transition-tool-error-with-steering-interrupts-remaining-tools-test
+  (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}
+                          {:id "tc-2" :name "good_tool" :arguments {}}
+                          {:id "tc-3" :name "echo" :arguments {:text "c"}}]
+        tool-result-msg  (tool-result-message "tc-1" "bad_tool" "kaboom" true)
+        steering-msg-1   {:role :user :content "interrupt-1"}
+        steering-msg-2   {:role :user :content "interrupt-2"}
+        state            (-> (state-with {:llx.agent.loop/phase :llx.agent.loop/tool-executing
+                                          :pending-tool-calls   tool-calls
+                                          :messages             [{:role :user :content "do stuff"}]})
+                             (update :steering-queue conj steering-msg-1)
+                             (update :steering-queue conj steering-msg-2))
+        [state' effects] (sut/tool-executing-transition
+                          state
+                          {:type                :llx.agent.signal/tool-error
+                           :tool-call-id        "tc-1"
+                           :error               "kaboom"
+                           :tool-result-message tool-result-msg})]
+    (testing "does not execute the next real tool and resumes llm after synthetic skipped results"
+      (is (= [] (:pending-tool-calls state')))
+      (is (not-any? #(= :execute-tool (::fx/type %)) effects))
+      (is (= :call-llm (::fx/type (last effects)))))
+
+    (testing "keeps one steering message queued in one-at-a-time mode"
+      (is (= [steering-msg-2] (vec (:steering-queue state')))))
+
+    (testing "appends error result, skipped tool results, and dequeued steering message"
+      (is (= [(dissoc tool-result-msg :timestamp)
+              {:role         :tool-result
+               :tool-call-id "tc-2"
+               :tool-name    "good_tool"
+               :content      [{:type :text :text "Skipped due to queued user message."}]
+               :is-error?    true}
+              {:role         :tool-result
+               :tool-call-id "tc-3"
+               :tool-name    "echo"
+               :content      [{:type :text :text "Skipped due to queued user message."}]
+               :is-error?    true}
+              steering-msg-1]
+             (mapv #(dissoc % :timestamp) (rest (:messages state'))))))))
 
 (deftest tool-executing-transition-tool-error-last-tool-test
   (let [tool-calls       [{:id "tc-1" :name "bad_tool" :arguments {}}]
