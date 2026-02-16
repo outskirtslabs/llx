@@ -54,17 +54,17 @@
 (deftest ^:llx/openai live-fx-call-llm-openai
   (util/async done
               (util/run-live-async!
-               (let [env    {:state_         (atom (agent-state models/openai-completions))
-                             :command>       (sp/chan)
-                             :events-mx>     (sp/mult :buf (sp/sliding-buffer 16))
+               (let [env    {:state_          (atom (agent-state models/openai-completions))
+                             :command>        (sp/chan)
+                             :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
                              :schema-registry (schema/registry {})
-                             :convert-to-llm identity
-                             :tools          {}
-                             :stream-fn      (fn [model context options]
-                                               (ai/stream (ai/default-env)
-                                                          model
-                                                          context
-                                                          (assoc options :max-tokens 64)))}
+                             :convert-to-llm  identity
+                             :tools           []
+                             :stream-fn       (fn [model context options]
+                                                (ai/stream (ai/default-env)
+                                                           model
+                                                           context
+                                                           (assoc options :max-tokens 64)))}
                      effect {::fx/type :call-llm
                              :messages [{:role      :user
                                          :content   "Reply with exactly: llx agent fx live ok"

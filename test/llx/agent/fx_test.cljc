@@ -69,7 +69,7 @@
           :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
           :schema-registry (schema/registry {})
           :convert-to-llm  identity
-          :tools           {}
+          :tools           []
           :abort-signal    nil}
          overrides))
 
@@ -88,10 +88,10 @@
    :input-schema [:map [:path :string]]})
 
 (defn- tool-env
-  [model tool-defs overrides]
+  [model tools overrides]
   (test-env
-   (base-state model [] :off (mapv :tool (vals tool-defs)))
-   (merge {:tools        tool-defs
+   (base-state model [] :off tools)
+   (merge {:tools        tools
            :abort-signal ::abort-signal}
           overrides)))
 
@@ -103,35 +103,31 @@
         missing-call       {:id "tc-1" :name "missing_tool" :arguments {:path "/tmp/input.txt"}}
         invalid-call       (tool-call {:path 123})
         success-env        (tool-env model
-                                     {"read_file"
-                                      {:tool    (tool-spec)
-                                       :execute (fn [tool-call-id args abort-signal on-update]
-                                                  (reset! success-seen* {:tool-call-id tool-call-id
-                                                                         :args         args
-                                                                         :abort-signal abort-signal})
-                                                  (p/let [_ (on-update {:progress 50})]
-                                                    {:content [{:type :text
-                                                                :text (str "read " (:path args))}]}))}}
+                                     [(assoc (tool-spec)
+                                             :execute (fn [tool-call-id args abort-signal on-update]
+                                                        (reset! success-seen* {:tool-call-id tool-call-id
+                                                                               :args         args
+                                                                               :abort-signal abort-signal})
+                                                        (p/let [_ (on-update {:progress 50})]
+                                                          {:content [{:type :text
+                                                                      :text (str "read " (:path args))}]})))]
                                      {})
-        missing-env        (tool-env model {} {})
+        missing-env        (tool-env model [] {})
         validation-env     (tool-env model
-                                     {"read_file"
-                                      {:tool    (tool-spec)
-                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
-                                                  (reset! validation-called* true)
-                                                  {:content [{:type :text :text "never"}]})}}
+                                     [(assoc (tool-spec)
+                                             :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                        (reset! validation-called* true)
+                                                        {:content [{:type :text :text "never"}]}))]
                                      {})
         throw-env          (tool-env model
-                                     {"read_file"
-                                      {:tool    (tool-spec)
-                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
-                                                  (throw (ex-info "read failed" {:type :test/tool-failed})))}}
+                                     [(assoc (tool-spec)
+                                             :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                        (throw (ex-info "read failed" {:type :test/tool-failed}))))]
                                      {})
         malformed-env      (tool-env model
-                                     {"read_file"
-                                      {:tool    (tool-spec)
-                                       :execute (fn [_tool-call-id _args _abort-signal _on-update]
-                                                  {:content "not-a-vector"})}}
+                                     [(assoc (tool-spec)
+                                             :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                        {:content "not-a-vector"}))]
                                      {})]
     (p/let [success-signals    (read-signals* (fx/execute-fx success-env {:llx.agent.fx/type :execute-tool
                                                                           :tool-call         success-call}))

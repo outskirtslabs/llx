@@ -4,6 +4,7 @@
    [llx.ai :as ai]
    [llx.ai.impl.schema :as ai.schema]
    [malli.core :as m]
+   [malli.util :as mu]
    [malli.error :as me]
    [malli.registry :as mr]
    [promesa.protocols :as pt]
@@ -164,7 +165,7 @@
      :llx.agent/command-set-tools
      [:map
       [:type [:= :llx.agent.command/set-tools]]
-      [:tools [:vector :llx/tool]]]
+      [:tools :llx/tools]]
 
      :llx.agent/command-set-steering-mode
      [:map
@@ -439,7 +440,7 @@
       [:convert-to-llm {:optional true} :llx/fn]
       [:transform-context {:optional true} :llx/fn]
       [:stream-fn {:optional true} :llx/fn]
-      [:tool-defs :llx.agent/tools]
+      [:tools :llx.agent/tools]
       [:schema-registry {:optional true} :llx.agent/schema-registry]
       [:custom-message-schemas {:optional true} :llx.agent/custom-message-schemas]
       [:session-id {:optional true} :llx/id-string]
@@ -449,18 +450,17 @@
       [:system-prompt {:optional true} :string]
       [:model {:optional true} :llx/model]
       [:thinking-level {:optional true} :llx.agent.loop/thinking-level]
-      [:tools {:optional true} [:vector :llx/tool]]
       [:steering-mode {:optional true} :llx.agent.loop/dequeue-mode]
       [:follow-up-mode {:optional true} :llx.agent.loop/dequeue-mode]
       [:abort-signal {:optional true} :any]]
 
-     :llx.agent/tool-def
-     [:map
-      [:tool :llx/tool]
-      [:execute :llx/fn]]
+     :llx.agent/tool
+     [:merge
+      :llx/tool
+      [:map  [:execute :llx/fn]]]
 
      :llx.agent/tools
-     [:map-of :string :llx.agent/tool-def]
+     [:vector :llx.agent/tool]
 
      :llx.agent/env
      [:map
@@ -493,7 +493,7 @@
       [:system-prompt {:default ""} :string]
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :llx/model]
       [:thinking-level {:default :off} :llx.agent.loop/thinking-level]
-      [:tools {:default []} [:vector :llx/tool]]
+      [:tools {:default []} :llx/tools]
       [:messages {:default []} :llx.agent/messages]
       [:stream-message {:default nil} [:maybe :llx.agent/message]]
       [:pending-tool-calls {:default []} [:vector :llx.agent/tool-call]]
@@ -513,9 +513,11 @@
 (defn registry
   [opts]
   (merge (m/default-schemas)
+         (mu/schemas)
          (custom-schemas opts)))
 
-(gr.reg/merge-schemas! (custom-schemas {}))
+(gr.reg/merge-schemas! (merge (mu/schemas)
+                              (custom-schemas {})))
 
 (defn validate!
   [schema-registry schema-id data]

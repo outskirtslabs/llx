@@ -218,7 +218,7 @@
    [:map
     [:messages :llx/context]
     [:system-prompt {:optional true} :string]
-    [:tools {:optional true} [:vector :llx/tool]]]
+    [:tools {:optional true} :llx/tools]]
 
    :llx/event-start
    [:map
@@ -302,6 +302,9 @@
     [:description :llx/id-string]
     [:input-schema [:fn schema-form?]]]
 
+   :llx/tools
+   [:vector :llx/tool]
+
    :llx/unified-request-options
    [:map
     [:max-tokens {:optional true} :llx/non-neg-int]
@@ -326,7 +329,7 @@
 
    :llx/provider-request-options
    [:map {:closed false}
-    [:tools {:optional true} [:vector :llx/tool]]
+    [:tools {:optional true} :llx/tools]
     [:tool-choice {:optional true} :any]
     [:reasoning {:optional true} :llx/provider-reasoning-options]
     [:cache-control {:optional true} :llx/cache-control]
@@ -344,7 +347,7 @@
 
    :llx/openai-completions-provider-options
    [:map {:closed false}
-    [:tools {:optional true} [:vector :llx/tool]]
+    [:tools {:optional true} :llx/tools]
     [:tool-choice {:optional true} [:or [:enum :auto :none :required] :llx/id-string]]
     [:reasoning {:optional true}
      [:map
@@ -363,7 +366,7 @@
 
    :llx/openai-responses-provider-options
    [:map {:closed false}
-    [:tools {:optional true} [:vector :llx/tool]]
+    [:tools {:optional true} :llx/tools]
     [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
     [:reasoning {:optional true}
      [:map
@@ -383,7 +386,7 @@
 
    :llx/anthropic-provider-options
    [:map {:closed false}
-    [:tools {:optional true} [:vector :llx/tool]]
+    [:tools {:optional true} :llx/tools]
     [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
     [:reasoning {:optional true}
      [:map
@@ -402,7 +405,7 @@
 
    :llx/google-provider-options
    [:map {:closed false}
-    [:tools {:optional true} [:vector :llx/tool]]
+    [:tools {:optional true} :llx/tools]
     [:tool-choice {:optional true} [:or [:enum :auto :none :any] :llx/id-string]]
     [:reasoning {:optional true}
      [:map

@@ -67,7 +67,7 @@
                 :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
                 :transform-context (:transform-context opts)
                 :stream-fn         (:stream-fn opts)
-                :tools             (:tool-defs opts)
+                :tools             (:tools opts)
                 :abort-signal      (:abort-signal opts)}
                optional-env)
               default-transformer
@@ -77,7 +77,7 @@
        "Creates an agent runtime handle.
 
    Required options:
-   - `:tool-defs`         map of tool name -> tool def (with `:execute`)
+   - `:tools`             vector of tools
 
    `opts` may include:
    - `:convert-to-llm`    `(fn [messages])`; defaults to filtering
@@ -88,7 +88,7 @@
    - `:schema-registry`   extra Malli registry to be composed with the built-in schemas
    - `:custom-message-schemas` map of message dispatch keyword to schema keyword in the active registry
    - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
-   - `:system-prompt`, `:model`, `:thinking-level`, `:tools`
+   - `:system-prompt`, `:model`, `:thinking-level`
    - `:steering-mode`, `:follow-up-mode`
    - `:abort-signal`
 
@@ -98,10 +98,12 @@
         (create-agent {}))
        ([opts]
         [:llx.agent/create-agent-opts => :llx.agent/env]
-        (let [schema-registry (agent-schema-registry opts)]
+        (let [schema-registry (agent-schema-registry opts)
+              opts'           (->> opts
+                                   (schema/validate! schema-registry :llx.agent/create-agent-opts))]
           (runtime-handle schema-registry
-                          (create-initial-state schema-registry opts)
-                          opts))))
+                          (create-initial-state schema-registry opts')
+                          opts'))))
 
 (defn rehydrate-agent
   "Creates an agent runtime from a previously persisted state snapshot.
@@ -114,11 +116,14 @@
    - `:schema-registry` (optional; see [[create-agent]])
    - `:custom-message-schemas` (optional; see [[create-agent]])
    - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
-  - `:tool-defs`
+  - `:tools`
   - `:abort-signal`."
   [state opts]
   (let [schema-registry (agent-schema-registry opts)]
-    (runtime-handle schema-registry state opts)))
+    (runtime-handle schema-registry
+                    state
+                    (->> opts
+                         (schema/validate! schema-registry :llx.agent/create-agent-opts)))))
 
 (defn state
   "Returns the current agent state snapshot."

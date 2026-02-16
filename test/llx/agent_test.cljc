@@ -22,7 +22,7 @@
    :transform-context identity
    :stream-fn         (fn [_model _context _opts]
                         (closed-channel))
-   :tool-defs         {}})
+   :tools             []})
 
 (defn- read-file-tool
   []
@@ -57,22 +57,22 @@
 (deftest create-agent-initializes-state-test
   (let [model         (ai/get-model :openai "gpt-4o")
         tool          (read-file-tool)
+        runtime-tool  (assoc tool :execute identity)
         agent         (sut/create-agent (merge required-env-opts
                                                {:system-prompt  "System prompt"
                                                 :model          model
                                                 :thinking-level :high
-                                                :tools          [tool]
+                                                :tools          [runtime-tool]
                                                 :steering-mode  :all
                                                 :follow-up-mode :all}))
         derived-agent (sut/create-agent
                        (merge required-env-opts
-                              {:tool-defs {"read_file" {:tool    tool
-                                                        :execute identity}}}))
+                              {:tools [runtime-tool]}))
         state         (sut/state agent)]
     (is (= {:system-prompt  "System prompt"
             :model          model
             :thinking-level :high
-            :tools          [tool]
+            :tools          [runtime-tool]
             :messages       []
             :steering-mode  :all
             :follow-up-mode :all}
@@ -84,7 +84,7 @@
                          :messages
                          :steering-mode
                          :follow-up-mode])))
-    (is (= {:tools    [tool]
+    (is (= {:tools    [runtime-tool]
             :messages []}
            (select-keys (sut/state derived-agent) [:tools :messages])))))
 
@@ -96,14 +96,12 @@
                   :cljs js/Error)
                (sut/create-agent
                 (merge required-env-opts
-                       {:tool-defs {"read_file" {:execute identity}}}))))
+                       {:tools [{:execute identity}]}))))
   (is (thrown? #?(:clj clojure.lang.ExceptionInfo
                   :cljs js/Error)
                (sut/create-agent
                 (merge required-env-opts
-                       {:tool-defs {"read_file" {:tool    (read-file-tool)
-                                                 :execute identity}}
-                        :tools     [{:name "read_file"}]})))))
+                       {:tools [{:name "read_file"}]})))))
 
 (deftest create-agent-ignores-initial-state-option-test
   (let [agent (sut/create-agent (assoc required-env-opts
@@ -444,10 +442,9 @@
    :is-error?    false
    :timestamp    1})
 
-(defn- tool-schema-valid-tool-def
+(defn- tool-schema-valid-runtime-tool
   []
-  {:tool    (tool-schema-valid-tool)
-   :execute identity})
+  (assoc (tool-schema-valid-tool) :execute identity))
 
 (defn- tool-schema-valid-loop-state
   []
@@ -488,8 +485,7 @@
                               :tools [tool]}
         invalid-set-tools    {:type  :llx.agent.command/set-tools
                               :tools [{:name "read_file"}]}
-        valid-create-agent   {:tool-defs {"read_file" (tool-schema-valid-tool-def)}
-                              :tools     [tool]}
+        valid-create-agent   {:tools [(tool-schema-valid-runtime-tool)]}
         invalid-create-agent (assoc valid-create-agent :tools [{:name "read_file"}])
         loop-state           (tool-schema-valid-loop-state)
         invalid-loop-state   (assoc loop-state :tools [{:name "read_file"}])]
@@ -499,7 +495,7 @@
       (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry
                                                                 :llx.agent/command-set-tools
                                                                 invalid-set-tools))))
-    (testing ":llx.agent/create-agent-opts expects :llx/tool entries in :tools"
+    (testing ":llx.agent/create-agent-opts expects :llx.agent/tool entries in :tools"
       (is (= valid-create-agent
              (agent.schema/validate! schema-registry :llx.agent/create-agent-opts valid-create-agent)))
       (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry
@@ -524,17 +520,17 @@
                                                               :llx.agent.fx/effect-execute-tool
                                                               invalid-effect)))))
 
-(deftest tool-def-and-pending-tool-call-schema-test
+(deftest tool-and-pending-tool-call-schema-test
   (let [schema-registry       (agent.schema/registry {})
-        tool-def              (tool-schema-valid-tool-def)
-        invalid-tool-def      {:execute identity}
+        tool                  (tool-schema-valid-runtime-tool)
+        invalid-tool          {:execute identity}
         loop-state            (tool-schema-valid-loop-state)
         invalid-pending-calls (assoc loop-state
                                      :pending-tool-calls
                                      [{:id "tc-1" :name "read_file"}])]
-    (is (= tool-def
-           (agent.schema/validate! schema-registry :llx.agent/tool-def tool-def)))
-    (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry :llx.agent/tool-def invalid-tool-def)))
+    (is (= tool
+           (agent.schema/validate! schema-registry :llx.agent/tool tool)))
+    (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry :llx.agent/tool invalid-tool)))
     (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry
                                                               :llx.agent.loop/state
                                                               invalid-pending-calls)))))

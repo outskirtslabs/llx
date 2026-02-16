@@ -10,13 +10,12 @@
   #?(:clj (System/currentTimeMillis)
      :cljs (.now js/Date)))
 
-(defn- resolve-tool-def
+(defn- resolve-tool
   [tools tool-name]
-  (or (get tools tool-name)
-      (some (fn [[_ tool-def]]
-              (when (= tool-name (get-in tool-def [:tool :name]))
-                tool-def))
-            tools)))
+  (some (fn [tool]
+          (when (= tool-name (:name tool))
+            tool))
+        tools))
 
 (defn- ensure-tool-result-content
   [tool-call result]
@@ -57,15 +56,15 @@
   [{:keys [tools abort-signal schema-registry]} effect]
   (let [out       (sp/chan)
         tool-call (:tool-call effect)]
-    (-> (p/let [tool-specs     (mapv :tool (vals tools))
+    (-> (p/let [tool-specs     tools
                 validated-args (ai/validate-tool-call tool-specs tool-call)
                 tool-name      (:name tool-call)
-                tool-def       (or (resolve-tool-def tools tool-name)
+                tool           (or (resolve-tool tools tool-name)
                                    (throw
-                                    (ex-info "Tool definition not found in runtime registry"
+                                    (ex-info "Tool not found in runtime registry"
                                              {:type      :llx/tool-not-found
                                               :tool-name tool-name})))
-                execute-fn     (:execute tool-def)
+                execute-fn     (:execute tool)
                 on-update      (fn [partial-result]
                                  (sp/put out {:type           :llx.agent.signal/tool-update
                                               :tool-call-id   (:id tool-call)

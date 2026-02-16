@@ -39,22 +39,17 @@
   (deref worker 1000 nil)
   nil)
 
-(defn- read-file-tool
-  []
+(def read-file-tool
   {:name         "read_file"
    :description  "Read a UTF-8 file from disk and return its contents."
    :input-schema [:map
                   [:path
                    {:description "Absolute or relative file path to read."}
-                   :string]]})
-
-(defn- read-file-tool-def
-  []
-  (assoc (read-file-tool)
-         :execute (fn [_tool-call-id {:keys [path]} _abort-signal on-update]
-                    (on-update {:stage :reading :path path})
-                    {:content [{:type :text
-                                :text (slurp path)}]})))
+                   :string]]
+   :execute      (fn [_tool-call-id {:keys [path]} _abort-signal on-update]
+                   (on-update {:stage :reading :path path})
+                   {:content [{:type :text
+                               :text (slurp path)}]})})
 
 (comment
   ;; Evaluate in REPL:
@@ -70,13 +65,11 @@
   (spit "tmp/llx-agent-demo-input.txt"
         "The build succeeded.\nThe next step is to ship it.\n")
 
-  ;; Register tool for runtime execution and model-visible tool schema list.
-  (def read-file-def (read-file-tool-def))
-  (def opts {:tool-defs      {"read_file" read-file-def}
+  ;; Register runtime tools.
+  (def opts {:tools          [read-file-tool]
              :system-prompt  "Use tools when needed and keep answers concise."
              :model          (ai/get-model :openai "gpt-5.2-codex")
-             :thinking-level :medium
-             :tools          [read-file-def]})
+             :thinking-level :medium})
 
   (def runtime (agent/create-agent opts))
   (def forwarder (start-event-forwarder! runtime))
