@@ -67,7 +67,6 @@
                 :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
                 :transform-context (:transform-context opts)
                 :stream-fn         (:stream-fn opts)
-                :tools             (:tools opts)
                 :abort-signal      (:abort-signal opts)}
                optional-env)
               default-transformer

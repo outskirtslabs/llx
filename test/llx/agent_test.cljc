@@ -24,8 +24,7 @@
                         (closed-channel))
    :tools             []})
 
-(defn- read-file-tool
-  []
+(def read-file-tool
   {:name         "read_file"
    :description  "Read a file from disk"
    :input-schema [:map [:path :string]]})
@@ -56,8 +55,7 @@
 
 (deftest create-agent-initializes-state-test
   (let [model         (ai/get-model :openai "gpt-4o")
-        tool          (read-file-tool)
-        runtime-tool  (assoc tool :execute identity)
+        runtime-tool  (assoc read-file-tool :execute identity)
         agent         (sut/create-agent (merge required-env-opts
                                                {:system-prompt  "System prompt"
                                                 :model          model
@@ -176,11 +174,12 @@
 
 (deftest rehydrate-agent-uses-snapshot-test
   (let [model (ai/get-model :openai "gpt-4o")
+        tool  (assoc read-file-tool :execute identity)
         state {:llx.agent.loop/phase :llx.agent.loop/idle
                :system-prompt        "Hydrated"
                :model                model
                :thinking-level       :medium
-               :tools                [(read-file-tool)]
+               :tools                [tool]
                :messages             [{:role :user :content "old" :timestamp 1}]
                :stream-message       nil
                :pending-tool-calls   []
@@ -452,7 +451,7 @@
    :system-prompt        ""
    :model                (ai/get-model :openai "gpt-5.2-codex")
    :thinking-level       :off
-   :tools                [(tool-schema-valid-tool)]
+   :tools                [(tool-schema-valid-runtime-tool)]
    :messages             []
    :stream-message       nil
    :pending-tool-calls   [(tool-schema-valid-tool-call)]
@@ -480,7 +479,7 @@
 
 (deftest tool-schema-tightening-on-commands-and-state-test
   (let [schema-registry      (agent.schema/registry {})
-        tool                 (tool-schema-valid-tool)
+        tool                 (tool-schema-valid-runtime-tool)
         set-tools-command    {:type  :llx.agent.command/set-tools
                               :tools [tool]}
         invalid-set-tools    {:type  :llx.agent.command/set-tools
@@ -489,7 +488,7 @@
         invalid-create-agent (assoc valid-create-agent :tools [{:name "read_file"}])
         loop-state           (tool-schema-valid-loop-state)
         invalid-loop-state   (assoc loop-state :tools [{:name "read_file"}])]
-    (testing ":llx.agent/command-set-tools expects :llx/tool entries"
+    (testing ":llx.agent/command-set-tools expects :llx.agent/tool entries"
       (is (= set-tools-command
              (agent.schema/validate! schema-registry :llx.agent/command-set-tools set-tools-command)))
       (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry
@@ -501,7 +500,7 @@
       (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry
                                                                 :llx.agent/create-agent-opts
                                                                 invalid-create-agent))))
-    (testing ":llx.agent.loop/state expects :llx/tool entries in :tools"
+    (testing ":llx.agent.loop/state expects :llx.agent/tool entries in :tools"
       (is (= loop-state
              (agent.schema/validate! schema-registry :llx.agent.loop/state loop-state)))
       (is (tool-schema-ex-info-thrown? #(agent.schema/validate! schema-registry

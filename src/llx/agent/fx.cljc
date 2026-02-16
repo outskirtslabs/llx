@@ -52,7 +52,6 @@
      - `:convert-to-llm`    — `(fn [messages])` transform to LLM messages
      - `:transform-context`  — `(fn [messages abort-signal])` optional context pruning
      - `:stream-fn`          — `(fn [model context opts])` LLM streaming fn
-     - `:tools`              — vector of tools
      - `:abort-signal`       — abort token for cancellation"
        [env effect]
        [:llx.agent/env ::effect => ::result]

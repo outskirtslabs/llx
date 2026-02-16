@@ -69,7 +69,6 @@
           :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
           :schema-registry (schema/registry {})
           :convert-to-llm  identity
-          :tools           []
           :abort-signal    nil}
          overrides))
 
@@ -91,8 +90,7 @@
   [model tools overrides]
   (test-env
    (base-state model [] :off tools)
-   (merge {:tools        tools
-           :abort-signal ::abort-signal}
+   (merge {:abort-signal ::abort-signal}
           overrides)))
 
 (defn- execute-tool-behaviors*
@@ -128,7 +126,18 @@
                                      [(assoc (tool-spec)
                                              :execute (fn [_tool-call-id _args _abort-signal _on-update]
                                                         {:content "not-a-vector"}))]
-                                     {})]
+                                     {})
+        stale-env-tools    (test-env
+                            (base-state model
+                                        []
+                                        :off
+                                        [(assoc (tool-spec)
+                                                :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                           {:content [{:type :text :text "from state"}]}))])
+                            {:tools        [(assoc (tool-spec)
+                                                   :execute (fn [_tool-call-id _args _abort-signal _on-update]
+                                                              {:content [{:type :text :text "from env"}]}))]
+                             :abort-signal ::abort-signal})]
     (p/let [success-signals    (read-signals* (fx/execute-fx success-env {:llx.agent.fx/type :execute-tool
                                                                           :tool-call         success-call}))
             missing-signals    (read-signals* (fx/execute-fx missing-env {:llx.agent.fx/type :execute-tool
@@ -138,14 +147,17 @@
             throw-signals      (read-signals* (fx/execute-fx throw-env {:llx.agent.fx/type :execute-tool
                                                                         :tool-call         success-call}))
             malformed-signals  (read-signals* (fx/execute-fx malformed-env {:llx.agent.fx/type :execute-tool
-                                                                            :tool-call         success-call}))]
+                                                                            :tool-call         success-call}))
+            stale-env-signals  (read-signals* (fx/execute-fx stale-env-tools {:llx.agent.fx/type :execute-tool
+                                                                              :tool-call         success-call}))]
       {:success-seen       @success-seen*
        :validation-called? @validation-called*
        :success-signals    success-signals
        :missing-signals    missing-signals
        :validation-signals validation-signals
        :throw-signals      throw-signals
-       :malformed-signals  malformed-signals})))
+       :malformed-signals  malformed-signals
+       :stale-env-signals  stale-env-signals})))
 
 (defn- assert-execute-tool-behaviors!
   [{:keys [success-seen
@@ -154,12 +166,14 @@
            missing-signals
            validation-signals
            throw-signals
-           malformed-signals]}]
+           malformed-signals
+           stale-env-signals]}]
   (is (not (util/timeout-result? success-signals)))
   (is (not (util/timeout-result? missing-signals)))
   (is (not (util/timeout-result? validation-signals)))
   (is (not (util/timeout-result? throw-signals)))
   (is (not (util/timeout-result? malformed-signals)))
+  (is (not (util/timeout-result? stale-env-signals)))
 
   (is (= [:llx.agent.signal/tool-update
           :llx.agent.signal/tool-result]
@@ -204,7 +218,11 @@
   (is (= [:llx.agent.signal/tool-error] (mapv :type malformed-signals)))
   (is (= :llx/invalid-tool-result
          (-> malformed-signals first :error ex-data :type)))
-  (is (true? (-> malformed-signals first :tool-result-message :is-error?))))
+  (is (true? (-> malformed-signals first :tool-result-message :is-error?)))
+
+  (is (= [:llx.agent.signal/tool-result] (mapv :type stale-env-signals)))
+  (is (= "from state"
+         (get-in stale-env-signals [0 :tool-result-message :content 0 :text]))))
 
 (deftest fx-call-llm-runs-hooks-and-maps-events-test
   #?(:clj

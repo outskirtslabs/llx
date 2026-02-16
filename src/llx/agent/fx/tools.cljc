@@ -53,11 +53,11 @@
                      :timestamp    (now-ms)}))
 
 (defn fx-execute-tool
-  [{:keys [tools abort-signal schema-registry]} effect]
+  [{:keys [state_ abort-signal schema-registry]} effect]
   (let [out       (sp/chan)
         tool-call (:tool-call effect)]
-    (-> (p/let [tool-specs     tools
-                validated-args (ai/validate-tool-call tool-specs tool-call)
+    (-> (p/let [tools          (:tools @state_)
+                validated-args (ai/validate-tool-call tools tool-call)
                 tool-name      (:name tool-call)
                 tool           (or (resolve-tool tools tool-name)
                                    (throw

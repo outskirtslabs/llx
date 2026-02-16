@@ -165,7 +165,7 @@
      :llx.agent/command-set-tools
      [:map
       [:type [:= :llx.agent.command/set-tools]]
-      [:tools :llx/tools]]
+      [:tools :llx.agent/tools]]
 
      :llx.agent/command-set-steering-mode
      [:map
@@ -475,7 +475,6 @@
       [:get-api-key {:optional true} [:maybe :llx/fn]]
       [:thinking-budgets {:optional true} :llx.agent/thinking-budgets]
       [:max-retry-delay-ms {:optional true} :llx/non-neg-int]
-      [:tools :llx.agent/tools]
       [:abort-signal {:optional true} :any]]
 
      :llx.agent.loop/phase
@@ -493,7 +492,7 @@
       [:system-prompt {:default ""} :string]
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :llx/model]
       [:thinking-level {:default :off} :llx.agent.loop/thinking-level]
-      [:tools {:default []} :llx/tools]
+      [:tools {:default []} :llx.agent/tools]
       [:messages {:default []} :llx.agent/messages]
       [:stream-message {:default nil} [:maybe :llx.agent/message]]
       [:pending-tool-calls {:default []} [:vector :llx.agent/tool-call]]
