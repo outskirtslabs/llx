@@ -4,6 +4,7 @@
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [llx.ai.impl.adapters.anthropic-messages :as anthropic-messages]
    [llx.ai.impl.adapters.google-generative-ai :as google-generative-ai]
+   [llx.ai.impl.adapters.openai-codex-responses :as openai-codex-responses]
    [llx.ai.impl.adapters.openai-completions :as openai-completions]
    [llx.ai.impl.adapters.openai-responses :as openai-responses]
    [llx.ai.impl.errors :as errors]
@@ -26,6 +27,9 @@
        builtins-source-id)
       (registry/register-adapter
        (openai-responses/adapter)
+       builtins-source-id)
+      (registry/register-adapter
+       (openai-codex-responses/adapter)
        builtins-source-id)
       (registry/register-adapter
        (anthropic-messages/adapter)
@@ -77,7 +81,7 @@
         reasoning-level (when reasoning-level
                           (clamp-reasoning-level model reasoning-level))]
     (when reasoning-level
-      (if (= :openai-responses (:api model))
+      (if (#{:openai-responses :openai-codex-responses} (:api model))
         {:effort reasoning-level}
         {:level reasoning-level}))))
 
@@ -103,7 +107,8 @@
 
 (defn- assert-reasoning-level!
   [model opts]
-  (when (= :xhigh (get-in opts [:reasoning :level]))
+  (when (= :xhigh (or (get-in opts [:reasoning :level])
+                      (get-in opts [:reasoning :effort])))
     (when-not (models/supports-xhigh? model)
       (throw (errors/unsupported-reasoning-level (:id model) :xhigh)))))
 
@@ -143,6 +148,7 @@
   (let [host (str/lower-case (str (or host "")))]
     (cond
       (str/blank? host) "unknown"
+      (str/includes? host "chatgpt.com") "openai-codex"
       (str/includes? host "openai.com") "openai"
       (str/includes? host "anthropic.com") "anthropic"
       (str/includes? host "googleapis.com") "google"

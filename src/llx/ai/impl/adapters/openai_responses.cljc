@@ -57,7 +57,7 @@
     (throw (ex-info "Unknown OpenAI responses stop reason" {:status status}))))
 
 (def ^:private allowed-tool-call-id-providers
-  #{:openai})
+  #{:openai :openai-codex})
 
 (defn- sanitize-and-limit-id
   [s]

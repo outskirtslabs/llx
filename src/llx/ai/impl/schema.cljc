@@ -43,10 +43,10 @@
    [:fn non-negative-number?]
 
    :llx/provider
-   [:enum :openai :anthropic :google :mistral :openai-compatible]
+   [:enum :openai :openai-codex :anthropic :google :mistral :openai-compatible]
 
    :llx/api
-   [:enum :openai-responses :openai-completions :anthropic-messages :google-generative-ai]
+   [:enum :openai-responses :openai-codex-responses :openai-completions :anthropic-messages :google-generative-ai]
 
    :llx/role
    [:enum :user :assistant :tool-result]
@@ -305,6 +305,55 @@
    :llx/tools
    [:vector :llx/tool]
 
+   :llx/oauth-provider-id
+   :llx/id-string
+
+   :llx/oauth-credentials
+   [:map {:closed false}
+    [:refresh :llx/id-string]
+    [:access :llx/id-string]
+    [:expires :llx/non-neg-int]]
+
+   :llx/oauth-credentials-by-provider
+   [:map-of :llx/oauth-provider-id :llx/oauth-credentials]
+
+   :llx/oauth-provider
+   [:map {:closed false}
+    [:id :llx/oauth-provider-id]
+    [:name :llx/id-string]
+    [:login :llx/fn]
+    [:refresh-token :llx/fn]
+    [:get-api-key :llx/fn]
+    [:uses-callback-server? {:optional true} :boolean]
+    [:modify-models {:optional true} :llx/fn]]
+
+   :llx/oauth-auth-info
+   [:map
+    [:url :llx/id-string]
+    [:instructions {:optional true} :string]]
+
+   :llx/oauth-prompt
+   [:map
+    [:message :llx/id-string]
+    [:placeholder {:optional true} :string]
+    [:allow-empty? {:optional true} :boolean]]
+
+   :llx/oauth-login-callbacks
+   [:map {:closed false}
+    [:on-auth {:optional true} :llx/fn]
+    [:on-prompt {:optional true} :llx/fn]
+    [:on-progress {:optional true} :llx/fn]
+    [:on-manual-code-input {:optional true} :llx/fn]
+    [:signal {:optional true} :any]]
+
+   :llx/oauth-login-hooks
+   [:map {:closed false}
+    [:create-authorization-flow :llx/fn]
+    [:start-local-oauth-server :llx/fn]
+    [:exchange-authorization-code :llx/fn]
+    [:account-id-from-access-token :llx/fn]
+    [:redirect-uri {:optional true} :llx/id-string]]
+
    :llx/unified-request-options
    [:map
     [:max-tokens {:optional true} :llx/non-neg-int]
@@ -384,6 +433,27 @@
     [:registry {:optional true} :any]
     [:max-retries {:optional true} :llx/non-neg-int]]
 
+   :llx/openai-codex-responses-provider-options
+   [:map {:closed false}
+    [:tools {:optional true} :llx/tools]
+    [:tool-choice {:optional true} [:or [:enum :auto :none] :llx/id-string]]
+    [:reasoning {:optional true}
+     [:map
+      [:effort {:optional true} :llx/reasoning-level]
+      [:summary {:optional true} [:or [:enum :auto :detailed :concise :none] :nil]]]]
+    [:cache-control {:optional true} :llx/cache-control]
+    [:session-id {:optional true} :llx/id-string]
+    [:api-key {:optional true} :llx/id-string]
+    [:originator {:optional true} :llx/id-string]
+    [:headers {:optional true} [:map-of :string :string]]
+    [:temperature {:optional true} :llx/non-neg-number]
+    [:top-p {:optional true} :llx/non-neg-number]
+    [:max-output-tokens {:optional true} :llx/non-neg-int]
+    [:signal {:optional true} :any]
+    [:metadata {:optional true} :llx/metadata-map]
+    [:registry {:optional true} :any]
+    [:max-retries {:optional true} :llx/non-neg-int]]
+
    :llx/anthropic-provider-options
    [:map {:closed false}
     [:tools {:optional true} :llx/tools]
@@ -435,6 +505,7 @@
    :llx/providers-config
    [:map
     [:openai {:optional true} :llx/provider-config]
+    [:openai-codex {:optional true} :llx/provider-config]
     [:anthropic {:optional true} :llx/provider-config]
     [:google {:optional true} :llx/provider-config]
     [:mistral {:optional true} :llx/provider-config]

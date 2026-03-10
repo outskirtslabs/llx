@@ -76,6 +76,14 @@
           :task (do (clojure* "-M:dev" "-m" "llx.ai.impl.model-catalog.generate")
                     (shell "cljfmt --quiet fix src/llx/ai/impl/models_generated.cljc"))}
 
+         oauth:providers
+         {:doc  "List available OAuth providers"
+          :task (clojure* "-M:dev" "-m" "llx.ai.oauth.cli" "providers")}
+
+         oauth:login
+         {:doc  "Run OAuth login flow for a provider id"
+          :task (apply clojure* "-M:dev" "-m" "llx.ai.oauth.cli" "login" *command-line-args*)}
+
          fmt
          {:doc  "Format code with cljfmt"
           :task (apply shell "cljfmt --quiet -v fix" (if (seq *command-line-args*) *command-line-args* paths))}

@@ -209,6 +209,7 @@
                          :anthropic         {:api-key "k2"}
                          :google            {:api-key "k3"}
                          :mistral           {:api-key "k4"}
+                         :openai-codex      {:api-key "k6"}
                          :openai-compatible {:api-key  "k5"
                                              :base-url "http://localhost:11434/v1"}}
              :models    [valid-model]}]
@@ -218,6 +219,35 @@
     (testing "accepts unknown provider keys"
       (is (sut/valid? :llx/library-config
                       (assoc-in cfg [:providers :bogus] {:api-key "x"}))))))
+
+(deftest oauth-schema-contracts
+  (let [valid-credentials {:access     "access-token"
+                           :refresh    "refresh-token"
+                           :expires    2000
+                           :account-id "acc_1"}
+        provider          {:id                    "openai-codex"
+                           :name                  "OpenAI Codex"
+                           :login                 (fn [_callbacks] nil)
+                           :refresh-token         (fn [credentials] credentials)
+                           :get-api-key           (fn [credentials] (:access credentials))
+                           :uses-callback-server? true}]
+    (testing "accepts OpenAI Codex provider and API enum values"
+      (is (sut/valid? :llx/provider :openai-codex))
+      (is (sut/valid? :llx/api :openai-codex-responses)))
+
+    (testing "accepts oauth credential and provider contracts"
+      (is (sut/valid? :llx/oauth-credentials valid-credentials))
+      (is (sut/valid? :llx/oauth-provider provider)))
+
+    (testing "rejects oauth credential map missing required keys"
+      (is (not (sut/valid? :llx/oauth-credentials (dissoc valid-credentials :refresh))))
+      (is (not (sut/valid? :llx/oauth-credentials (dissoc valid-credentials :access))))
+      (is (not (sut/valid? :llx/oauth-credentials (dissoc valid-credentials :expires)))))
+
+    (testing "rejects oauth provider missing required function slots"
+      (is (not (sut/valid? :llx/oauth-provider (dissoc provider :login))))
+      (is (not (sut/valid? :llx/oauth-provider (dissoc provider :refresh-token))))
+      (is (not (sut/valid? :llx/oauth-provider (dissoc provider :get-api-key)))))))
 
 (deftest adapter-and-env-schema
   (testing "accepts valid adapter and runtime env"

@@ -18,7 +18,8 @@
           (is (schema/valid? :llx/model model))
           (is (= model (models/get-model provider (:id model)))))))
     (is (nil? (models/get-model :openai "__definitely_missing__")))
-    (is (nil? (models/get-model :openai-compatible "llama3.2")))))
+    (is (nil? (models/get-model :openai-compatible "llama3.2")))
+    (is (some? (models/get-model :openai-codex "gpt-5.2-codex")))))
 
 (deftest model-utility-functions
   (testing "calculate-cost"
