@@ -100,7 +100,13 @@
               {:type "text" :text text}))
     :thinking (let [thinking  (:thinking block)
                     signature (:signature block)]
-                (when (and (string? thinking) (not (str/blank? thinking)))
+                (cond
+                  (and (:redacted block)
+                       (string? signature)
+                       (not (str/blank? signature)))
+                  {:type "redacted_thinking" :data signature}
+
+                  (and (string? thinking) (not (str/blank? thinking)))
                   (if (and (string? signature) (not (str/blank? signature)))
                     {:type "thinking" :thinking thinking :signature signature}
                     {:type "text" :text thinking})))
@@ -154,16 +160,21 @@
 (defn- supports-adaptive-thinking?
   [model-id]
   (or (str/includes? (or model-id "") "opus-4-6")
-      (str/includes? (or model-id "") "opus-4.6")))
+      (str/includes? (or model-id "") "opus-4.6")
+      (str/includes? (or model-id "") "sonnet-4-6")
+      (str/includes? (or model-id "") "sonnet-4.6")))
 
 (defn- map-reasoning-level->effort
-  [level]
+  [level model-id]
   (case level
     :minimal "low"
     :low     "low"
     :medium  "medium"
     :high    "high"
-    :xhigh   "max"
+    :xhigh   (if (or (str/includes? (or model-id "") "opus-4-6")
+                     (str/includes? (or model-id "") "opus-4.6"))
+               "max"
+               "high")
     "high"))
 
 (defn- adjust-max-tokens-for-thinking
@@ -219,7 +230,9 @@
                                  (seq (:system-prompt context))
                                  (assoc :system [{:type "text" :text (:system-prompt context)}])
 
-                                 (contains? opts :temperature)
+                                 (and (contains? opts :temperature)
+                                      (not adaptive?)
+                                      (not budget?))
                                  (assoc :temperature (:temperature opts))
 
                                  (seq (:tools context))
@@ -235,7 +248,7 @@
 
                                  adaptive?
                                  (assoc :thinking {:type "adaptive"}
-                                        :output_config {:effort (map-reasoning-level->effort reasoning-level)})
+                                        :output_config {:effort (map-reasoning-level->effort reasoning-level (:id model))})
 
                                  budget?
                                  (assoc :thinking {:type          "enabled"
@@ -281,6 +294,10 @@
                 "text" {:type :text :text (:text block)}
                 "thinking" (cond-> {:type :thinking :thinking (:thinking block)}
                              (seq (:signature block)) (assoc :signature (:signature block)))
+                "redacted_thinking" {:type      :thinking
+                                     :thinking  "[Reasoning redacted]"
+                                     :signature (:data block)
+                                     :redacted  true}
                 "tool_use" {:type      :tool-call
                             :id        (:id block)
                             :name      (:name block)
@@ -367,6 +384,16 @@
                "thinking"
                (let [{next-state :state content-index :content-index}
                      (append-content-block state {:type :thinking :thinking ""})]
+                 {:state  (assoc-in next-state [:stream-blocks index]
+                                    {:kind :thinking :content-index content-index})
+                  :events [{:type :thinking-start}]})
+
+               "redacted_thinking"
+               (let [{next-state :state content-index :content-index}
+                     (append-content-block state {:type      :thinking
+                                                  :thinking  "[Reasoning redacted]"
+                                                  :signature (:data block)
+                                                  :redacted  true})]
                  {:state  (assoc-in next-state [:stream-blocks index]
                                     {:kind :thinking :content-index content-index})
                   :events [{:type :thinking-start}]})

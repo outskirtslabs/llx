@@ -134,6 +134,7 @@
    [:map
     [:type [:= :thinking]]
     [:thinking :string]
+    [:redacted {:optional true} :boolean]
     [:signature {:optional true} :string]]
 
    :llx/content-image

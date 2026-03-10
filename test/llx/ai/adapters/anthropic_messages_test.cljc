@@ -158,6 +158,17 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? true :input #{:text :image}}})
 
+(def anthropic-sonnet-46-model
+  {:id             "claude-sonnet-4-6-20251001"
+   :name           "Claude Sonnet 4.6"
+   :provider       :anthropic
+   :api            :anthropic-messages
+   :base-url       "https://api.anthropic.com"
+   :context-window 200000
+   :max-tokens     64000
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? true :input #{:text :image}}})
+
 (deftest build-request-enables-adaptive-thinking-for-opus-4-6
   (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
         request (sut/build-request (stub-env) anthropic-opus-model context
@@ -169,6 +180,27 @@
             :model         "claude-opus-4-6-20250801"
             :stream        false}
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-enables-adaptive-thinking-for-sonnet-4-6
+  (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-sonnet-46-model context
+                                   {:api-key "k" :reasoning {:level :medium}} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= {:thinking      {:type "adaptive"}
+            :output_config {:effort "medium"}
+            :max_tokens    21333
+            :model         "claude-sonnet-4-6-20251001"
+            :stream        false}
+           (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-clamps-sonnet-4-6-xhigh-to-high
+  (let [context {:messages [{:role :user :content "think harder" :timestamp 1}]}
+        request (sut/build-request (stub-env) anthropic-sonnet-46-model context
+                                   {:api-key "k" :reasoning {:level :xhigh}} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= {:thinking      {:type "adaptive"}
+            :output_config {:effort "high"}}
+           (select-keys payload [:thinking :output_config])))))
 
 (deftest build-request-enables-budget-thinking-for-older-reasoning-model
   (let [context {:messages [{:role :user :content "think about this" :timestamp 1}]}
@@ -193,6 +225,23 @@
             :model      "claude-sonnet-4-5"
             :stream     false}
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
+
+(deftest build-request-omits-temperature-when-thinking-is-enabled
+  (let [context          {:messages [{:role :user :content "think about this" :timestamp 1}]}
+        adaptive-payload (-> (sut/build-request (stub-env) anthropic-sonnet-46-model context
+                                                {:api-key     "k"
+                                                 :temperature 0.25
+                                                 :reasoning   {:level :medium}} false)
+                             :body
+                             (util/json-read {:key-fn keyword}))
+        budget-payload   (-> (sut/build-request (stub-env) anthropic-model context
+                                                {:api-key     "k"
+                                                 :temperature 0.25
+                                                 :reasoning   {:level :medium}} false)
+                             :body
+                             (util/json-read {:key-fn keyword}))]
+    (is (nil? (:temperature adaptive-payload)))
+    (is (nil? (:temperature budget-payload)))))
 
 (deftest build-request-omits-thinking-when-no-reasoning-opts
   (let [context {:messages [{:role :user :content "just chat" :timestamp 1}]}
@@ -246,6 +295,52 @@
            (get-in finalize-result [:assistant-message :content 2 :arguments])))
     (is (= :tool-use
            (get-in finalize-result [:assistant-message :stop-reason])))))
+
+(deftest decode-event-redacted-thinking-round-trips-to-canonical-content
+  (let [env       (stub-env)
+        init      {:model anthropic-sonnet-46-model}
+        start-out (sut/decode-event env init
+                                    (util/json-write {:type          "content_block_start"
+                                                      :index         0
+                                                      :content_block {:type "redacted_thinking"
+                                                                      :data "opaque-redacted-payload"}}))
+        stop-out  (sut/decode-event env (:state start-out)
+                                    (util/json-write {:type  "content_block_stop"
+                                                      :index 0}))
+        finalized (sut/finalize env (:state stop-out))]
+    (is (= [{:type :thinking-start}] (:events start-out)))
+    (is (= [{:type :thinking-end}] (:events stop-out)))
+    (is (= [{:type      :thinking
+             :thinking  "[Reasoning redacted]"
+             :signature "opaque-redacted-payload"
+             :redacted  true}]
+           (get-in finalized [:assistant-message :content])))))
+
+(deftest build-request-replays-redacted-thinking-as-anthropic-redacted-block
+  (let [context {:messages [{:role        :assistant
+                             :content     [{:type      :thinking
+                                            :thinking  "[Reasoning redacted]"
+                                            :signature "opaque-redacted-payload"
+                                            :redacted  true}]
+                             :api         :anthropic-messages
+                             :provider    :anthropic
+                             :model       "claude-sonnet-4-6-20251001"
+                             :usage       {:input        1
+                                           :output       1
+                                           :cache-read   0
+                                           :cache-write  0
+                                           :total-tokens 2
+                                           :cost         {:input       0.0
+                                                          :output      0.0
+                                                          :cache-read  0.0
+                                                          :cache-write 0.0
+                                                          :total       0.0}}
+                             :stop-reason :stop
+                             :timestamp   1}]}
+        request (sut/build-request (stub-env) anthropic-sonnet-46-model context {:api-key "k"} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= [{:type "redacted_thinking" :data "opaque-redacted-payload"}]
+           (get-in payload [:messages 0 :content])))))
 
 (deftest finalize-calculates-usage-costs
   (let [result (sut/finalize
