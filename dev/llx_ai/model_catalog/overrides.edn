@@ -19,7 +19,79 @@
 
  ;; Provenance: extra/pi-mono/packages/ai/scripts/generate-models.ts@fdcd9ab7 lines 724-742
  ;; adjust pricing for gpt-5.1-codex to match Pi override values.
- "gpt-5.1-codex"
+ [:openai "gpt-5.1-codex"]
  {:cost {:output 5.0
          :cache-write 1.25}}
+
+ ;; Provenance: local LLX OpenAI Codex OAuth parity catalog entries.
+ ;; models.dev does not currently emit the ChatGPT subscription provider family.
+ [:openai-codex "gpt-5.1"]
+ {:name "GPT-5.1"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 1.25 :output 10.0 :cache-read 0.125 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.1-codex-max"]
+ {:name "GPT-5.1 Codex Max"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 1.25 :output 10.0 :cache-read 0.125 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.1-codex-mini"]
+ {:name "GPT-5.1 Codex Mini"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 0.25 :output 2.0 :cache-read 0.025 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.2"]
+ {:name "GPT-5.2"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 1.75 :output 14.0 :cache-read 0.175 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.2-codex"]
+ {:name "GPT-5.2 Codex"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 1.75 :output 14.0 :cache-read 0.175 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.3-codex"]
+ {:name "GPT-5.3 Codex"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 272000
+  :max-tokens 128000
+  :cost {:input 1.75 :output 14.0 :cache-read 0.175 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text :image}}}
+
+ [:openai-codex "gpt-5.3-codex-spark"]
+ {:name "GPT-5.3 Codex Spark"
+  :provider :openai-codex
+  :api :openai-codex-responses
+  :base-url "https://chatgpt.com/backend-api"
+  :context-window 128000
+  :max-tokens 128000
+  :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+  :capabilities {:reasoning? true :input #{:text}}}
 }

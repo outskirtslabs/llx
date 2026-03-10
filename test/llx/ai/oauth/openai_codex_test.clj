@@ -1,7 +1,8 @@
 (ns llx.ai.oauth.openai-codex-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [llx.ai.impl.oauth.openai-codex :as sut]))
+   [llx.ai.impl.oauth.openai-codex :as sut]
+   [llx.ai.impl.oauth.openai-codex-jvm :as jvm]))
 
 (set! *warn-on-reflection* true)
 
@@ -74,3 +75,27 @@
          :exchange-authorization-code  (fn [_code _verifier _redirect-uri]
                                          {:type :failed})
          :account-id-from-access-token sut/account-id-from-access-token}))))
+
+(deftest login-openai-codex-bind-failure-falls-back-to-manual-input
+  (with-open [_socket (java.net.ServerSocket. 1455
+                                              50
+                                              (java.net.InetAddress/getByName "127.0.0.1"))]
+    (let [result (sut/login-openai-codex
+                  {:on-auth              (fn [_auth-info])
+                   :on-prompt            (fn [_prompt] "bind-fallback-code#state-bind")
+                   :on-manual-code-input (fn [] "bind-fallback-code#state-bind")}
+                  {:create-authorization-flow    (fn []
+                                                   {:verifier "verifier-bind"
+                                                    :state    "state-bind"
+                                                    :url      "https://auth.example"})
+                   :start-local-oauth-server     jvm/start-local-oauth-server
+                   :exchange-authorization-code  (fn [code verifier _redirect-uri]
+                                                   (is (= "bind-fallback-code" code))
+                                                   (is (= "verifier-bind" verifier))
+                                                   {:type    :success
+                                                    :access  account-token
+                                                    :refresh "refresh-bind"
+                                                    :expires 9000})
+                   :account-id-from-access-token sut/account-id-from-access-token})]
+      (is (= "acc_test" (:account-id result)))
+      (is (= "refresh-bind" (:refresh result))))))

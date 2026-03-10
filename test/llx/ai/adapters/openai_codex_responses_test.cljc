@@ -1,7 +1,7 @@
 (ns llx.ai.adapters.openai-codex-responses-test
   (:require
-   #?@(:clj [[clojure.test :refer [deftest is testing]]]
-       :cljs [[cljs.test :refer-macros [deftest is testing]]])
+   #?@(:clj [[clojure.test :refer [deftest is]]]
+       :cljs [[cljs.test :refer-macros [deftest is]]])
    [llx.ai.impl.adapters.openai-codex-responses :as sut]
    [llx.ai.impl.utils.unicode :as unicode]
    [llx.ai.test-util :as util]))

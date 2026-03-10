@@ -27,6 +27,17 @@
    :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
    :capabilities   {:reasoning? false :input #{:text :image}}})
 
+(def openai-codex
+  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_CODEX_MODEL") "gpt-5.2-codex")
+   :name           "OpenAI Codex"
+   :provider       :openai-codex
+   :api            :openai-codex-responses
+   :base-url       (or (live-env/get-env "LLX_LIVE_OPENAI_CODEX_BASE_URL") "https://chatgpt.com/backend-api")
+   :context-window 272000
+   :max-tokens     128000
+   :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
+   :capabilities   {:reasoning? true :input #{:text :image}}})
+
 (def anthropic
   {:id             (or (live-env/get-env "LLX_LIVE_ANTHROPIC_MODEL") "claude-3-5-haiku-20241022")
    :name           "Anthropic"

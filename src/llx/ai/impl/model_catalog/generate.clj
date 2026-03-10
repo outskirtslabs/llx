@@ -14,7 +14,7 @@
    "mistral"   {:provider :mistral :api :openai-completions :base-url "https://api.mistral.ai/v1"}})
 
 (def generated-artifact-path "src/llx/ai/impl/models_generated.cljc")
-(def overrides-path "dev/llx/ai/impl/model_catalog/overrides.edn")
+(def overrides-path "dev/llx_ai/model_catalog/overrides.edn")
 (def models-dev-url "https://models.dev/api.json")
 
 (defn fetch-models-dev-data
@@ -35,6 +35,22 @@
                    (str ns "/" (name k))
                    (name k))
     :else (str k)))
+
+(defn- override-target
+  [override-key]
+  (cond
+    (or (string? override-key) (keyword? override-key))
+    {:id (key->string override-key)}
+
+    (and (vector? override-key)
+         (= 2 (count override-key)))
+    (let [[provider model-id] override-key]
+      {:provider (keyword (key->string provider))
+       :id       (key->string model-id)})
+
+    :else
+    (throw (ex-info "Override key must be a model id or [provider model-id]"
+                    {:override-key override-key}))))
 
 (defn- finite-number
   [n]
@@ -142,39 +158,44 @@
     model))
 
 (defn- apply-override-entry
-  [models-by-key source-models [override-id raw-patch]]
-  (let [override-id (key->string override-id)
-        patch       (or raw-patch {})
-        _           (when-not (map? patch)
-                      (throw (ex-info "Override patch must be a map"
-                                      {:id override-id :patch patch})))
-        _           (when (contains? patch :id)
-                      (throw (ex-info "Override patch must not include :id"
-                                      {:id override-id :patch patch})))
-        matched     (filterv #(= override-id (:id %)) source-models)]
+  [models-by-key source-models [override-key raw-patch]]
+  (let [{:keys [id provider]} (override-target override-key)
+        patch                 (or raw-patch {})
+        _                     (when-not (map? patch)
+                                (throw (ex-info "Override patch must be a map"
+                                                {:id id :provider provider :patch patch})))
+        _                     (when (contains? patch :id)
+                                (throw (ex-info "Override patch must not include :id"
+                                                {:id id :provider provider :patch patch})))
+        matched               (if provider
+                                (filterv #(= [provider id] (model-key %)) source-models)
+                                (filterv #(= id (:id %)) source-models))]
     (case (count matched)
       0 (let [new-model (schema/assert-valid!
                          :llx/model
                          (normalize-model-after-merge
-                          (deep-merge {} (assoc patch :id override-id))))]
+                          (cond-> (deep-merge {} patch)
+                            true (assoc :id id)
+                            provider (assoc :provider provider))))]
           (assoc models-by-key (model-key new-model) new-model))
 
       1 (let [base-model (first matched)
               _          (when (and (contains? patch :provider)
                                     (not= (:provider patch) (:provider base-model)))
                            (throw (ex-info "Override patch cannot change provider for an existing model id"
-                                           {:id   override-id
+                                           {:id   id
                                             :from (:provider base-model)
                                             :to   (:provider patch)})))
               merged     (schema/assert-valid!
                           :llx/model
                           (normalize-model-after-merge
-                           (assoc (deep-merge base-model patch)
-                                  :id override-id)))]
+                           (cond-> (assoc (deep-merge base-model patch)
+                                          :id id)
+                             provider (assoc :provider provider))))]
           (assoc models-by-key (model-key merged) merged))
 
       (throw (ex-info "Override id matches multiple source models; key by provider+id is required to disambiguate"
-                      {:id      override-id
+                      {:id      id
                        :matches (mapv model-key matched)})))))
 
 (defn build-catalog

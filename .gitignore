@@ -20,4 +20,4 @@ result
 .shadow-cljs
 .tmuxb_session
 node_modules/
-
+.worktrees

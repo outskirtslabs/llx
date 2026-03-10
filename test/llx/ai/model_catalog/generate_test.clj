@@ -4,6 +4,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
+   [llx.ai.impl.model-catalog.generate :as generate]
    [llx.ai.impl.schema :as schema]))
 
 (defn- resolve-public [sym]
@@ -22,6 +23,31 @@
 (defn- load-expected-fixture []
   (edn/read-string (slurp (fixture-path "expected_models_generated.edn"))))
 
+(defn- add-openai-codex-source-fixture
+  [fixture]
+  (-> fixture
+      (assoc-in [:openai :models "gpt-5.1-codex"]
+                {:name       "GPT-5.1 Codex"
+                 :tool_call  true
+                 :reasoning  true
+                 :limit      {:context 272000 :output 128000}
+                 :cost       {:input 1.25 :output 10.0 :cache_read 0.125 :cache_write 1.25}
+                 :modalities {:input ["text" "image"]}})
+      (assoc-in [:openai :models "gpt-5-chat-latest"]
+                {:name       "GPT-5 Chat Latest"
+                 :tool_call  true
+                 :reasoning  false
+                 :limit      {:context 128000 :output 16384}
+                 :cost       {:input 1.25 :output 10.0 :cache_read 0.125 :cache_write 0.0}
+                 :modalities {:input ["text" "image"]}})
+      (assoc-in [:anthropic :models "claude-opus-4-5"]
+                {:name       "Claude Opus 4.5"
+                 :tool_call  true
+                 :reasoning  true
+                 :limit      {:context 200000 :output 32000}
+                 :cost       {:input 15.0 :output 75.0 :cache_read 0.0 :cache_write 0.0}
+                 :modalities {:input ["text" "image"]}})))
+
 (def overrides
   {"gpt-5-mini"
    {:name       "GPT-5 Mini Override"
@@ -35,6 +61,19 @@
     :max-tokens     16384
     :cost           {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0}
     :capabilities   {:reasoning? false :input #{:text :image}}}})
+
+(def provider-qualified-overrides
+  {[:openai "gpt-5.1-codex"]
+   {:cost {:output 5.0 :cache-write 1.25}}
+   [:openai-codex "gpt-5.1-codex"]
+   {:name           "GPT-5.1 Codex"
+    :provider       :openai-codex
+    :api            :openai-codex-responses
+    :base-url       "https://chatgpt.com/backend-api"
+    :context-window 272000
+    :max-tokens     128000
+    :cost           {:input 1.25 :output 10.0 :cache-read 0.125 :cache-write 0.0}
+    :capabilities   {:reasoning? true :input #{:text :image}}}})
 
 (deftest build-catalog-normalizes-supported-providers-only
   (let [build-catalog (resolve-public 'llx.ai.impl.model-catalog.generate/build-catalog)]
@@ -153,3 +192,31 @@
                 :capabilities   {:reasoning? true :input #{:text}}
                 :compat         {:token-field :max_tokens :tool-id-format :mistral-9-alnum}}
                model))))))
+
+(deftest build-catalog-supports-provider-qualified-override-keys
+  (let [build-catalog (resolve-public 'llx.ai.impl.model-catalog.generate/build-catalog)]
+    (is (ifn? build-catalog))
+    (when (ifn? build-catalog)
+      (let [fixture (add-openai-codex-source-fixture (load-models-dev-fixture))
+            catalog (build-catalog
+                     {:models-dev-data fixture
+                      :overrides       provider-qualified-overrides})
+            by-key  (into {} (map (juxt (fn [m] [(:provider m) (:id m)]) identity) catalog))]
+        (is (= 5.0 (get-in by-key [[:openai "gpt-5.1-codex"] :cost :output])))
+        (is (= :openai-codex-responses (get-in by-key [[:openai-codex "gpt-5.1-codex"] :api])))))))
+
+(deftest generate-models-uses-checked-in-overrides-and-emits-openai-codex-models
+  (let [generate-models! (resolve-public 'llx.ai.impl.model-catalog.generate/generate-models!)
+        rendered*        (atom nil)]
+    (is (ifn? generate-models!))
+    (when (ifn? generate-models!)
+      (with-redefs [generate/fetch-models-dev-data
+                    (fn [] (add-openai-codex-source-fixture (load-models-dev-fixture)))
+                    generate/write-generated-artifact!
+                    (fn [{:keys [content]}]
+                      (reset! rendered* content)
+                      :ok)]
+        (is (= :ok (generate-models! {})))
+        (is (string? @rendered*))
+        (is (str/includes? @rendered* ":openai-codex"))
+        (is (str/includes? @rendered* "\"gpt-5.2-codex\""))))))
