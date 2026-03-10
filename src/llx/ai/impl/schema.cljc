@@ -127,7 +127,8 @@
    :llx/content-text
    [:map
     [:type [:= :text]]
-    [:text :string]]
+    [:text :string]
+    [:signature {:optional true} :string]]
 
    :llx/content-thinking
    [:map

@@ -105,13 +105,8 @@
   [model]
   (str/includes? (str/lower-case (:id model)) "gemini-3"))
 
-(defn- tool-call->historical-text
-  [tool-call]
-  {:text (str "[Historical context: a different model called tool \""
-              (:name tool-call)
-              "\" with arguments: "
-              ((fnil pr-str {}) (:arguments tool-call))
-              ". Do not mimic this format - use proper function calling.]")})
+(def ^:private skip-thought-signature-validator
+  "skip_thought_signature_validator")
 
 (defn- assistant-part
   [model assistant-message block]
@@ -137,17 +132,13 @@
 
       :tool-call
       (let [name (:name block)
-            args (or (:arguments block) {})]
-        (cond
-          (and (gemini-3-model? model)
-               (nil? thought-signature))
-          (tool-call->historical-text block)
-
-          :else
-          (let [part {:functionCall (cond-> {:name name :args args}
-                                      (requires-tool-call-id? (:id model)) (assoc :id (:id block)))}]
-            (cond-> part
-              thought-signature (assoc :thoughtSignature thought-signature)))))
+            args (or (:arguments block) {})
+            part {:functionCall (cond-> {:name name :args args}
+                                  (requires-tool-call-id? (:id model)) (assoc :id (:id block)))}]
+        (cond-> part
+          thought-signature (assoc :thoughtSignature thought-signature)
+          (and (nil? thought-signature)
+               (gemini-3-model? model)) (assoc :thoughtSignature skip-thought-signature-validator)))
 
       nil)))
 

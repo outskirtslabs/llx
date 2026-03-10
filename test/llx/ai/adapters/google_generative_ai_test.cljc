@@ -93,6 +93,50 @@
                                        :required   ["value"]}}]}]}
            payload))))
 
+(deftest build-request-gemini-3-preserves-unsigned-tool-calls-with-sentinel
+  (let [context      {:messages [{:role      :user
+                                  :content   "What happened before?"
+                                  :timestamp 1}
+                                 {:role        :assistant
+                                  :content     [{:type      :tool-call
+                                                 :id        "call_1"
+                                                 :name      "double_number"
+                                                 :arguments {:value 21}}]
+                                  :api         :openai-responses
+                                  :provider    :openai
+                                  :model       "gpt-5.4"
+                                  :usage       {:input        1
+                                                :output       1
+                                                :cache-read   0
+                                                :cache-write  0
+                                                :total-tokens 2
+                                                :cost         {:input       0.0
+                                                               :output      0.0
+                                                               :cache-read  0.0
+                                                               :cache-write 0.0
+                                                               :total       0.0}}
+                                  :stop-reason :tool-use
+                                  :timestamp   2}]}
+        gemini3-part (-> (sut/build-request (stub-env) google-gemini3-model context {} false)
+                         :body
+                         (util/json-read {:key-fn keyword})
+                         :contents
+                         second
+                         :parts
+                         first)
+        legacy-part  (-> (sut/build-request (stub-env) google-model context {} false)
+                         :body
+                         (util/json-read {:key-fn keyword})
+                         :contents
+                         second
+                         :parts
+                         first)]
+    (is (= {:functionCall     {:name "double_number" :args {:value 21}}
+            :thoughtSignature "skip_thought_signature_validator"}
+           gemini3-part))
+    (is (= {:functionCall {:name "double_number" :args {:value 21}}}
+           legacy-part))))
+
 (deftest adapter-registers-tool-call-id-normalizer-with-model-id-gate
   (let [normalize-id (:normalize-tool-call-id (sut/adapter))
         gated-model  (assoc google-model :id "claude-sonnet-4-5")

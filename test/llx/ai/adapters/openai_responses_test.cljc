@@ -98,6 +98,33 @@
                       :payload  payload}}
              (util/strip-generated event [:call-id])))))))
 
+(deftest build-request-replays-versioned-text-signature-metadata
+  (let [signature (util/json-write {:v 1 :id "msg_original_1" :phase "final_answer"})
+        context   {:messages [{:role        :assistant
+                               :content     [{:type      :text
+                                              :text      "Final answer."
+                                              :signature signature}]
+                               :api         :openai-responses
+                               :provider    :openai
+                               :model       "gpt-5-mini"
+                               :usage       {:input        1
+                                             :output       1
+                                             :cache-read   0
+                                             :cache-write  0
+                                             :total-tokens 2
+                                             :cost         {:input       0.0
+                                                            :output      0.0
+                                                            :cache-read  0.0
+                                                            :cache-write 0.0
+                                                            :total       0.0}}
+                               :stop-reason :stop
+                               :timestamp   1}]}
+        request   (sut/build-request (stub-env) openai-responses-model context {:api-key "openai-key"} false)
+        payload   (util/json-read (:body request) {:key-fn keyword})
+        item      (first (filter #(= "message" (:type %)) (:input payload)))]
+    (is (= "msg_original_1" (:id item)))
+    (is (= "final_answer" (:phase item)))))
+
 (deftest normalize-tool-call-id-normalizes-pipe-ids-and-preserves-pairing
   (let [messages  (fixture "pipe_id_prefilled")
         out       (transform-messages/for-target-model
@@ -320,6 +347,52 @@
     (is (= [:thinking-start] (mapv :type (:events start-out))))
     (is (= [] (:events done-out)))
     (is (= "" (get-in done-out [:state :assistant-message :content 0 :thinking])))))
+
+(deftest decode-event-message-output-item-done-encodes-versioned-text-signature
+  (let [env       (stub-env)
+        init      {:model openai-responses-model}
+        start-out (sut/decode-event env init
+                                    (util/json-write {:type "response.output_item.added"
+                                                      :item {:type    "message"
+                                                             :id      "msg_1"
+                                                             :content []}}))
+        done-out  (sut/decode-event env (:state start-out)
+                                    (util/json-write {:type "response.output_item.done"
+                                                      :item {:type    "message"
+                                                             :id      "msg_1"
+                                                             :phase   "commentary"
+                                                             :content [{:type "output_text"
+                                                                        :text "Hello"}]}}))
+        signature (get-in done-out [:state :assistant-message :content 0 :signature])]
+    (is (= [{:type :text-start}] (:events start-out)))
+    (is (= [{:type :text-end}] (:events done-out)))
+    (is (= "Hello" (get-in done-out [:state :assistant-message :content 0 :text])))
+    (is (= {:v 1 :id "msg_1" :phase "commentary"}
+           (util/json-read signature {:key-fn keyword})))))
+
+(deftest decode-event-response-failed-includes-provider-error-details
+  (let [env         (stub-env)
+        failure-ex  (try
+                      (sut/decode-event env
+                                        {:model openai-responses-model}
+                                        (util/json-write
+                                         {:type     "response.failed"
+                                          :response {:error {:code    "server_error"
+                                                             :message "Backend exploded"}}}))
+                      (catch #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) e
+                        e))
+        fallback-ex (try
+                      (sut/decode-event env
+                                        {:model openai-responses-model}
+                                        (util/json-write
+                                         {:type     "response.failed"
+                                          :response {:incomplete_details {:reason "max_output_tokens"}}}))
+                      (catch #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) e
+                        e))
+        normalized  (sut/normalize-error env failure-ex {:model openai-responses-model})
+        fallback    (sut/normalize-error env fallback-ex {:model openai-responses-model})]
+    (is (= "server_error: Backend exploded" (:error-message normalized)))
+    (is (= "incomplete: max_output_tokens" (:error-message fallback)))))
 
 (deftest stream-error-normalization-contract
   (let [partial-state {:model             openai-responses-model

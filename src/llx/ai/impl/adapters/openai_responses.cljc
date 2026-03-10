@@ -118,6 +118,46 @@
       (str "msg_" (Math/abs (long (hash v))))
       v)))
 
+(defn- valid-text-signature-phase
+  [phase]
+  (when (#{"commentary" "final_answer"} phase)
+    phase))
+
+(defn- encode-text-signature-v1
+  [env id phase]
+  ((:json/encode env)
+   (cond-> {:v 1 :id id}
+     (valid-text-signature-phase phase) (assoc :phase phase))))
+
+(defn- parse-text-signature
+  [env signature]
+  (when (string? signature)
+    (if (str/starts-with? signature "{")
+      (let [parsed (adapter-common/parse-json-safe env signature)
+            id     (:id parsed)
+            phase  (valid-text-signature-phase (:phase parsed))]
+        (when (and (= 1 (:v parsed))
+                   (string? id))
+          (cond-> {:id id}
+            phase (assoc :phase phase))))
+      {:id signature})))
+
+(defn- response-failed-message
+  [chunk]
+  (let [error   (get-in chunk [:response :error])
+        details (get-in chunk [:response :incomplete_details])]
+    (cond
+      (map? error)
+      (str (or (:code error) "unknown")
+           ": "
+           (or (:message error) "no message"))
+
+      (some? (:reason details))
+      (str "incomplete: " (:reason details))
+
+      :else
+      "Unknown error (no error details in response)")))
+
 (defn- assistant-blocks->responses-items
   [env model assistant-message idx]
   (let [different-model? (different-openai-model? assistant-message model)]
@@ -135,11 +175,13 @@
                 [])
 
               :text
-              [{:type    "message"
-                :role    "assistant"
-                :status  "completed"
-                :id      (truncate-message-id (:signature block) idx)
-                :content [{:type "output_text" :text (:text block) :annotations []}]}]
+              (let [parsed-signature (parse-text-signature env (:signature block))]
+                [(cond-> {:type    "message"
+                          :role    "assistant"
+                          :status  "completed"
+                          :id      (truncate-message-id (:id parsed-signature) idx)
+                          :content [{:type "output_text" :text (:text block) :annotations []}]}
+                   (:phase parsed-signature) (assoc :phase (:phase parsed-signature)))])
 
               :tool-call
               (let [[call-id item-id] (str/split (or (:id block) "") #"\|" 2)
@@ -471,6 +513,8 @@
                                        (apply str))
                        next-state (-> state
                                       (assoc-in [:assistant-message :content idx :text] (or text ""))
+                                      (assoc-in [:assistant-message :content idx :signature]
+                                                (encode-text-signature-v1 env (:id item) (:phase item)))
                                       (assoc :current-item nil :current-block nil))]
                    {:state  next-state
                     :events [{:type :text-end}]})
@@ -511,7 +555,8 @@
              {:state next-state :events []})
 
            "response.failed"
-           (throw (ex-info "OpenAI responses stream failed" {:error chunk}))
+           (let [message (response-failed-message chunk)]
+             (throw (ex-info message {:error message :chunk chunk})))
 
            "error"
            (throw (ex-info "OpenAI responses stream error"
@@ -540,7 +585,8 @@
                     (remove nil?)
                     (apply str))]
       (if (seq text)
-        [{:type :text :text text}]
+        [(cond-> {:type :text :text text}
+           (:id item) (assoc :signature (encode-text-signature-v1 env (:id item) (:phase item))))]
         []))
 
     "function_call"
