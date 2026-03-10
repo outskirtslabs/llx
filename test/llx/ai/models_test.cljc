@@ -19,7 +19,12 @@
           (is (= model (models/get-model provider (:id model)))))))
     (is (nil? (models/get-model :openai "__definitely_missing__")))
     (is (nil? (models/get-model :openai-compatible "llama3.2")))
-    (is (some? (models/get-model :openai-codex "gpt-5.2-codex")))))
+    (is (some? (models/get-model :openai "gpt-5.2-codex")))
+    (is (some? (models/get-model :openai "gpt-5.4")))
+    (is (some? (models/get-model :openai "gpt-5.4-pro")))
+    (is (some? (models/get-model :anthropic "claude-sonnet-4-6")))
+    (is (some? (models/get-model :google "gemini-3.1-pro-preview")))
+    (is (some? (models/get-model :google "gemini-3.1-flash-lite-preview")))))
 
 (deftest model-utility-functions
   (testing "calculate-cost"
@@ -36,8 +41,12 @@
   (testing "supports-xhigh?"
     (is (true? (models/supports-xhigh? {:id  "claude-opus-4.6"
                                         :api :anthropic-messages})))
+    (is (true? (models/supports-xhigh? {:id  "gpt-5.4"
+                                        :api :openai-responses})))
     (is (false? (models/supports-xhigh? {:id  "claude-opus-4.6"
                                          :api :openai-completions})))
+    (is (false? (models/supports-xhigh? {:id  "claude-sonnet-4-6"
+                                         :api :anthropic-messages})))
     (is (false? (models/supports-xhigh? {:id  "gpt-4o-mini"
                                          :api :openai-completions}))))
   (testing "models-equal?"

@@ -58,6 +58,7 @@
   (or (true? (get-in model [:capabilities :supports-xhigh?]))
       (str/includes? (or (:id model) "") "gpt-5.2")
       (str/includes? (or (:id model) "") "gpt-5.3")
+      (str/includes? (or (:id model) "") "gpt-5.4")
       (and (= :anthropic-messages (:api model))
            (or (str/includes? (or (:id model) "") "opus-4-6")
                (str/includes? (or (:id model) "") "opus-4.6")))))

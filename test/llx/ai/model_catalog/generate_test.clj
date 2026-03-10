@@ -2,6 +2,7 @@
   (:require
    [babashka.json :as json]
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
    [llx.ai.impl.model-catalog.generate :as generate]
@@ -86,8 +87,16 @@
         (is (= :openai-responses (get-in by-key [[:openai "gpt-5-mini"] :api])))
         (is (= 0.25 (get-in by-key [[:openai "gpt-5-mini"] :cost :input])))
         (is (= :anthropic-messages (get-in by-key [[:anthropic "claude-sonnet-4-5"] :api])))
+        (is (= :anthropic-messages (get-in by-key [[:anthropic "claude-sonnet-4-6"] :api])))
         (is (= :google-generative-ai (get-in by-key [[:google "gemini-2.5-flash"] :api])))
+        (is (= :google-generative-ai (get-in by-key [[:google "gemini-3.1-pro-preview"] :api])))
+        (is (= :google-generative-ai (get-in by-key [[:google "gemini-3.1-flash-lite-preview"] :api])))
         (is (= :openai-completions (get-in by-key [[:mistral "devstral-medium-latest"] :api])))
+        (is (= 272000 (get-in by-key [[:openai "gpt-5.4"] :context-window])))
+        (is (= 128000 (get-in by-key [[:openai "gpt-5.4"] :max-tokens])))
+        (is (= 1050000 (get-in by-key [[:openai "gpt-5.4-pro"] :context-window])))
+        (is (= 65536 (get-in by-key [[:google "gemini-3.1-pro-preview"] :max-tokens])))
+        (is (= 64000 (get-in by-key [[:anthropic "claude-sonnet-4-6"] :max-tokens])))
         (is (nil? (get by-key [:openai-compatible "llama3.2"])))
         (is (nil? (get by-key [:unknown-provider "mystery-1"])))
         (is (nil? (some #(when (= "mistral-no-tools" (:id %)) %) catalog)))
@@ -100,10 +109,15 @@
     (when (ifn? build-catalog)
       (let [input     (load-models-dev-fixture)
             expected  [[:anthropic "claude-sonnet-4-5"]
+                       [:anthropic "claude-sonnet-4-6"]
                        [:google "gemini-2.5-flash"]
+                       [:google "gemini-3.1-flash-lite-preview"]
+                       [:google "gemini-3.1-pro-preview"]
                        [:mistral "devstral-medium-latest"]
                        [:openai "gpt-4o-mini"]
-                       [:openai "gpt-5-mini"]]
+                       [:openai "gpt-5-mini"]
+                       [:openai "gpt-5.4"]
+                       [:openai "gpt-5.4-pro"]]
             catalog-a (build-catalog {:models-dev-data input
                                       :overrides       overrides})
             catalog-b (build-catalog {:models-dev-data input
@@ -220,3 +234,21 @@
         (is (string? @rendered*))
         (is (str/includes? @rendered* ":openai-codex"))
         (is (str/includes? @rendered* "\"gpt-5.2-codex\""))))))
+
+(deftest generate-models-writes-artifact-using-injected-paths
+  (let [generate-models! (resolve-public 'llx.ai.impl.model-catalog.generate/generate-models!)
+        temp-dir         (.toFile (java.nio.file.Files/createTempDirectory
+                                   "llx-model-catalog-"
+                                   (make-array java.nio.file.attribute.FileAttribute 0)))
+        overrides-file   (io/file temp-dir "overrides.edn")
+        output-file      (io/file temp-dir "models_generated.cljc")]
+    (is (ifn? generate-models!))
+    (when (ifn? generate-models!)
+      (spit overrides-file (pr-str overrides))
+      (with-redefs [generate/fetch-models-dev-data load-models-dev-fixture]
+        (generate-models! {:overrides-path          (.getPath overrides-file)
+                           :generated-artifact-path (.getPath output-file)}))
+      (is (.exists output-file))
+      (let [rendered (slurp output-file)]
+        (is (str/includes? rendered "gpt-5.4"))
+        (is (str/includes? rendered "claude-sonnet-4-6"))))))

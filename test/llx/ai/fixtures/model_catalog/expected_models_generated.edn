@@ -7,6 +7,15 @@
   :max-tokens 8192
   :name "Claude Sonnet 4.5 Source"
   :provider :anthropic}
+ {:api :anthropic-messages
+  :base-url "https://api.anthropic.com"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 200000
+  :cost {:cache-read 0.3 :cache-write 3.75 :input 3.0 :output 15.0}
+  :id "claude-sonnet-4-6"
+  :max-tokens 64000
+  :name "Claude Sonnet 4.6"
+  :provider :anthropic}
  {:api :google-generative-ai
   :base-url "https://generativelanguage.googleapis.com/v1beta"
   :capabilities {:input #{:image :text} :reasoning? true}
@@ -15,6 +24,24 @@
   :id "gemini-2.5-flash"
   :max-tokens 65536
   :name "Gemini 2.5 Flash Source"
+  :provider :google}
+ {:api :google-generative-ai
+  :base-url "https://generativelanguage.googleapis.com/v1beta"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 1048576
+  :cost {:cache-read 0.05 :cache-write 0.0 :input 0.5 :output 3.0}
+  :id "gemini-3.1-flash-lite-preview"
+  :max-tokens 65536
+  :name "Gemini 3.1 Flash Lite Preview"
+  :provider :google}
+ {:api :google-generative-ai
+  :base-url "https://generativelanguage.googleapis.com/v1beta"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 1048576
+  :cost {:cache-read 0.2 :cache-write 0.0 :input 2.0 :output 12.0}
+  :id "gemini-3.1-pro-preview"
+  :max-tokens 65536
+  :name "Gemini 3.1 Pro Preview"
   :provider :google}
  {:api :openai-completions
   :base-url "https://api.mistral.ai/v1"
@@ -42,4 +69,22 @@
   :id "gpt-5-mini"
   :max-tokens 60000
   :name "GPT-5 Mini Override"
+  :provider :openai}
+ {:api :openai-responses
+  :base-url "https://api.openai.com/v1"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 272000
+  :cost {:cache-read 0.25 :cache-write 0.0 :input 2.5 :output 15.0}
+  :id "gpt-5.4"
+  :max-tokens 128000
+  :name "GPT-5.4"
+  :provider :openai}
+ {:api :openai-responses
+  :base-url "https://api.openai.com/v1"
+  :capabilities {:input #{:image :text} :reasoning? true}
+  :context-window 1050000
+  :cost {:cache-read 0.0 :cache-write 0.0 :input 30.0 :output 180.0}
+  :id "gpt-5.4-pro"
+  :max-tokens 128000
+  :name "GPT-5.4 Pro"
   :provider :openai}]

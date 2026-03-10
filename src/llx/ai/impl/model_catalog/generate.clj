@@ -13,8 +13,8 @@
    "google"    {:provider :google :api :google-generative-ai :base-url "https://generativelanguage.googleapis.com/v1beta"}
    "mistral"   {:provider :mistral :api :openai-completions :base-url "https://api.mistral.ai/v1"}})
 
-(def generated-artifact-path "src/llx/ai/impl/models_generated.cljc")
-(def overrides-path "dev/llx_ai/model_catalog/overrides.edn")
+(def default-generated-artifact-path "src/llx/ai/impl/models_generated.cljc")
+(def default-overrides-path "dev/llx_ai/model_catalog/overrides.edn")
 (def models-dev-url "https://models.dev/api.json")
 
 (defn fetch-models-dev-data
@@ -253,16 +253,19 @@
   path)
 
 (defn- load-override-models
-  []
-  (-> overrides-path io/file slurp edn/read-string))
+  [path]
+  (-> path io/file slurp edn/read-string))
 
 (defn generate-models!
-  [_opts]
-  (let [models-dev-data (fetch-models-dev-data)
-        overrides       (load-override-models)
-        catalog         (build-catalog {:models-dev-data models-dev-data
-                                        :overrides       overrides})
-        rendered        (render-generated-source catalog)]
+  [opts]
+  (let [{:keys [generated-artifact-path overrides-path]
+         :or   {generated-artifact-path default-generated-artifact-path
+                overrides-path          default-overrides-path}}        opts
+        models-dev-data                                                 (fetch-models-dev-data)
+        overrides                                                       (load-override-models overrides-path)
+        catalog                                                         (build-catalog {:models-dev-data models-dev-data
+                                                                                        :overrides       overrides})
+        rendered                                                        (render-generated-source catalog)]
     (write-generated-artifact! {:path generated-artifact-path :content rendered})))
 
 (defn -main
