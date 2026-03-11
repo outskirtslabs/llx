@@ -1,4 +1,4 @@
-(ns ^{:kaocha/parallelize? true} ol.llx.ai.live.provider-parity-smoke-test
+(ns ^{:kaocha/parallelize? true} ol.llx.ai.live.provider-contract-smoke-test
   (:require
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer [deftest is testing]]])
@@ -258,7 +258,7 @@
                 (multi-turn!* model thinking-opts)))]
     true))
 
-(deftest ^:ol.llx/google live-parity-google
+(deftest ^:ol.llx/google live-contract-google
   (util/async done
               (util/run-live-async!
                (run-provider-suite!* {:model         models/google
@@ -267,7 +267,7 @@
                                                       :reasoning         {:level :high}}})
                done)))
 
-(deftest ^:ol.llx/openai live-parity-openai-completions
+(deftest ^:ol.llx/openai live-contract-openai-completions
   (util/async done
               (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
@@ -282,7 +282,7 @@
                    true))
                done)))
 
-(deftest ^:ol.llx/openai live-parity-openai-responses
+(deftest ^:ol.llx/openai live-contract-openai-responses
   (util/async done
               (util/run-live-async!
                (run-provider-suite!* {:model         models/openai-responses
@@ -291,7 +291,7 @@
                                                       :reasoning         {:effort :high}}})
                done)))
 
-(deftest ^:ol.llx/anthropic live-parity-anthropic
+(deftest ^:ol.llx/anthropic live-contract-anthropic
   (util/async done
               (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
@@ -306,7 +306,7 @@
                    true))
                done)))
 
-(deftest ^:ol.llx/mistral live-parity-mistral-devstral
+(deftest ^:ol.llx/mistral live-contract-mistral-devstral
   (util/async done
               (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
@@ -322,7 +322,7 @@
                    true))
                done)))
 
-(deftest ^:ol.llx/mistral live-parity-mistral-pixtral
+(deftest ^:ol.llx/mistral live-contract-mistral-pixtral
   (util/async done
               (util/run-live-async!
                (let [opts {:max-output-tokens 256}]
@@ -337,7 +337,7 @@
                    true))
                done)))
 
-(deftest ^:ol.llx/ollama live-parity-ollama
+(deftest ^:ol.llx/ollama live-contract-ollama
   (util/async done
               (util/run-live-async!
                (run-provider-suite!* {:model         models/ollama
