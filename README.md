@@ -15,6 +15,9 @@ The basic shape isn't that big. The real work is absorbing each provider's many 
 This unified API is exposed under the entrypoints `ol.llx.ai/complete` and `ol.llx.ai/stream` and the default choice for most callers. 
 If you need provider-specific options, `ol.llx.ai/complete*` and `ol.llx.ai/stream*` let you work directly with them.
 
+`llx` does not use any Java ecosystem libraries. Provider HTTP APIs are used directly without any Java libs/SDKs.
+
+
 Project Status: [Experimental](https://docs.outskirtslabs.com/open-source-vital-signs#experimental)
 
 ## License: European Union Public License 1.2
