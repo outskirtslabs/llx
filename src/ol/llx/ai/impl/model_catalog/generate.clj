@@ -14,7 +14,7 @@
    "mistral"   {:provider :mistral :api :openai-completions :base-url "https://api.mistral.ai/v1"}})
 
 (def default-generated-artifact-path "src/ol/llx/ai/impl/models_generated.cljc")
-(def default-overrides-path "dev/llx_ai/model_catalog/overrides.edn")
+(def default-overrides-path "resources/ol/llx/model_catalog/overrides.edn")
 (def models-dev-url "https://models.dev/api.json")
 
 (defn fetch-models-dev-data

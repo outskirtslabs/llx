@@ -1,4 +1,4 @@
-{:paths   ["src"]
+{:paths   ["src" "resources"]
  :deps    {metosin/malli              {:mvn/version "0.20.1"}
            com.taoensso/trove         {:mvn/version "1.1.0"}
            funcool/promesa            {:mvn/version "12.0.0-RC2"}
