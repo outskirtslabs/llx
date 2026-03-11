@@ -1,0 +1,8 @@
+{:paths ["src" "test"]
+ :deps  {org.jline/jline       {:mvn/version "3.26.3"}
+         com.outskirtslabs/llx {:local/root "../.."}}
+ :aliases
+ {:run  {:jvm-opts  ["--enable-native-access=ALL-UNNAMED"]
+         :main-opts ["-m" "minimal-coding-agent.main"]}
+  :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+         :main-opts  ["-m" "kaocha.runner"]}}}
