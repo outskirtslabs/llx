@@ -14,14 +14,14 @@
   {:target     :node-test
    :output-to  "target/kaocha-tests.js"
    :output-dir "target/kaocha-test/"
-   :ns-regexp  "^(?!llx\\.ai\\.live\\.).*-test$"
-   :main       llx.cljs-test-runner/main
+   :ns-regexp  ".*-test$"
+   :main       ol.llx.cljs-test-runner/main
    :autorun    false}
 
   :kaocha-test-live
   {:target     :node-test
    :output-to  "target/kaocha-tests-live.js"
    :output-dir "target/kaocha-test-live/"
-   :ns-regexp  "^llx\\.ai\\.live\\..*-test$"
-   :main       llx.cljs-test-runner/main
+   :ns-regexp  ".*-test$"
+   :main       ol.llx.cljs-test-runner/main
    :autorun    false}}}

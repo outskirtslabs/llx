@@ -3,7 +3,7 @@
  :tasks {:requires
          ([clojure.string :as str]
           [clojure.pprint :refer [print-table]]
-          [llx.bb.live-env :as live-env]
+          [ol.llx.bb.live-env :as live-env]
           [babashka.tasks :refer [shell]])
 
          :init
@@ -73,16 +73,16 @@
 
          generate-models
          {:doc  "Generate built-in model catalog artifact"
-          :task (do (clojure* "-M:dev" "-m" "llx.ai.impl.model-catalog.generate")
-                    (shell "cljfmt --quiet fix src/llx/ai/impl/models_generated.cljc"))}
+          :task (do (clojure* "-M:dev" "-m" "ol.llx.ai.impl.model-catalog.generate")
+                    (shell "cljfmt --quiet fix src/ol/llx/ai/impl/models_generated.cljc"))}
 
          oauth:providers
          {:doc  "List available OAuth providers"
-          :task (clojure* "-M:dev" "-m" "llx.ai.oauth.cli" "providers")}
+          :task (clojure* "-M:dev" "-m" "ol.llx.ai.oauth.cli" "providers")}
 
          oauth:login
          {:doc  "Run OAuth login flow for a provider id"
-          :task (apply clojure* "-M:dev" "-m" "llx.ai.oauth.cli" "login" *command-line-args*)}
+          :task (apply clojure* "-M:dev" "-m" "ol.llx.ai.oauth.cli" "login" *command-line-args*)}
 
          fmt
          {:doc  "Format code with cljfmt"
@@ -114,7 +114,7 @@
          {:doc  "Fail when Guardrails signatures are all-generic (map?/any? only)"
           :task (let [pattern "\\[(map\\?|any\\?)(\\s+(map\\?|any\\?))*\\s+=>\\s+(map\\?|any\\?)\\]"
                       result  (shell {:continue true :out :string :err :string}
-                                     "rg" "-n" pattern "src/llx/ai/impl")]
+                                     "rg" "-n" pattern "src/ol/llx/ai/impl")]
                   (case (:exit result)
                     1 (println "Guardrails signature quality gate passed: no all-generic signatures found.")
                     0 (do
