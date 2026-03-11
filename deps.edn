@@ -5,7 +5,6 @@
            com.fulcrologic/guardrails {:mvn/version "1.2.16"}
            org.babashka/http-client   {:mvn/version "0.4.23"}
            org.babashka/json          {:mvn/version "0.1.6"}}
-
  :aliases {:kaocha
            {:extra-paths ["test"]
             :extra-deps  {}
@@ -42,7 +41,7 @@
                          slipset/deps-deploy           {:mvn/version "0.2.2"}}
             :ns-default build}
            :neil
-           {:project {:name        com.outskirtslabs/TODO
-                      :license     {:id "TODO"}
-                      :description ""
-                      :version     "0.0.TODO"}}}}
+           {:project {:name        com.outskirtslabs/llx
+                      :license     {:id "EUPL-1.2"}
+                      :description "Unified LLM client for supported providers with cross-provider context handoff for CLJ, CLJS, and CLJD"
+                      :version     "0.0.1"}}}}
