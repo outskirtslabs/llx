@@ -1,11 +1,10 @@
 {
   "image": "ghcr.io/ramblurr/nix-devenv:main",
-	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-	"remoteUser": "vscode",
-	"containerEnv": {
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "remoteUser": "vscode",
+  "containerEnv": {
     "WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
-	},
+  },
   "onCreateCommand": "dev-env-start",
-	"postCreateCommand": "dev-env-poststart"
+  "postCreateCommand": "dev-env-poststart"
 }
-

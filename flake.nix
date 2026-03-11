@@ -13,6 +13,19 @@
       ...
     }:
     devenv.lib.mkFlake ./. {
+
+      treefmtConfig = {
+        programs = {
+          nixfmt.enable = true;
+          cljfmt.enable = true;
+          prettier.enable = true;
+          mdformat.plugins =
+            ps: with ps; [
+              mdformat-gfm
+              mdformat-gfm-alerts
+            ];
+        };
+      };
       withOverlays = [
         devshell.overlays.default
         devenv.overlays.default
