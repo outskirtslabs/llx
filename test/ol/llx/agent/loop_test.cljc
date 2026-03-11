@@ -379,6 +379,72 @@
       (is (= :ol.llx.agent.event/message-end (get-in effects [0 :event :type])))
       (is (= :ol.llx.agent.event/turn-end (get-in effects [1 :event :type]))))))
 
+(deftest streaming-transition-llm-done-with-steering-queue-starts-next-turn-test
+  (let [message          {:role :assistant :content [{:type :text :text "Done"}]}
+        steering-message {:role :user :content "next steer"}
+        state            (-> (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
+                                          :messages                [{:role :user :content "hello"}]
+                                          :stream-message          {:role :assistant :content "partial"}})
+                             (update :steering-queue conj steering-message))
+        [state' effects] (sut/streaming-transition state {:type    :ol.llx.agent.signal/llm-done
+                                                          :message message})]
+    (testing "moves directly into the next streaming turn"
+      (is (= :ol.llx.agent.loop/streaming (:ol.llx.agent.loop/phase state')))
+      (is (nil? (:stream-message state')))
+      (is (empty? (:steering-queue state'))))
+
+    (testing "appends the finished assistant message and queued steering message"
+      (is (= [{:role :user :content "hello"} message steering-message]
+             (:messages state'))))
+
+    (testing "continues the run by ending the turn and scheduling more llm work"
+      (is (= :call-llm (::fx/type (last effects))))
+      (is (= (:messages state') (:messages (last effects))))
+      (is (some #(= :ol.llx.agent.event/turn-end (get-in % [:event :type])) effects))
+      (is (some #(= :ol.llx.agent.event/turn-start (get-in % [:event :type])) effects)))))
+
+(deftest streaming-transition-llm-done-with-follow-up-queue-starts-next-turn-test
+  (let [message          {:role :assistant :content [{:type :text :text "Done"}]}
+        follow-up        {:role :user :content "queued follow-up"}
+        state            (-> (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
+                                          :messages                [{:role :user :content "hello"}]
+                                          :stream-message          {:role :assistant :content "partial"}})
+                             (update :follow-up-queue conj follow-up))
+        [state' effects] (sut/streaming-transition state {:type    :ol.llx.agent.signal/llm-done
+                                                          :message message})]
+    (testing "starts a new turn from follow-up messages when no steering exists"
+      (is (= :ol.llx.agent.loop/streaming (:ol.llx.agent.loop/phase state')))
+      (is (empty? (:follow-up-queue state')))
+      (is (= [{:role :user :content "hello"} message follow-up]
+             (:messages state'))))
+
+    (testing "continues the run with another llm call"
+      (is (= :call-llm (::fx/type (last effects))))
+      (is (= (:messages state') (:messages (last effects))))
+      (is (some #(= :ol.llx.agent.event/turn-start (get-in % [:event :type])) effects)))))
+
+(deftest streaming-transition-llm-done-prefers-steering-over-follow-up-test
+  (let [message          {:role :assistant :content [{:type :text :text "Done"}]}
+        steering-message {:role :user :content "steer first"}
+        follow-up        {:role :user :content "follow later"}
+        state            (-> (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
+                                          :messages                [{:role :user :content "hello"}]
+                                          :stream-message          {:role :assistant :content "partial"}})
+                             (update :steering-queue conj steering-message)
+                             (update :follow-up-queue conj follow-up))
+        [state' effects] (sut/streaming-transition state {:type    :ol.llx.agent.signal/llm-done
+                                                          :message message})]
+    (testing "uses steering messages first and leaves follow-up queued"
+      (is (= :ol.llx.agent.loop/streaming (:ol.llx.agent.loop/phase state')))
+      (is (empty? (:steering-queue state')))
+      (is (= [follow-up] (vec (:follow-up-queue state'))))
+      (is (= [{:role :user :content "hello"} message steering-message]
+             (:messages state'))))
+
+    (testing "continues immediately with call-llm"
+      (is (= :call-llm (::fx/type (last effects))))
+      (is (= (:messages state') (:messages (last effects)))))))
+
 (deftest streaming-transition-llm-done-with-tools-test
   (let [tool-calls       [(tool-call-block "tc-1" "read_file" {:path "/tmp"})
                           (tool-call-block "tc-2" "write_file" {:path "/out"})]
@@ -721,23 +787,9 @@
   (is (= :ol.llx.agent.loop/closed (sut/route-from-idle {:ol.llx.agent.loop/phase :ol.llx.agent.loop/closed}))))
 
 (deftest route-from-streaming-test
-  (testing "idle with empty queues stays idle"
+  (testing "idle routes to idle"
     (is (= :ol.llx.agent.loop/idle
-           (sut/route-from-streaming {:ol.llx.agent.loop/phase :ol.llx.agent.loop/idle
-                                      :steering-queue          sut/empty-queue
-                                      :follow-up-queue         sut/empty-queue}))))
-
-  (testing "idle with steering queue routes to streaming"
-    (is (= :ol.llx.agent.loop/streaming
-           (sut/route-from-streaming {:ol.llx.agent.loop/phase :ol.llx.agent.loop/idle
-                                      :steering-queue          (conj sut/empty-queue {:msg 1})
-                                      :follow-up-queue         sut/empty-queue}))))
-
-  (testing "idle with follow-up queue routes to streaming"
-    (is (= :ol.llx.agent.loop/streaming
-           (sut/route-from-streaming {:ol.llx.agent.loop/phase :ol.llx.agent.loop/idle
-                                      :steering-queue          sut/empty-queue
-                                      :follow-up-queue         (conj sut/empty-queue {:msg 1})}))))
+           (sut/route-from-streaming {:ol.llx.agent.loop/phase :ol.llx.agent.loop/idle}))))
 
   (testing "tool-executing routes to tool-executing"
     (is (= :ol.llx.agent.loop/tool-executing

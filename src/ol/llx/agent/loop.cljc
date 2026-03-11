@@ -27,6 +27,13 @@
         [(vec queue) (assoc state queue-key empty-queue)]
         [[(peek queue)] (assoc state queue-key (pop queue))]))))
 
+(defn- dequeue-continuation-messages
+  [state]
+  (let [[steering state-with-steering] (dequeue-by-mode state :steering-queue :steering-mode)]
+    (if (seq steering)
+      [steering state-with-steering]
+      (dequeue-by-mode state-with-steering :follow-up-queue :follow-up-mode))))
+
 (defn- message-lifecycle-effects
   [message]
   [{::fx/type :emit-event :event {:type :ol.llx.agent.event/message-start :message message}}
@@ -112,6 +119,21 @@
              (concat (tool-result-lifecycle-effects tool-result)
                      [{::fx/type :call-llm :messages (:messages state')}]))])))
 
+(defn- continue-after-turn
+  [state completion-effects]
+  (let [[queued-messages state'] (dequeue-continuation-messages state)]
+    (if (seq queued-messages)
+      (let [state'' (-> state'
+                        (update :messages into queued-messages)
+                        (assoc ::phase ::streaming))]
+        [state''
+         (into []
+               (concat completion-effects
+                       [{::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-start}}]
+                       (mapcat message-lifecycle-effects queued-messages)
+                       [{::fx/type :call-llm :messages (:messages state'')}]))])
+      [state completion-effects])))
+
 (defn handle-command
   "Pure command handler. Takes state + command, returns `[state' signals]`.
    Handles global state mutations directly and translates FSM-driving
@@ -130,15 +152,10 @@
     :ol.llx.agent.command/continue
     (if (not= ::idle (::phase state))
       [state [{:type :ol.llx.agent.signal/rejected :reason :not-idle}]]
-      (let [[steering state-with-steering] (dequeue-by-mode state :steering-queue :steering-mode)]
-        (if (seq steering)
-          [state-with-steering
-           [{:type :ol.llx.agent.signal/continue-start :messages steering}]]
-          (let [[follow-up state-with-follow-up] (dequeue-by-mode state :follow-up-queue :follow-up-mode)]
-            (if (seq follow-up)
-              [state-with-follow-up
-               [{:type :ol.llx.agent.signal/continue-start :messages follow-up}]]
-              [state [{:type :ol.llx.agent.signal/rejected :reason :no-queued-messages}]])))))
+      (let [[messages state'] (dequeue-continuation-messages state)]
+        (if (seq messages)
+          [state' [{:type :ol.llx.agent.signal/continue-start :messages messages}]]
+          [state [{:type :ol.llx.agent.signal/rejected :reason :no-queued-messages}]])))
 
     :ol.llx.agent.command/abort
     (if (= ::idle (::phase state))
@@ -260,12 +277,13 @@
                                          :tool-name    (:name first-tool)
                                          :args         (:arguments first-tool)}}
           {::fx/type :execute-tool :tool-call first-tool}]]
-        [(-> state
+        (continue-after-turn
+         (-> state
              (update :messages conj message)
              (assoc ::phase ::idle)
              (assoc :stream-message nil))
          [{::fx/type :emit-event :event {:type :ol.llx.agent.event/message-end :message message}}
-          {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end :message message}}]]))
+          {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end :message message}}])))
 
     :ol.llx.agent.signal/llm-error
     [(-> state
@@ -321,14 +339,7 @@
   (::phase state))
 
 (defn route-from-streaming [state]
-  (case (::phase state)
-    ::idle (if (or (seq (:steering-queue state))
-                   (seq (:follow-up-queue state)))
-             ::streaming
-             ::idle)
-    ::tool-executing ::tool-executing
-    ::closed ::closed
-    ::streaming))
+  (::phase state))
 
 (defn route-from-tool-executing [state]
   (case (::phase state)
