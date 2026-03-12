@@ -1,0 +1,16 @@
+{:paths ["src" "test"]
+ :deps  {com.outskirtslabs/llx              {:local/root "../.."}
+         djblue/portal                      {:mvn/version "0.63.0"}
+         ol/bramble                         {:local/root "/home/ramblurr/src/github.com/ramblurr/bramble-private/libs/bramble"}
+         town.lilac/flex                    {:local/root "/home/ramblurr/src/github.com/lilactown/flex"}
+         com.github.phronmophobic/clobber   {:local/root "/home/ramblurr/src/github.com/phronmophobic/clobber"}}
+ :aliases
+ {:dev  {:jvm-opts ["--enable-native-access=ALL-UNNAMED"
+                    "--add-opens=java.base/java.io=ALL-UNNAMED"]}
+  :run  {:jvm-opts  ["--enable-native-access=ALL-UNNAMED"
+                     "--add-opens=java.base/java.io=ALL-UNNAMED"]
+         :main-opts ["-m" "bramble-coding-agent.main"]}
+  :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+         :jvm-opts   ["--enable-native-access=ALL-UNNAMED"
+                      "--add-opens=java.base/java.io=ALL-UNNAMED"]
+         :main-opts  ["-m" "kaocha.runner"]}}}
