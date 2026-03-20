@@ -57,6 +57,7 @@
         payload          (util/json-read (:body request) {:key-fn keyword})
         input            (:input payload)
         user-msg         (first (filter #(= "user" (:role %)) input))
+        user-msgs        (filter #(= "user" (:role %)) input)
         reasoning-items  (filter #(= "reasoning" (:type %)) input)
         function-calls   (filter #(= "function_call" (:type %)) input)
         function-outputs (filter #(= "function_call_output" (:type %)) input)]
@@ -69,12 +70,18 @@
     (is (= "developer" (:role (first input))))
     (is (= "input_text" (get-in user-msg [:content 0 :type])))
     (is (= "input_image" (get-in user-msg [:content 1 :type])))
+    (is (= 2 (count user-msgs)))
     (is (= 1 (count reasoning-items)))
     (is (= 1 (count function-calls)))
     (is (= "call_abc" (:call_id (first function-calls))))
     (is (= "fc_abc" (:id (first function-calls))))
     (is (= 1 (count function-outputs)))
     (is (= "call_abc" (:call_id (first function-outputs))))
+    (is (= [{:type "input_text" :text "42"}
+            {:type      "input_image"
+             :detail    "auto"
+             :image_url "data:image/png;base64,aGVsbG8="}]
+           (:output (first function-outputs))))
     (is (= {:effort "high" :summary "detailed"}
            (:reasoning payload)))
     (is (= ["reasoning.encrypted_content"]

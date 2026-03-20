@@ -199,6 +199,26 @@
               [])))
          vec)))
 
+(defn- tool-result-output-items
+  [model content]
+  (let [text-output  (->> content
+                          (filter #(= :text (:type %)))
+                          (map :text)
+                          (remove nil?)
+                          (str/join "\n"))
+        image-items  (when (contains? (get-in model [:capabilities :input] #{}) :image)
+                       (->> content
+                            (filter #(= :image (:type %)))
+                            (mapv (partial block->input-user model))))
+        output-items (cond-> []
+                       (seq text-output)
+                       (conj {:type "input_text" :text text-output})
+
+                       (seq image-items)
+                       (into image-items))]
+    {:text-output  text-output
+     :output-items output-items}))
+
 (defn- convert-messages
   [env model context]
   (let [system-role (if (true? (get-in model [:capabilities :reasoning?])) "developer" "system")]
@@ -230,29 +250,13 @@
                  (inc idx))
 
           :tool-result
-          (let [text-output (->> (:content message)
-                                 (filter #(= :text (:type %)))
-                                 (map :text)
-                                 (remove nil?)
-                                 (str/join "\n"))
-                has-images? (some #(= :image (:type %)) (:content message))
-                [call-id]   (str/split (:tool-call-id message) #"\|" 2)
-                out         (conj out {:type    "function_call_output"
-                                       :call_id call-id
-                                       :output  (if (seq text-output) text-output "(see attached image)")})
-                out         (if (and has-images?
-                                     (contains? (get-in model [:capabilities :input] #{}) :image))
-                              (let [image-content (->> (:content message)
-                                                       (filter #(= :image (:type %)))
-                                                       (mapv (fn [block]
-                                                               {:type      "input_image"
-                                                                :detail    "auto"
-                                                                :image_url (str "data:" (:mime-type block) ";base64," (:data block))})))]
-                                (conj out {:role    "user"
-                                           :content (into [{:type "input_text"
-                                                            :text "Attached image(s) from tool result:"}]
-                                                          image-content)}))
-                              out)]
+          (let [{:keys [text-output output-items]} (tool-result-output-items model (:content message))
+                [call-id]                          (str/split (:tool-call-id message) #"\|" 2)
+                out                                (conj out {:type    "function_call_output"
+                                                              :call_id call-id
+                                                              :output  (if (seq output-items)
+                                                                         output-items
+                                                                         text-output)})]
             (recur (rest remaining) out (inc idx)))
 
           (recur (rest remaining) out (inc idx)))
