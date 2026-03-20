@@ -10,15 +10,18 @@
    [promesa.core :as p]
    [taoensso.trove :as trove]))
 
-(defn- map-stop-reason
+(defn- finish-reason->assistant-fields
   [finish-reason]
   (case finish-reason
-    "stop" :stop
-    "length" :length
-    "tool_calls" :tool-use
-    "tool" :tool-use
-    "content_filter" :error
-    (throw (ex-info "Unknown OpenAI completions stop reason" {:finish-reason finish-reason}))))
+    "stop" {:stop-reason :stop}
+    "length" {:stop-reason :length}
+    "tool_calls" {:stop-reason :tool-use}
+    "tool" {:stop-reason :tool-use}
+    "content_filter" {:stop-reason :error}
+    "network_error" {:stop-reason   :error
+                     :error-message "Provider finish_reason reported network_error"}
+    {:stop-reason   :error
+     :error-message (str "Unknown provider finish_reason: " finish-reason)}))
 
 (defn- usage->canonical
   [model usage]
@@ -361,17 +364,20 @@
                 {:status status
                  :error  (or (get-in body [:error :message]) body)})))
     (let [choice  (first (:choices body))
-          message (:message choice)]
+          message (:message choice)
+          usage   (or (:usage body) (:usage choice))
+          stop    (finish-reason->assistant-fields (:finish_reason choice))]
       (when-not choice
         (throw (ex-info "OpenAI completions response missing choices" {:body body})))
-      {:role        :assistant
-       :content     (message->canonical-content env message)
-       :api         (:api model)
-       :provider    (:provider model)
-       :model       (:id model)
-       :usage       (usage->canonical model (:usage body))
-       :stop-reason (map-stop-reason (:finish_reason choice))
-       :timestamp   ((:clock/now-ms env))})))
+      (merge
+       {:role      :assistant
+        :content   (message->canonical-content env message)
+        :api       (:api model)
+        :provider  (:provider model)
+        :model     (:id model)
+        :usage     (usage->canonical model usage)
+        :timestamp ((:clock/now-ms env))}
+       stop))))
 
 (defn init-stream-state
   [env model]
@@ -525,12 +531,16 @@
 
 (defn- apply-chunk-metadata
   [state chunk]
-  (let [state  (if-let [usage (:usage chunk)]
+  (let [choice (first (:choices chunk))
+        usage  (or (:usage chunk) (:usage choice))
+        state  (if usage
                  (assoc-in state [:assistant-message :usage] (usage->canonical (:model state) usage))
                  state)
-        choice (first (:choices chunk))
         state  (if-let [finish-reason (:finish_reason choice)]
-                 (assoc-in state [:assistant-message :stop-reason] (map-stop-reason finish-reason))
+                 (let [{:keys [stop-reason error-message]}
+                       (finish-reason->assistant-fields finish-reason)]
+                   (cond-> (assoc-in state [:assistant-message :stop-reason] stop-reason)
+                     error-message (assoc-in [:assistant-message :error-message] error-message)))
                  state)]
     {:state state :delta (:delta choice)}))
 

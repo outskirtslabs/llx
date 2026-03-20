@@ -69,7 +69,7 @@
                                         (sp/offer ch {:type :start})
                                         (deliver first-stream-started* true)
                                         (deref first-stream-release* 1000 ::timeout)
-                                        (sp/offer ch {:type :done
+                                        (sp/offer ch {:type              :done
                                                       :assistant-message (assistant-message stream-model "first" 2)})
                                         (sp/close ch))
                                       ch)
@@ -77,7 +77,7 @@
                                     (= 2 call-number)
                                     (stream-with-events
                                      [{:type :start}
-                                      {:type :done
+                                      {:type              :done
                                        :assistant-message (assistant-message stream-model "second" 4)}])
 
                                     :else

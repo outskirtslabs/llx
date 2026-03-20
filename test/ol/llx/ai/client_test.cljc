@@ -458,7 +458,7 @@
                                  (is (re-find #"Schema validation failed" (or (ex-message ex) ""))))
                                done))))
 
-(deftest complete-fails-fast-on-unknown-openai-completions-stop-reason
+(deftest complete-surfaces-unknown-openai-completions-stop-reason-as-error-message
   (util/async done
               (let [env     (stub-env (fn [_request]
                                         {:status 200
@@ -469,11 +469,13 @@
                                                    :usage   {:prompt_tokens 2 :completion_tokens 1 :total_tokens 3}})}))
                     context {:messages [{:role :user :content "hello" :timestamp 1}]}
                     d       (sut/complete* env base-model context {:api-key "x"})]
-                (rejects-with! d
-                               (fn [ex]
-                                 (is (re-find #"Unknown OpenAI completions stop reason"
-                                              (or (ex-message ex) ""))))
-                               done))))
+                (-> d
+                    (p/then (fn [out]
+                              (is (= :error (:stop-reason out)))
+                              (is (= "Unknown provider finish_reason: unknown_new_reason"
+                                     (:error-message out)))
+                              (done)))
+                    (p/catch (partial util/fail-and-done! done))))))
 
 #?(:clj
    (defn- assert-complete-retry-success!

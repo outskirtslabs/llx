@@ -320,6 +320,20 @@
     (is (= {:input 0.1 :output 0.08 :cache-read 0.06 :cache-write 0.0 :total 0.24}
            (get-in out [:usage :cost])))))
 
+(deftest response->assistant-message-falls-back-to-choice-usage
+  (let [response {:status 200
+                  :body   (util/json-write
+                           {:choices [{:finish_reason "stop"
+                                       :message       {:role "assistant" :content "ok"}
+                                       :usage         {:prompt_tokens             25
+                                                       :prompt_tokens_details     {:cached_tokens 5}
+                                                       :completion_tokens         7
+                                                       :completion_tokens_details {:reasoning_tokens 3}
+                                                       :total_tokens              35}}]})}
+        out      (sut/response->assistant-message (stub-env) openai-model response)]
+    (is (= {:input 20 :output 10 :cache-read 5 :cache-write 0 :total-tokens 35}
+           (select-keys (:usage out) [:input :output :cache-read :cache-write :total-tokens])))))
+
 (deftest decode-event-stream-usage-calculates-costs
   (let [state (sut/init-stream-state (stub-env) priced-openai-model)
         chunk {:choices [{:delta {:content "ok"}}]
@@ -331,6 +345,39 @@
         out   (sut/decode-event (stub-env) state (util/json-write chunk))]
     (is (= {:input 0.06 :output 0.06 :cache-read 0.09 :cache-write 0.0 :total 0.21}
            (get-in out [:state :assistant-message :usage :cost])))))
+
+(deftest decode-event-stream-falls-back-to-choice-usage
+  (let [state (sut/init-stream-state (stub-env) openai-model)
+        chunk {:choices [{:delta {:content "ok"}
+                          :usage {:prompt_tokens             18
+                                  :prompt_tokens_details     {:cached_tokens 3}
+                                  :completion_tokens         4
+                                  :completion_tokens_details {:reasoning_tokens 1}
+                                  :total_tokens              23}}]}
+        out   (sut/decode-event (stub-env) state (util/json-write chunk))]
+    (is (= {:input 15 :output 5 :cache-read 3 :cache-write 0 :total-tokens 23}
+           (select-keys (get-in out [:state :assistant-message :usage])
+                        [:input :output :cache-read :cache-write :total-tokens])))))
+
+(deftest response->assistant-message-maps-provider-finish-reason-errors
+  (doseq [finish-reason ["network_error" "brand_new_reason"]]
+    (let [response {:status 200
+                    :body   (util/json-write
+                             {:choices [{:finish_reason finish-reason
+                                         :message       {:role "assistant" :content "partial"}}]})}
+          out      (sut/response->assistant-message (stub-env) openai-model response)]
+      (is (= :error (:stop-reason out)))
+      (is (str/includes? (:error-message out) finish-reason)))))
+
+(deftest decode-event-maps-provider-finish-reason-errors
+  (doseq [finish-reason ["network_error" "brand_new_reason"]]
+    (let [state (sut/init-stream-state (stub-env) openai-model)
+          chunk {:choices [{:delta         {:content "partial"}
+                            :finish_reason finish-reason}]}
+          out   (sut/decode-event (stub-env) state (util/json-write chunk))]
+      (is (= :error (get-in out [:state :assistant-message :stop-reason])))
+      (is (str/includes? (get-in out [:state :assistant-message :error-message])
+                         finish-reason)))))
 
 (deftest decode-event-tracks-thinking-signature
   (let [state           (sut/init-stream-state (stub-env) reasoning-model)
