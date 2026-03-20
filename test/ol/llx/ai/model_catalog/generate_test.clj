@@ -233,7 +233,8 @@
         (is (= :ok (generate-models! {})))
         (is (string? @rendered*))
         (is (str/includes? @rendered* ":openai-codex"))
-        (is (str/includes? @rendered* "\"gpt-5.2-codex\""))))))
+        (is (str/includes? @rendered* "\"gpt-5.2-codex\""))
+        (is (str/includes? @rendered* "\"gpt-5.4-mini\""))))))
 
 (deftest generate-models-writes-artifact-using-injected-paths
   (let [generate-models! (resolve-public 'ol.llx.ai.impl.model-catalog.generate/generate-models!)

@@ -196,7 +196,7 @@
      {:input 5.0, :output 25.0, :cache-read 0.5, :cache-write 6.25},
      :max-tokens                                                     128000,
      :provider                                                       :anthropic,
-     :context-window                                                 200000},
+     :context-window                                                 1000000},
     "claude-sonnet-4-0"
     {:capabilities                                                   {:reasoning? true, :input #{:image :text}},
      :api                                                            :anthropic-messages,
@@ -251,7 +251,7 @@
      {:input 3.0, :output 15.0, :cache-read 0.3, :cache-write 3.75},
      :max-tokens                                                     64000,
      :provider                                                       :anthropic,
-     :context-window                                                 200000}},
+     :context-window                                                 1000000}},
    :google
    {"gemini-1.5-flash"
     {:capabilities                                                       {:reasoning? false, :input #{:image :text}},
@@ -1252,4 +1252,24 @@
      :cost           {:input 0.0, :output 0.0, :cache-read 0.0, :cache-write 0.0},
      :max-tokens     128000,
      :provider       :openai-codex,
-     :context-window 128000}}})
+     :context-window 128000},
+    "gpt-5.4"
+    {:capabilities   {:reasoning? true, :input #{:image :text}},
+     :api            :openai-codex-responses,
+     :name           "GPT-5.4",
+     :base-url       "https://chatgpt.com/backend-api",
+     :id             "gpt-5.4",
+     :cost           {:input 2.5, :output 15.0, :cache-read 0.25, :cache-write 0.0},
+     :max-tokens     128000,
+     :provider       :openai-codex,
+     :context-window 272000},
+    "gpt-5.4-mini"
+    {:capabilities   {:reasoning? true, :input #{:image :text}},
+     :api            :openai-codex-responses,
+     :name           "GPT-5.4 Mini",
+     :base-url       "https://chatgpt.com/backend-api",
+     :id             "gpt-5.4-mini",
+     :cost           {:input 0.25, :output 2.0, :cache-read 0.025, :cache-write 0.0},
+     :max-tokens     128000,
+     :provider       :openai-codex,
+     :context-window 272000}}})

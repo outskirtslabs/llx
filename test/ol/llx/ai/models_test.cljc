@@ -22,6 +22,8 @@
     (is (some? (models/get-model :openai "gpt-5.2-codex")))
     (is (some? (models/get-model :openai "gpt-5.4")))
     (is (some? (models/get-model :openai "gpt-5.4-pro")))
+    (is (some? (models/get-model :openai-codex "gpt-5.4")))
+    (is (some? (models/get-model :openai-codex "gpt-5.4-mini")))
     (is (some? (models/get-model :anthropic "claude-sonnet-4-6")))
     (is (some? (models/get-model :google "gemini-3.1-pro-preview")))
     (is (some? (models/get-model :google "gemini-3.1-flash-lite-preview")))))
@@ -49,6 +51,11 @@
                                          :api :anthropic-messages})))
     (is (false? (models/supports-xhigh? {:id  "gpt-4o-mini"
                                          :api :openai-completions}))))
+  (testing "direct anthropic 4.6 models use the larger context window"
+    (is (= 1000000
+           (:context-window (models/get-model :anthropic "claude-opus-4-6"))))
+    (is (= 1000000
+           (:context-window (models/get-model :anthropic "claude-sonnet-4-6")))))
   (testing "models-equal?"
     (is (true? (models/models-equal? {:provider :openai :id "gpt-4o-mini"}
                                      {:provider :openai :id "gpt-4o-mini"})))
