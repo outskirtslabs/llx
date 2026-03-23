@@ -92,9 +92,68 @@
       checks =
         let
           mkLlxPackage = pkgs: self.packages.${pkgs.system}.default;
+          mkCljsCheck =
+            pkgs:
+            let
+              root = toString ./.;
+              projectSrc = pkgs.lib.cleanSourceWith {
+                src = ./.;
+                filter =
+                  path: _type:
+                  let
+                    rel = pkgs.lib.removePrefix (root + "/") (toString path);
+                    base = builtins.baseNameOf path;
+                  in
+                  !(
+                    base == ".git"
+                    || rel == "result"
+                    || pkgs.lib.hasPrefix "node_modules/" rel
+                    || pkgs.lib.hasPrefix "target/" rel
+                    || pkgs.lib.hasPrefix ".shadow-cljs/" rel
+                    || pkgs.lib.hasPrefix ".cpcache/" rel
+                    || pkgs.lib.hasPrefix "tmp/" rel
+                  );
+              };
+              npmDeps = pkgs.fetchNpmDeps {
+                src = projectSrc;
+                hash = "sha256-loXK2ZmTWxCnP/ym4F+5ZK8pWLAunrTTSmrjwy4wyWc=";
+              };
+            in
+            pkgs.mkCljLib {
+              inherit projectSrc;
+              name = "com.outskirtslabs/llx-cljs-tests";
+              version = "0.0.1";
+              nativeBuildInputs = [
+                pkgs.coreutils
+                pkgs.nodejs
+                pkgs.npmHooks.npmConfigHook
+              ];
+              inherit npmDeps;
+              JAVA_HOME = pkgs.jdk25.home;
+              buildCommand = ''
+                export JAVA_HOME="${pkgs.jdk25.home}"
+                export JAVA_CMD="${pkgs.jdk25}/bin/java"
+                export PATH="${pkgs.nodejs}/bin:$PATH"
+                export HOME=$(mktemp -d)
+
+                # start funnel in the background (required by kaocha-cljs2)
+                clojure -M:funnel &
+                FUNNEL_PID=$!
+                sleep 2
+
+                clojure -M:dev:kaocha :cljs
+
+                kill $FUNNEL_PID 2>/dev/null || true
+              '';
+              installPhase = ''
+                mkdir -p $out
+                echo "cljs tests passed" > $out/result.txt
+              '';
+            };
         in
         {
           default = mkLlxPackage;
+          cljs = mkCljsCheck;
         };
       devShell =
         pkgs:
