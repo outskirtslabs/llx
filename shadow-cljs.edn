@@ -14,7 +14,7 @@
   {:target     :node-test
    :output-to  "target/kaocha-tests.js"
    :output-dir "target/kaocha-test/"
-   :ns-regexp  ".*-test$"
+   :ns-regexp  "^(?!ol\\.llx\\..*\\.live\\.).*-test$"
    :main       ol.llx.cljs-test-runner/main
    :autorun    false}
 
@@ -22,6 +22,6 @@
   {:target     :node-test
    :output-to  "target/kaocha-tests-live.js"
    :output-dir "target/kaocha-test-live/"
-   :ns-regexp  ".*-test$"
+   :ns-regexp  "^ol\\.llx\\..*\\.live\\..*-test$"
    :main       ol.llx.cljs-test-runner/main
    :autorun    false}}}

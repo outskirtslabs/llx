@@ -101,6 +101,10 @@
          {:doc  "Prepare Clojure dependencies"
           :task (apply clojure* "-X:deps prep :aliases '[:dev :kaocha]'")}
 
+         deps-lock
+         {:doc  "Generate deps-lock.json from the root deps.edn only"
+          :task (shell "deps-lock" "--deps-include" "deps.edn")}
+
          deps-tree
          {:doc  "Show dependency tree"
           :task (clojure* "-X:deps tree :aliases '[:dev]'")}

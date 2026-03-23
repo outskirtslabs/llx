@@ -83,8 +83,6 @@
                 export JAVA_HOME="${pkgs.jdk25.home}"
                 export JAVA_CMD="${pkgs.jdk25}/bin/java"
                 clojure -M:dev:kaocha :unit
-                clojure -M:dev:shadow-cljs compile kaocha-test
-                node target/kaocha-tests.js
                 clojure -T:build jar
               '';
             };
