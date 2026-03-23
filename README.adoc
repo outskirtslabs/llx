@@ -8,11 +8,11 @@ image:https://img.shields.io/badge/doc-outskirtslabs-orange.svg[doc,link=https:/
 image:https://img.shields.io/badge/status-experimental-orange.svg[status: experimental,link=https://docs.outskirtslabs.com/open-source-vital-signs#experimental]
 image:https://img.shields.io/clojars/v/com.outskirtslabs/llx.svg[Clojars Project,link=https://clojars.org/com.outskirtslabs/llx]
 
-`ol.llx` packages two related layers: `llx.ai` for provider-neutral LLM calls and context handoff, and `llx.agent` for multi-turn agent execution on top of that API.
+`ol.llx` packages two related layers: `ol.llx.ai` for provider-neutral LLM calls and context handoff, and `ol.llx.agent` for multi-turn agent execution on top of that API.
 
-`llx.ai` keeps context portable across providers and models by normalizing messages, stream events, tool-call state, and serialized context as far as each provider allows. In practice, that lets you switch models, including across providers, in the middle of a conversation without rebuilding context by hand.
+`ol.llx.ai` keeps context portable across providers and models by normalizing messages, stream events, tool-call state, and serialized context as far as each provider allows. In practice, that lets you switch models, including across providers, in the middle of a conversation without rebuilding context by hand.
 
-`llx.agent` builds on the same model abstraction with a pure finite state machine for streaming inference, concurrent tool execution, steering interrupts, and resumable conversation state.
+`ol.llx.agent` builds on the same model abstraction with a pure finite state machine for streaming inference, concurrent tool execution, steering interrupts, and resumable conversation state.
 
 Project status: *https://docs.outskirtslabs.com/open-source-vital-signs#experimental[Experimental]*.
 
@@ -59,7 +59,7 @@ Project status: *https://docs.outskirtslabs.com/open-source-vital-signs#experime
 (agent/close a)
 ----
 
-`llx.ai` exposes unified entrypoints at `ol.llx.ai/complete` and `ol.llx.ai/stream`, with `complete*` and `stream*` available when you need provider-specific escape hatches.
+`ol.llx.ai` exposes unified entrypoints at `ol.llx.ai/complete` and `ol.llx.ai/stream`, with `complete*` and `stream*` available when you need provider-specific escape hatches.
 
 == Documentation
 
@@ -67,15 +67,15 @@ Project status: *https://docs.outskirtslabs.com/open-source-vital-signs#experime
 * https://docs.outskirtslabs.com/ol.llx/next/api[API Reference]
 * https://github.com/outskirtslabs/llx/issues[Support via GitHub Issues]
 
-== llx.ai
+== ol.llx.ai
 
-`llx.ai` targets JVM Clojure, ClojureScript, and ClojureDart. Under the hood it is built around the API families that cover most of the current LLM ecosystem: OpenAI Completions, OpenAI Responses, Anthropic Messages, and Google Generative AI.
+`ol.llx.ai` targets JVM Clojure, ClojureScript, and ClojureDart. Under the hood it is built around the API families that cover most of the current LLM ecosystem: OpenAI Completions, OpenAI Responses, Anthropic Messages, and Google Generative AI.
 
 It absorbs provider quirks around streaming, tool calls, reasoning traces, and model behavior to present a unified API without relying on vendor SDKs or Java wrappers.
 
-== llx.agent
+== ol.llx.agent
 
-`llx.agent` sits on top of `llx.ai` and handles the multi-turn agent loop.
+`ol.llx.agent` sits on top of `ol.llx.ai` and handles the multi-turn agent loop.
 
 Feature highlights:
 
