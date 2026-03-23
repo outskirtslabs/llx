@@ -75,7 +75,6 @@
               version = "0.0.1";
               nativeBuildInputs = [
                 pkgs.coreutils
-                pkgs.nodejs
               ];
               GIT_REV = gitRev;
               JAVA_HOME = pkgs.jdk25.home;
