@@ -1,0 +1,116 @@
+= ol.llx.ai.impl.utils.unicode
+
+[discrete]
+=== 
+
+
+
+[discrete]
+=== 
+
+
+
+[#sanitize-surrogates]
+== sanitize-surrogates
+
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(sanitize-surrogates text)
+----
+
+Removes unpaired UTF-16 surrogate code units from `text`.
+
+Preserves valid surrogate pairs (for example, emoji) and removes
+standalone high/low surrogates that can break JSON serialization.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.clj#L5-L36[source,window=_blank]
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(sanitize-surrogates text)
+----
+
+Removes unpaired UTF-16 surrogate code units from `text`.
+
+Preserves valid surrogate pairs and removes standalone high/low surrogates.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.cljs#L13-L38[source,window=_blank]
+
+'''
+
+[#sanitize-payload]
+== sanitize-payload
+
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(sanitize-payload data)
+----
+
+Recursively walks a data structure, applying `sanitize-surrogates` to all strings.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.clj#L38-L41[source,window=_blank]
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(sanitize-payload data)
+----
+
+Recursively walks a data structure, applying `sanitize-surrogates` to all strings.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.cljs#L40-L43[source,window=_blank]
+
+'''
+
+[#truncate]
+== truncate
+
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(truncate s max-len)
+----
+
+Returns `s` truncated to at most `max-len` characters.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.clj#L43-L49[source,window=_blank]
+
+[discrete]
+=== 
+
+
+[source,clojure]
+----
+(truncate s max-len)
+----
+
+Returns `s` truncated to at most `max-len` characters.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/unicode.cljs#L45-L51[source,window=_blank]

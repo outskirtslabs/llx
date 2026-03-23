@@ -1,0 +1,442 @@
+= ol.llx.ai.impl.client.event-stream
+
+_platforms: clj, cljs_
+
+Shared stream runtime orchestration for all hosts.
+
+## Why
+
+Host runtimes should differ only in transport concerns (how bytes arrive, how
+cancellation reaches the underlying request). Event decoding, lifecycle
+emission, finalize behavior, and terminal error handling must stay identical.
+
+## What
+
+This namespace owns the shared stream loop:
+- opens a provider stream with retry policy
+- emits canonical `:start` / delta / `:done` events
+- converts runtime failures into canonical terminal error events
+- coordinates cancellation across producer/source and consumer/output channel
+
+## How
+
+Hosts inject two hooks:
+- `:open-stream!` to acquire the transport stream response
+- `:start-source!` to push provider payloads onto `payload-ch`
+
+The shared loop consumes payload/control channels with Promesa CSP, applies
+adapter decode/finalize functions, and emits canonical events to `out`.
+
+## Related Namespaces
+
+- xref:api/ol-llx-ai-impl-client-jvm.adoc[`ol.llx.ai.impl.client.jvm`]
+- xref:api/ol-llx-ai-impl-client-node.adoc[`ol.llx.ai.impl.client.node`]
+- xref:api/ol-llx-ai-impl-client.adoc[`ol.llx.ai.impl.client`]
+
+[#await-BANG-]
+== await!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(await! x)
+(await! x duration default-on-timeout)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L48-L62[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(await! x)
+(await! x _duration default-on-timeout)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L65-L71[source,window=_blank]
+
+'''
+
+[#open-stream-with-retries-STAR-]
+== open-stream-with-retries*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(open-stream-with-retries* {:keys [adapter env model request request-opts]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L73-L92[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(open-stream-with-retries* {:keys [adapter env model request request-opts]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L73-L92[source,window=_blank]
+
+'''
+
+[#emit-events-STAR-]
+== emit-events*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(emit-events* {:keys [emit! cancel-fn events]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L94-L108[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(emit-events* {:keys [emit! cancel-fn events]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L94-L108[source,window=_blank]
+
+'''
+
+[#emit-start-STAR-]
+== emit-start*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(emit-start* {:keys [emit! cancel-fn env model]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L110-L124[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(emit-start* {:keys [emit! cancel-fn env model]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L110-L124[source,window=_blank]
+
+'''
+
+[#decode-payload-step]
+== decode-payload-step
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(decode-payload-step {:keys [adapter env model state item-index payload]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L126-L145[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(decode-payload-step {:keys [adapter env model state item-index payload]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L126-L145[source,window=_blank]
+
+'''
+
+[#process-payload-step-STAR-]
+== process-payload-step*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(process-payload-step* {:keys [adapter env model state* emit! cancel-fn]} item-index payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L147-L163[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(process-payload-step* {:keys [adapter env model state* emit! cancel-fn]} item-index payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L147-L163[source,window=_blank]
+
+'''
+
+[#finalize-step]
+== finalize-step
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(finalize-step {:keys [adapter env state]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L165-L172[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(finalize-step {:keys [adapter env state]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L165-L172[source,window=_blank]
+
+'''
+
+[#finalize-stream-STAR-]
+== finalize-stream*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(finalize-stream* {:keys [adapter env model state* emit! cancel-fn]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L174-L194[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(finalize-stream* {:keys [adapter env model state* emit! cancel-fn]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L174-L194[source,window=_blank]
+
+'''
+
+[#emit-terminal-error-STAR-]
+== emit-terminal-error*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(emit-terminal-error* {:keys [adapter env model state* emit!]} stream-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L196-L199[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(emit-terminal-error* {:keys [adapter env model state* emit!]} stream-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L196-L199[source,window=_blank]
+
+'''
+
+[#payload-msg]
+== payload-msg
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(payload-msg payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L201-L203[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(payload-msg payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L201-L203[source,window=_blank]
+
+'''
+
+[#error-msg]
+== error-msg
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(error-msg ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L205-L207[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(error-msg ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L205-L207[source,window=_blank]
+
+'''
+
+[#run-stream-BANG-]
+== run-stream!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(run-stream! {:keys [adapter env model request out state* cancel! start-source! open-stream!] :as args})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L220-L330[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(run-stream! {:keys [adapter env model request out state* cancel! start-source! open-stream!] :as args})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/event_stream.cljc#L220-L330[source,window=_blank]

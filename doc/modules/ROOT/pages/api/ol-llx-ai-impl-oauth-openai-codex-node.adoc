@@ -1,0 +1,46 @@
+= ol.llx.ai.impl.oauth.openai-codex-node
+
+[#login-openai-codex]
+== login-openai-codex
+
+
+
+
+[source,clojure]
+----
+(login-openai-codex _callbacks)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_node.cljs#L9-L11[source,window=_blank]
+
+'''
+
+[#refresh-openai-codex-token]
+== refresh-openai-codex-token
+
+
+
+
+[source,clojure]
+----
+(refresh-openai-codex-token _refresh-token)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_node.cljs#L13-L15[source,window=_blank]
+
+'''
+
+[#oauth-provider]
+== oauth-provider
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_node.cljs#L17-L25[source,window=_blank]

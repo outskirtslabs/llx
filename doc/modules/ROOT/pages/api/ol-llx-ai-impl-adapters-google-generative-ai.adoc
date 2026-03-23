@@ -1,0 +1,276 @@
+= ol.llx.ai.impl.adapters.google-generative-ai
+
+_platforms: clj, cljs_
+
+
+[#normalize-tool-call-id]
+== normalize-tool-call-id
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(normalize-tool-call-id tool-call-id target-model _source-assistant-message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L73-L80[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(normalize-tool-call-id tool-call-id target-model _source-assistant-message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L73-L80[source,window=_blank]
+
+'''
+
+[#build-request]
+== build-request
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(build-request env model context opts)
+(build-request env model context opts stream?)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L295-L354[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(build-request env model context opts)
+(build-request env model context opts stream?)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L295-L354[source,window=_blank]
+
+'''
+
+[#decode-event]
+== decode-event
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(decode-event env state raw-chunk)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L472-L497[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(decode-event env state raw-chunk)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L472-L497[source,window=_blank]
+
+'''
+
+[#finalize]
+== finalize
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(finalize env state-or-response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L551-L562[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(finalize env state-or-response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L551-L562[source,window=_blank]
+
+'''
+
+[#normalize-error]
+== normalize-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(normalize-error env ex partial-state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L564-L589[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(normalize-error env ex partial-state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L564-L589[source,window=_blank]
+
+'''
+
+[#handle-open-stream-response]
+== handle-open-stream-response
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(handle-open-stream-response env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L591-L616[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(handle-open-stream-response env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L591-L616[source,window=_blank]
+
+'''
+
+[#open-stream]
+== open-stream
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(open-stream env _model request-map)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L618-L623[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(open-stream env _model request-map)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L618-L623[source,window=_blank]
+
+'''
+
+[#adapter]
+== adapter
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(adapter)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L625-L635[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(adapter)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L625-L635[source,window=_blank]

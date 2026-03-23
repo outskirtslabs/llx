@@ -1,0 +1,368 @@
+= ol.llx.ai.errors
+
+_platforms: clj, cljs_
+
+
+[#llx-error-QMARK-]
+== llx-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(llx-error? ex)
+----
+
+Returns true when `ex` is a structured LLX error exception.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L5-L8[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(llx-error? ex)
+----
+
+Returns true when `ex` is a structured LLX error exception.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L5-L8[source,window=_blank]
+
+'''
+
+[#recoverable-QMARK-]
+== recoverable?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(recoverable? ex)
+----
+
+Returns true when `ex` is classified as recoverable.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L10-L13[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(recoverable? ex)
+----
+
+Returns true when `ex` is classified as recoverable.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L10-L13[source,window=_blank]
+
+'''
+
+[#rate-limit-error-QMARK-]
+== rate-limit-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(rate-limit-error? ex)
+----
+
+Returns true when `ex` is a rate-limit error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L15-L18[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(rate-limit-error? ex)
+----
+
+Returns true when `ex` is a rate-limit error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L15-L18[source,window=_blank]
+
+'''
+
+[#quota-exceeded-error-QMARK-]
+== quota-exceeded-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(quota-exceeded-error? ex)
+----
+
+Returns true when `ex` is a quota-exceeded error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L20-L23[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(quota-exceeded-error? ex)
+----
+
+Returns true when `ex` is a quota-exceeded error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L20-L23[source,window=_blank]
+
+'''
+
+[#rate-limited-error-QMARK-]
+== rate-limited-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(rate-limited-error? ex)
+----
+
+Returns true when `ex` is either a rate-limit or quota-exceeded error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L25-L28[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(rate-limited-error? ex)
+----
+
+Returns true when `ex` is either a rate-limit or quota-exceeded error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L25-L28[source,window=_blank]
+
+'''
+
+[#timeout-error-QMARK-]
+== timeout-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(timeout-error? ex)
+----
+
+Returns true when `ex` is a timeout error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L30-L33[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(timeout-error? ex)
+----
+
+Returns true when `ex` is a timeout error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L30-L33[source,window=_blank]
+
+'''
+
+[#client-error-QMARK-]
+== client-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(client-error? ex)
+----
+
+Returns true when `ex` is a non-recoverable client-classified error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L35-L38[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(client-error? ex)
+----
+
+Returns true when `ex` is a non-recoverable client-classified error.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L35-L38[source,window=_blank]
+
+'''
+
+[#transient-error-QMARK-]
+== transient-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(transient-error? ex)
+----
+
+Returns true when `ex` is a transient error eligible for retry handling.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L40-L43[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(transient-error? ex)
+----
+
+Returns true when `ex` is a transient error eligible for retry handling.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L40-L43[source,window=_blank]
+
+'''
+
+[#should-retry-QMARK-]
+== should-retry?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(should-retry? ex)
+(should-retry? ex & opts)
+----
+
+Returns true when retry policy allows another attempt for `ex`.
+
+Optional keyword arguments include `:max-retries` and `:current-retry`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L45-L52[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(should-retry? ex)
+(should-retry? ex & opts)
+----
+
+Returns true when retry policy allows another attempt for `ex`.
+
+Optional keyword arguments include `:max-retries` and `:current-retry`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L45-L52[source,window=_blank]
+
+'''
+
+[#retry-delay-ms]
+== retry-delay-ms
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(retry-delay-ms ex retry-count)
+----
+
+Returns the retry delay in milliseconds for `ex` at `retry-count`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L54-L57[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(retry-delay-ms ex retry-count)
+----
+
+Returns the retry delay in milliseconds for `ex` at `retry-count`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/errors.cljc#L54-L57[source,window=_blank]

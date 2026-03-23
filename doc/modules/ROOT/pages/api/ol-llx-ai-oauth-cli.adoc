@@ -1,0 +1,16 @@
+= ol.llx.ai.oauth.cli
+
+[#-main]
+== -main
+
+
+
+
+[source,clojure]
+----
+(-main & args)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth/cli.clj#L79-L87[source,window=_blank]

@@ -1,0 +1,472 @@
+= ol.llx.ai.impl.schema
+
+_platforms: clj, cljs_
+
+
+[#non-blank-string-QMARK-]
+== non-blank-string?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(non-blank-string? s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L11-L13[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(non-blank-string? s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L11-L13[source,window=_blank]
+
+'''
+
+[#non-negative-int-QMARK-]
+== non-negative-int?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(non-negative-int? n)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L15-L17[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(non-negative-int? n)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L15-L17[source,window=_blank]
+
+'''
+
+[#non-negative-number-QMARK-]
+== non-negative-number?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(non-negative-number? n)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L19-L21[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(non-negative-number? n)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L19-L21[source,window=_blank]
+
+'''
+
+[#deferred-QMARK-]
+== deferred?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(deferred? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L23-L25[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(deferred? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L23-L25[source,window=_blank]
+
+'''
+
+[#schema-form-QMARK-]
+== schema-form?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(schema-form? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L27-L33[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(schema-form? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L27-L33[source,window=_blank]
+
+'''
+
+[#schemas]
+== schemas
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L35-L520[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L35-L520[source,window=_blank]
+
+'''
+
+[#custom-schemas]
+== custom-schemas
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(custom-schemas)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L522-L525[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(custom-schemas)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L522-L525[source,window=_blank]
+
+'''
+
+[#registry]
+== registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(registry)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L527-L530[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(registry)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L527-L530[source,window=_blank]
+
+'''
+
+[#schema]
+== schema
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(schema schema-id)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L534-L536[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(schema schema-id)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L534-L536[source,window=_blank]
+
+'''
+
+[#valid-QMARK-]
+== valid?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(valid? schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L538-L540[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(valid? schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L538-L540[source,window=_blank]
+
+'''
+
+[#explain]
+== explain
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(explain schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L542-L544[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(explain schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L542-L544[source,window=_blank]
+
+'''
+
+[#humanize]
+== humanize
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(humanize schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L546-L548[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(humanize schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L546-L548[source,window=_blank]
+
+'''
+
+[#assert-valid-BANG-]
+== assert-valid!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(assert-valid! schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L550-L558[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(assert-valid! schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L550-L558[source,window=_blank]
+
+'''
+
+[#malli--GT-json-schema]
+== malli->json-schema
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(malli->json-schema schema-form)
+----
+
+Converts a Malli schema form to a JSON Schema object map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L560-L565[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(malli->json-schema schema-form)
+----
+
+Converts a Malli schema form to a JSON Schema object map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/schema.cljc#L560-L565[source,window=_blank]

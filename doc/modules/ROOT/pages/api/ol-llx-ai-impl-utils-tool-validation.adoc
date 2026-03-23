@@ -1,0 +1,50 @@
+= ol.llx.ai.impl.utils.tool-validation
+
+_platforms: clj, cljs_
+
+
+[#validate-tool-call]
+== validate-tool-call
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(validate-tool-call tools tool-call)
+----
+
+Validates tool-call arguments against the matching tool `:input-schema`.
+
+Returns validated arguments on success.
+
+Throws `ExceptionInfo` with structured `ex-data`:
+- `{:type :ol.llx/tool-not-found ...}` when `tool-call` name is unknown.
+- `{:type :ol.llx/validation-error ...}` when arguments do not satisfy the schema.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/tool_validation.cljc#L11-L30[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(validate-tool-call tools tool-call)
+----
+
+Validates tool-call arguments against the matching tool `:input-schema`.
+
+Returns validated arguments on success.
+
+Throws `ExceptionInfo` with structured `ex-data`:
+- `{:type :ol.llx/tool-not-found ...}` when `tool-call` name is unknown.
+- `{:type :ol.llx/validation-error ...}` when arguments do not satisfy the schema.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/utils/tool_validation.cljc#L11-L30[source,window=_blank]

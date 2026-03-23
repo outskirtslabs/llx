@@ -1,0 +1,72 @@
+= ol.llx.ai.impl.oauth.core
+
+_platforms: clj, cljs_
+
+
+[#refresh-oauth-token]
+== refresh-oauth-token
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(refresh-oauth-token provider-id credentials)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/core.cljc#L17-L24[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(refresh-oauth-token provider-id credentials)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/core.cljc#L17-L24[source,window=_blank]
+
+'''
+
+[#get-oauth-api-key]
+== get-oauth-api-key
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-oauth-api-key provider-id credentials-by-provider)
+(get-oauth-api-key provider-id credentials-by-provider opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/core.cljc#L26-L56[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-oauth-api-key provider-id credentials-by-provider)
+(get-oauth-api-key provider-id credentials-by-provider opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/core.cljc#L26-L56[source,window=_blank]

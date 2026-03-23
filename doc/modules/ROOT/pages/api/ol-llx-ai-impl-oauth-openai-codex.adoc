@@ -1,0 +1,208 @@
+= ol.llx.ai.impl.oauth.openai-codex
+
+_platforms: clj, cljs_
+
+
+[#token-claim-path]
+== token-claim-path
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L6-L7[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L6-L7[source,window=_blank]
+
+'''
+
+[#default-redirect-uri]
+== default-redirect-uri
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L9-L10[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L9-L10[source,window=_blank]
+
+'''
+
+[#default-authorize-url]
+== default-authorize-url
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L12-L13[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L12-L13[source,window=_blank]
+
+'''
+
+[#default-scope]
+== default-scope
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L15-L16[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L15-L16[source,window=_blank]
+
+'''
+
+[#parse-authorization-input]
+== parse-authorization-input
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(parse-authorization-input input)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L50-L77[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(parse-authorization-input input)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L50-L77[source,window=_blank]
+
+'''
+
+[#account-id-from-access-token]
+== account-id-from-access-token
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(account-id-from-access-token token)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L99-L110[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(account-id-from-access-token token)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L99-L110[source,window=_blank]
+
+'''
+
+[#login-openai-codex]
+== login-openai-codex
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(login-openai-codex callbacks hooks)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L134-L177[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(login-openai-codex callbacks hooks)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex.cljc#L134-L177[source,window=_blank]

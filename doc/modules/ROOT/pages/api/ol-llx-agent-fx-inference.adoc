@@ -1,0 +1,122 @@
+= ol.llx.agent.fx.inference
+
+_platforms: clj, cljs_
+
+
+[#LlmEventStepSignal]
+== LlmEventStepSignal
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L15-L21[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L15-L21[source,window=_blank]
+
+'''
+
+[#LlmEventStep]
+== LlmEventStep
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L23-L27[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L23-L27[source,window=_blank]
+
+'''
+
+[#llm-event--GT-step]
+== llm-event->step
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(llm-event->step model partial event)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L157[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(llm-event->step model partial event)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L157[source,window=_blank]
+
+'''
+
+[#fx-call-llm]
+== fx-call-llm
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L178-L217[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L178-L217[source,window=_blank]

@@ -1,0 +1,344 @@
+= ol.llx.ai.impl.adapters.openai-completions
+
+_platforms: clj, cljs_
+
+
+[#build-request]
+== build-request
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(build-request env model context opts)
+(build-request env model context opts stream?)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L246-L317[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(build-request env model context opts)
+(build-request env model context opts stream?)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L246-L317[source,window=_blank]
+
+'''
+
+[#response--GT-assistant-message]
+== response->assistant-message
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(response->assistant-message env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L357-L380[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(response->assistant-message env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L357-L380[source,window=_blank]
+
+'''
+
+[#init-stream-state]
+== init-stream-state
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(init-stream-state env model)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L382-L394[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(init-stream-state env model)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L382-L394[source,window=_blank]
+
+'''
+
+[#decode-event]
+== decode-event
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(decode-event env state raw-chunk)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L596-L606[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(decode-event env state raw-chunk)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L596-L606[source,window=_blank]
+
+'''
+
+[#finalize]
+== finalize
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(finalize env state-or-response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L608-L619[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(finalize env state-or-response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L608-L619[source,window=_blank]
+
+'''
+
+[#normalize-error]
+== normalize-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(normalize-error env ex partial-state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L621-L646[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(normalize-error env ex partial-state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L621-L646[source,window=_blank]
+
+'''
+
+[#handle-open-stream-response]
+== handle-open-stream-response
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(handle-open-stream-response env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L648-L673[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(handle-open-stream-response env model response)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L648-L673[source,window=_blank]
+
+'''
+
+[#open-stream]
+== open-stream
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(open-stream env _model request-map)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L675-L680[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(open-stream env _model request-map)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L675-L680[source,window=_blank]
+
+'''
+
+[#normalize-tool-call-id]
+== normalize-tool-call-id
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(normalize-tool-call-id tool-call-id target-model source-assistant-message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L742-L761[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(normalize-tool-call-id tool-call-id target-model source-assistant-message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L742-L761[source,window=_blank]
+
+'''
+
+[#adapter]
+== adapter
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(adapter)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L763-L774[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(adapter)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_completions.cljc#L763-L774[source,window=_blank]

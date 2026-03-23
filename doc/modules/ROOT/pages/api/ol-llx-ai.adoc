@@ -1,0 +1,794 @@
+= ol.llx.ai
+
+_platforms: clj, cljs_
+
+
+[#default-env]
+== default-env
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(default-env)
+----
+
+Returns the default environment for your platform.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L12-L17[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(default-env)
+----
+
+Returns the default environment for your platform.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L12-L17[source,window=_blank]
+
+'''
+
+[#complete-STAR-]
+== complete*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(complete* env model context opts)
+----
+
+Runs one non-streaming assistant turn using provider-style options.
+
+Use `complete*` when you need provider-level control and adapter-specific
+options. This is the provider path.
+
+`opts` is validated against `:ol.llx/provider-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Adapter `build-request` boundaries also validate adapter-specific schemas:
+`:ol.llx/openai-completions-provider-options`,
+`:ol.llx/openai-responses-provider-options`,
+`:ol.llx/anthropic-provider-options`, and
+`:ol.llx/google-provider-options`.
+
+Common provider option keys:
+
+| key                  | description                                                 |
+|----------------------|-------------------------------------------------------------|
+| `:max-output-tokens` | Requested output token cap.                                 |
+| `:temperature`       | Sampling temperature.                                       |
+| `:top-p`             | Nucleus sampling probability.                               |
+| `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
+| `:session-id`        | Optional session identifier for provider-side caching/routing. |
+| `:api-key`           | Provider API key override for this call.                    |
+| `:headers`           | Additional provider request headers.                        |
+| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
+| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
+| `:metadata`          | Request metadata map forwarded to adapter payload builders. |
+| `:registry`          | Per-call adapter registry override.                         |
+| `:max-retries`       | Retry count for transient failures (default `2`).           |
+
+Returns a promise that resolves to one canonical assistant message map.
+Errors reject the promise with structured LLX exception data.
+
+Use <<complete,`complete`>> for the unified API.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L19-L56[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(complete* env model context opts)
+----
+
+Runs one non-streaming assistant turn using provider-style options.
+
+Use `complete*` when you need provider-level control and adapter-specific
+options. This is the provider path.
+
+`opts` is validated against `:ol.llx/provider-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Adapter `build-request` boundaries also validate adapter-specific schemas:
+`:ol.llx/openai-completions-provider-options`,
+`:ol.llx/openai-responses-provider-options`,
+`:ol.llx/anthropic-provider-options`, and
+`:ol.llx/google-provider-options`.
+
+Common provider option keys:
+
+| key                  | description                                                 |
+|----------------------|-------------------------------------------------------------|
+| `:max-output-tokens` | Requested output token cap.                                 |
+| `:temperature`       | Sampling temperature.                                       |
+| `:top-p`             | Nucleus sampling probability.                               |
+| `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
+| `:session-id`        | Optional session identifier for provider-side caching/routing. |
+| `:api-key`           | Provider API key override for this call.                    |
+| `:headers`           | Additional provider request headers.                        |
+| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
+| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
+| `:metadata`          | Request metadata map forwarded to adapter payload builders. |
+| `:registry`          | Per-call adapter registry override.                         |
+| `:max-retries`       | Retry count for transient failures (default `2`).           |
+
+Returns a promise that resolves to one canonical assistant message map.
+Errors reject the promise with structured LLX exception data.
+
+Use <<complete,`complete`>> for the unified API.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L19-L56[source,window=_blank]
+
+'''
+
+[#stream-STAR-]
+== stream*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(stream* env model context opts)
+----
+
+Runs one streaming assistant turn using provider-style options.
+
+Use `stream*` when you need provider-level control and adapter-specific
+options. This is the provider path.
+
+`opts` is validated against `:ol.llx/provider-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`, and adapter-specific schemas are
+enforced at each adapter `build-request` boundary.
+
+Common provider option keys:
+
+| key                  | description                                                |
+|----------------------|------------------------------------------------------------|
+| `:max-output-tokens` | Requested output token cap.                                |
+| `:temperature`       | Sampling temperature.                                      |
+| `:top-p`             | Nucleus sampling probability.                              |
+| `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
+| `:session-id`        | Optional session identifier for provider-side caching/routing. |
+| `:api-key`           | Provider API key override for this call.                   |
+| `:headers`           | Additional provider request headers.                       |
+| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
+| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
+| `:metadata`          | Request metadata map forwarded to adapter payload builders.|
+| `:registry`          | Per-call adapter registry override.                        |
+| `:max-retries`       | Retry count for transient failures (default `2`).          |
+
+Returns a Promesa CSP channel emitting canonical LLX event maps.
+Stream completion emits terminal `:done` or `:error` and closes the channel.
+Consumer cancellation is channel closure.
+
+Use <<stream,`stream`>> for the unified API.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L58-L91[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(stream* env model context opts)
+----
+
+Runs one streaming assistant turn using provider-style options.
+
+Use `stream*` when you need provider-level control and adapter-specific
+options. This is the provider path.
+
+`opts` is validated against `:ol.llx/provider-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`, and adapter-specific schemas are
+enforced at each adapter `build-request` boundary.
+
+Common provider option keys:
+
+| key                  | description                                                |
+|----------------------|------------------------------------------------------------|
+| `:max-output-tokens` | Requested output token cap.                                |
+| `:temperature`       | Sampling temperature.                                      |
+| `:top-p`             | Nucleus sampling probability.                              |
+| `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
+| `:session-id`        | Optional session identifier for provider-side caching/routing. |
+| `:api-key`           | Provider API key override for this call.                   |
+| `:headers`           | Additional provider request headers.                       |
+| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
+| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
+| `:metadata`          | Request metadata map forwarded to adapter payload builders.|
+| `:registry`          | Per-call adapter registry override.                        |
+| `:max-retries`       | Retry count for transient failures (default `2`).          |
+
+Returns a Promesa CSP channel emitting canonical LLX event maps.
+Stream completion emits terminal `:done` or `:error` and closes the channel.
+Consumer cancellation is channel closure.
+
+Use <<stream,`stream`>> for the unified API.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L58-L91[source,window=_blank]
+
+'''
+
+[#complete]
+== complete
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(complete env model context unified-opts)
+----
+
+Runs one non-streaming assistant turn using the unified options API.
+
+This is the unified path and is recommended for most callers.
+`opts` is validated against `:ol.llx/unified-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Unified options are normalized and forwarded to provider adapters.
+For example:
+- `:max-tokens` -> provider `:max-output-tokens`
+- `:reasoning` / `:reasoning-effort` -> provider reasoning shape
+
+Unified option keys:
+
+| key                 | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+| `:temperature`      | Sampling temperature.                                             |
+| `:top-p`            | Nucleus sampling probability.                                     |
+| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+| `:reasoning-effort` | Alias for `:reasoning`.                                           |
+| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
+| `:api-key`          | Provider API key override for this call.                          |
+| `:headers`          | Additional provider request headers.                              |
+| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+| `:registry`         | Per-call adapter registry override.                               |
+
+Returns a promise that resolves to one canonical assistant message map.
+Errors reject the promise with structured LLX exception data.
+
+Use <<complete-STAR-,`complete*`>> if you need provider-specific options that are outside the
+unified schema.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L93-L129[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(complete env model context unified-opts)
+----
+
+Runs one non-streaming assistant turn using the unified options API.
+
+This is the unified path and is recommended for most callers.
+`opts` is validated against `:ol.llx/unified-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Unified options are normalized and forwarded to provider adapters.
+For example:
+- `:max-tokens` -> provider `:max-output-tokens`
+- `:reasoning` / `:reasoning-effort` -> provider reasoning shape
+
+Unified option keys:
+
+| key                 | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+| `:temperature`      | Sampling temperature.                                             |
+| `:top-p`            | Nucleus sampling probability.                                     |
+| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+| `:reasoning-effort` | Alias for `:reasoning`.                                           |
+| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
+| `:api-key`          | Provider API key override for this call.                          |
+| `:headers`          | Additional provider request headers.                              |
+| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+| `:registry`         | Per-call adapter registry override.                               |
+
+Returns a promise that resolves to one canonical assistant message map.
+Errors reject the promise with structured LLX exception data.
+
+Use <<complete-STAR-,`complete*`>> if you need provider-specific options that are outside the
+unified schema.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L93-L129[source,window=_blank]
+
+'''
+
+[#stream]
+== stream
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(stream env model context unified-opts)
+----
+
+Runs one streaming assistant turn using the unified options API.
+
+This is the unified path and is recommended for most callers.
+`opts` is validated against `:ol.llx/unified-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Unified option keys:
+
+| key                 | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+| `:temperature`      | Sampling temperature.                                             |
+| `:top-p`            | Nucleus sampling probability.                                     |
+| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+| `:reasoning-effort` | Alias for `:reasoning`.                                           |
+| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
+| `:api-key`          | Provider API key override for this call.                          |
+| `:headers`          | Additional provider request headers.                              |
+| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+| `:registry`         | Per-call adapter registry override.                               |
+
+Returns a Promesa CSP channel emitting canonical LLX event maps.
+Stream completion emits terminal `:done` or `:error` and closes the channel.
+Consumer cancellation is channel closure.
+
+Use <<stream-STAR-,`stream*`>> for provider-specific option control.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L131-L162[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(stream env model context unified-opts)
+----
+
+Runs one streaming assistant turn using the unified options API.
+
+This is the unified path and is recommended for most callers.
+`opts` is validated against `:ol.llx/unified-request-options` in
+`src/ol/llx/ai/impl/schema/options.cljc`.
+
+Unified option keys:
+
+| key                 | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
+| `:temperature`      | Sampling temperature.                                             |
+| `:top-p`            | Nucleus sampling probability.                                     |
+| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
+| `:reasoning-effort` | Alias for `:reasoning`.                                           |
+| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
+| `:api-key`          | Provider API key override for this call.                          |
+| `:headers`          | Additional provider request headers.                              |
+| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
+| `:registry`         | Per-call adapter registry override.                               |
+
+Returns a Promesa CSP channel emitting canonical LLX event maps.
+Stream completion emits terminal `:done` or `:error` and closes the channel.
+Consumer cancellation is channel closure.
+
+Use <<stream-STAR-,`stream*`>> for provider-specific option control.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L131-L162[source,window=_blank]
+
+'''
+
+[#get-model]
+== get-model
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-model provider model-id)
+----
+
+Returns the model definition for `provider` and `model-id`, or `nil` when absent.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L164-L167[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-model provider model-id)
+----
+
+Returns the model definition for `provider` and `model-id`, or `nil` when absent.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L164-L167[source,window=_blank]
+
+'''
+
+[#get-models]
+== get-models
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-models provider)
+----
+
+Returns all models for `provider` as a deterministic vector sorted by `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L169-L172[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-models provider)
+----
+
+Returns all models for `provider` as a deterministic vector sorted by `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L169-L172[source,window=_blank]
+
+'''
+
+[#get-providers]
+== get-providers
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-providers)
+----
+
+Returns supported providers as a deterministic sorted vector.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L174-L177[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-providers)
+----
+
+Returns supported providers as a deterministic sorted vector.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L174-L177[source,window=_blank]
+
+'''
+
+[#calculate-cost]
+== calculate-cost
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(calculate-cost model usage)
+----
+
+Calculates usage cost totals from `model` pricing and `usage` token counts.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L179-L182[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(calculate-cost model usage)
+----
+
+Calculates usage cost totals from `model` pricing and `usage` token counts.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L179-L182[source,window=_blank]
+
+'''
+
+[#supports-xhigh-QMARK-]
+== supports-xhigh?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(supports-xhigh? model)
+----
+
+Returns true when `model` supports `:xhigh` reasoning effort.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L184-L187[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(supports-xhigh? model)
+----
+
+Returns true when `model` supports `:xhigh` reasoning effort.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L184-L187[source,window=_blank]
+
+'''
+
+[#models-equal-QMARK-]
+== models-equal?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(models-equal? a b)
+----
+
+Returns true when two model maps refer to the same `:provider` and `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L189-L192[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(models-equal? a b)
+----
+
+Returns true when two model maps refer to the same `:provider` and `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L189-L192[source,window=_blank]
+
+'''
+
+[#validate-tool-call]
+== validate-tool-call
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(validate-tool-call tools tool-call)
+----
+
+Validates a `tool-call` entry against matching tool definitions in `tools`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L194-L197[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(validate-tool-call tools tool-call)
+----
+
+Validates a `tool-call` entry against matching tool definitions in `tools`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L194-L197[source,window=_blank]
+
+'''
+
+[#context-overflow-QMARK-]
+== context-overflow?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(context-overflow? assistant-message)
+(context-overflow? assistant-message context-window)
+----
+
+Returns true when the input matches known context-window overflow patterns.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L199-L204[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(context-overflow? assistant-message)
+(context-overflow? assistant-message context-window)
+----
+
+Returns true when the input matches known context-window overflow patterns.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L199-L204[source,window=_blank]
+
+'''
+
+[#sanitize-surrogates]
+== sanitize-surrogates
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(sanitize-surrogates text)
+----
+
+Removes unpaired surrogate code units while preserving valid Unicode pairs.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L206-L209[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(sanitize-surrogates text)
+----
+
+Removes unpaired surrogate code units while preserving valid Unicode pairs.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L206-L209[source,window=_blank]
+
+'''
+
+[#schema-regsitry]
+== schema-regsitry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(schema-regsitry)
+----
+
+Returns the full LLX schema registry map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L211-L214[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(schema-regsitry)
+----
+
+Returns the full LLX schema registry map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai.cljc#L211-L214[source,window=_blank]

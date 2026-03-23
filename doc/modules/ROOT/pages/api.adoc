@@ -1,0 +1,126 @@
+= API Reference
+
+This release publishes 39 namespaces.
+
+[cols="1,3",options="header",stripes=hover]
+|===
+| Namespace | Summary
+
+| xref:api/ol-llx-agent.adoc[`ol.llx.agent`]
+| Public runtime wrapper for the agent loop.
+
+| xref:api/ol-llx-agent-driver.adoc[`ol.llx.agent.driver`]
+| Driver loop for the agent runtime.
+
+| xref:api/ol-llx-agent-fx.adoc[`ol.llx.agent.fx`]
+| Effect interpreter for the agent runtime.
+
+| xref:api/ol-llx-agent-fx-inference.adoc[`ol.llx.agent.fx.inference`]
+| -
+
+| xref:api/ol-llx-agent-fx-tools.adoc[`ol.llx.agent.fx.tools`]
+| -
+
+| xref:api/ol-llx-agent-loop.adoc[`ol.llx.agent.loop`]
+| -
+
+| xref:api/ol-llx-agent-schema.adoc[`ol.llx.agent.schema`]
+| -
+
+| xref:api/ol-llx-ai.adoc[`ol.llx.ai`]
+| -
+
+| xref:api/ol-llx-ai-errors.adoc[`ol.llx.ai.errors`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-anthropic-messages.adoc[`ol.llx.ai.impl.adapters.anthropic-messages`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-common.adoc[`ol.llx.ai.impl.adapters.common`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-google-generative-ai.adoc[`ol.llx.ai.impl.adapters.google-generative-ai`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-openai-codex-responses.adoc[`ol.llx.ai.impl.adapters.openai-codex-responses`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-openai-completions.adoc[`ol.llx.ai.impl.adapters.openai-completions`]
+| -
+
+| xref:api/ol-llx-ai-impl-adapters-openai-responses.adoc[`ol.llx.ai.impl.adapters.openai-responses`]
+| -
+
+| xref:api/ol-llx-ai-impl-client.adoc[`ol.llx.ai.impl.client`]
+| -
+
+| xref:api/ol-llx-ai-impl-client-event-stream.adoc[`ol.llx.ai.impl.client.event-stream`]
+| Shared stream runtime orchestration for all hosts.
+
+| xref:api/ol-llx-ai-impl-client-jvm.adoc[`ol.llx.ai.impl.client.jvm`]
+| -
+
+| xref:api/ol-llx-ai-impl-client-node.adoc[`ol.llx.ai.impl.client.node`]
+| -
+
+| xref:api/ol-llx-ai-impl-errors.adoc[`ol.llx.ai.impl.errors`]
+| -
+
+| xref:api/ol-llx-ai-impl-model-catalog-generate.adoc[`ol.llx.ai.impl.model-catalog.generate`]
+| -
+
+| xref:api/ol-llx-ai-impl-models.adoc[`ol.llx.ai.impl.models`]
+| -
+
+| xref:api/ol-llx-ai-impl-models-generated.adoc[`ol.llx.ai.impl.models-generated`]
+| -
+
+| xref:api/ol-llx-ai-impl-oauth-core.adoc[`ol.llx.ai.impl.oauth.core`]
+| -
+
+| xref:api/ol-llx-ai-impl-oauth-openai-codex.adoc[`ol.llx.ai.impl.oauth.openai-codex`]
+| -
+
+| xref:api/ol-llx-ai-impl-oauth-openai-codex-jvm.adoc[`ol.llx.ai.impl.oauth.openai-codex-jvm`]
+| -
+
+| xref:api/ol-llx-ai-impl-oauth-openai-codex-node.adoc[`ol.llx.ai.impl.oauth.openai-codex-node`]
+| -
+
+| xref:api/ol-llx-ai-impl-oauth-registry.adoc[`ol.llx.ai.impl.oauth.registry`]
+| -
+
+| xref:api/ol-llx-ai-impl-registry.adoc[`ol.llx.ai.impl.registry`]
+| -
+
+| xref:api/ol-llx-ai-impl-schema.adoc[`ol.llx.ai.impl.schema`]
+| -
+
+| xref:api/ol-llx-ai-impl-transform-messages.adoc[`ol.llx.ai.impl.transform-messages`]
+| -
+
+| xref:api/ol-llx-ai-impl-utils-overflow.adoc[`ol.llx.ai.impl.utils.overflow`]
+| -
+
+| xref:api/ol-llx-ai-impl-utils-rate-limit.adoc[`ol.llx.ai.impl.utils.rate-limit`]
+| -
+
+| xref:api/ol-llx-ai-impl-utils-tool-validation.adoc[`ol.llx.ai.impl.utils.tool-validation`]
+| -
+
+| xref:api/ol-llx-ai-impl-utils-unicode.adoc[`ol.llx.ai.impl.utils.unicode`]
+| -
+
+| xref:api/ol-llx-ai-oauth.adoc[`ol.llx.ai.oauth`]
+| -
+
+| xref:api/ol-llx-ai-oauth-cli.adoc[`ol.llx.ai.oauth.cli`]
+| -
+
+| xref:api/ol-llx-ai-registry.adoc[`ol.llx.ai.registry`]
+| -
+
+| xref:api/ol-llx-ai-schema-runtime.adoc[`ol.llx.ai.schema.runtime`]
+| -
+
+|===

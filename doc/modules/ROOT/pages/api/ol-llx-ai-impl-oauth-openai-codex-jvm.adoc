@@ -1,0 +1,108 @@
+= ol.llx.ai.impl.oauth.openai-codex-jvm
+
+[#client-id]
+== client-id
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L16-L17[source,window=_blank]
+
+'''
+
+[#token-url]
+== token-url
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L19-L20[source,window=_blank]
+
+'''
+
+[#create-authorization-flow]
+== create-authorization-flow
+
+
+
+
+[source,clojure]
+----
+(create-authorization-flow)
+(create-authorization-flow {:keys [originator redirect-uri]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L84-L105[source,window=_blank]
+
+'''
+
+[#start-local-oauth-server]
+== start-local-oauth-server
+
+
+
+
+[source,clojure]
+----
+(start-local-oauth-server expected-state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L115-L164[source,window=_blank]
+
+'''
+
+[#exchange-authorization-code]
+== exchange-authorization-code
+
+
+
+
+[source,clojure]
+----
+(exchange-authorization-code code verifier)
+(exchange-authorization-code code verifier redirect-uri)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L204-L212[source,window=_blank]
+
+'''
+
+[#refresh-openai-codex-token]
+== refresh-openai-codex-token
+
+
+
+
+[source,clojure]
+----
+(refresh-openai-codex-token refresh-token)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L214-L227[source,window=_blank]
+
+'''
+
+[#oauth-provider]
+== oauth-provider
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/oauth/openai_codex_jvm.clj#L229-L244[source,window=_blank]

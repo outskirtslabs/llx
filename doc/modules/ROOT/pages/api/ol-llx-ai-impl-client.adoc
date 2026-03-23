@@ -1,0 +1,450 @@
+= ol.llx.ai.impl.client
+
+_platforms: clj, cljs_
+
+
+[#default-registry]
+== default-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L23-L39[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L23-L39[source,window=_blank]
+
+'''
+
+[#unified-opts--GT-request-opts]
+== unified-opts->request-opts
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(unified-opts->request-opts model unified-opts)
+----
+
+Converts unified options to provider-path request options.
+
+See xref:api/ol-llx-ai.adoc#complete[`ol.llx.ai/complete`] and xref:api/ol-llx-ai.adoc#stream[`ol.llx.ai/stream`] for unified option semantics.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L88-L106[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(unified-opts->request-opts model unified-opts)
+----
+
+Converts unified options to provider-path request options.
+
+See xref:api/ol-llx-ai.adoc#complete[`ol.llx.ai/complete`] and xref:api/ol-llx-ai.adoc#stream[`ol.llx.ai/stream`] for unified option semantics.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L88-L106[source,window=_blank]
+
+'''
+
+[#provider-from-host]
+== provider-from-host
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(provider-from-host host)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L146-L156[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(provider-from-host host)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L146-L156[source,window=_blank]
+
+'''
+
+[#runtime-data-line--GT-payload]
+== runtime-data-line->payload
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-data-line->payload line)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L210-L215[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-data-line->payload line)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L210-L215[source,window=_blank]
+
+'''
+
+[#runtime-fallback-error-message]
+== runtime-fallback-error-message
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-fallback-error-message stream-ex normalize-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L217-L222[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-fallback-error-message stream-ex normalize-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L217-L222[source,window=_blank]
+
+'''
+
+[#runtime-fallback-assistant-message]
+== runtime-fallback-assistant-message
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-fallback-assistant-message env model stream-ex normalize-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L224-L239[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-fallback-assistant-message env model stream-ex normalize-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L224-L239[source,window=_blank]
+
+'''
+
+[#runtime-payload--GT-provider-item-type]
+== runtime-payload->provider-item-type
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-payload->provider-item-type env payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L241-L248[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-payload->provider-item-type env payload)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L241-L248[source,window=_blank]
+
+'''
+
+[#runtime-split-lines]
+== runtime-split-lines
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-split-lines buffer)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L250-L254[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-split-lines buffer)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L250-L254[source,window=_blank]
+
+'''
+
+[#runtime-terminal-error-event]
+== runtime-terminal-error-event
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(runtime-terminal-error-event adapter env model state* stream-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L269-L290[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(runtime-terminal-error-event adapter env model state* stream-ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L269-L290[source,window=_blank]
+
+'''
+
+[#complete-STAR-]
+== complete*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(complete* env model context opts)
+----
+
+See xref:api/ol-llx-ai.adoc#complete-STAR-[`ol.llx.ai/complete*`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L292-L366[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(complete* env model context opts)
+----
+
+See xref:api/ol-llx-ai.adoc#complete-STAR-[`ol.llx.ai/complete*`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L292-L366[source,window=_blank]
+
+'''
+
+[#stream-STAR-]
+== stream*
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(stream* env model context opts)
+----
+
+See xref:api/ol-llx-ai.adoc#stream-STAR-[`ol.llx.ai/stream*`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L368-L438[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(stream* env model context opts)
+----
+
+See xref:api/ol-llx-ai.adoc#stream-STAR-[`ol.llx.ai/stream*`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L368-L438[source,window=_blank]
+
+'''
+
+[#stream]
+== stream
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(stream env model context unified-opts)
+----
+
+See xref:api/ol-llx-ai.adoc#stream[`ol.llx.ai/stream`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L440-L445[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(stream env model context unified-opts)
+----
+
+See xref:api/ol-llx-ai.adoc#stream[`ol.llx.ai/stream`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L440-L445[source,window=_blank]
+
+'''
+
+[#complete]
+== complete
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(complete env model context unified-opts)
+----
+
+See xref:api/ol-llx-ai.adoc#complete[`ol.llx.ai/complete`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L447-L452[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(complete env model context unified-opts)
+----
+
+See xref:api/ol-llx-ai.adoc#complete[`ol.llx.ai/complete`]
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client.cljc#L447-L452[source,window=_blank]

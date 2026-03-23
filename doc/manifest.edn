@@ -1,0 +1,18 @@
+{:manifest/version 1,
+ :project
+ {:id "ol.llx",
+  :coord "com.outskirtslabs/llx",
+  :description
+  "Unified LLM API and agent runtime for Clojure, ClojureScript, and Clojure Dart",
+  :license "EUPL-1.2",
+  :platforms [:clj :cljs :cljd],
+  :status :experimental,
+  :created "2026-02-09",
+  :version "0.0.1"},
+ :docs
+ {:component "ol.llx",
+  :title "ol.llx",
+  :version "next",
+  :prerelease true,
+  :start-path "doc"},
+ :repo {:url "https://github.com/outskirtslabs/llx"}}

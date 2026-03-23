@@ -1,0 +1,420 @@
+= ol.llx.ai.registry
+
+_platforms: clj, cljs_
+
+
+[#immutable-registry]
+== immutable-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(immutable-registry)
+(immutable-registry registry-map)
+----
+
+Creates an immutable registry map.
+
+With no argument it creates an empty normalized registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L5-L12[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(immutable-registry)
+(immutable-registry registry-map)
+----
+
+Creates an immutable registry map.
+
+With no argument it creates an empty normalized registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L5-L12[source,window=_blank]
+
+'''
+
+[#mutable-registry]
+== mutable-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(mutable-registry registry*)
+----
+
+Wraps an atom-backed registry for mutable use cases.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L14-L17[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(mutable-registry registry*)
+----
+
+Wraps an atom-backed registry for mutable use cases.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L14-L17[source,window=_blank]
+
+'''
+
+[#dynamic-registry]
+== dynamic-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(dynamic-registry)
+----
+
+Creates a dynamic registry wrapper that resolves from thread-local bindings.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L19-L22[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(dynamic-registry)
+----
+
+Creates a dynamic registry wrapper that resolves from thread-local bindings.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L19-L22[source,window=_blank]
+
+'''
+
+[#default-registry]
+== default-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(default-registry)
+----
+
+Returns the process default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L24-L27[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(default-registry)
+----
+
+Returns the process default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L24-L27[source,window=_blank]
+
+'''
+
+[#set-default-registry-BANG-]
+== set-default-registry!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(set-default-registry! registry-value)
+----
+
+Sets the process default registry after resolving wrapper implementations.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L29-L32[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(set-default-registry! registry-value)
+----
+
+Sets the process default registry after resolving wrapper implementations.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L29-L32[source,window=_blank]
+
+'''
+
+[#resolve-registry]
+== resolve-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(resolve-registry)
+(resolve-registry registry-value)
+----
+
+Resolves supported registry wrapper implementations to a registry map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L34-L39[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(resolve-registry)
+(resolve-registry registry-value)
+----
+
+Resolves supported registry wrapper implementations to a registry map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L34-L39[source,window=_blank]
+
+'''
+
+[#register-adapter]
+== register-adapter
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(register-adapter registry-value adapter)
+(register-adapter registry-value adapter source-id)
+----
+
+Registers `adapter` in `registry-value`, with optional `source-id` metadata.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L41-L46[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(register-adapter registry-value adapter)
+(register-adapter registry-value adapter source-id)
+----
+
+Registers `adapter` in `registry-value`, with optional `source-id` metadata.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L41-L46[source,window=_blank]
+
+'''
+
+[#unregister-adapters-by-source]
+== unregister-adapters-by-source
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(unregister-adapters-by-source registry-value source-id)
+----
+
+Removes adapters from `registry-value` whose registration `source-id` matches.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L48-L51[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(unregister-adapters-by-source registry-value source-id)
+----
+
+Removes adapters from `registry-value` whose registration `source-id` matches.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L48-L51[source,window=_blank]
+
+'''
+
+[#clear-adapters]
+== clear-adapters
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(clear-adapters registry-value)
+----
+
+Removes all adapters from `registry-value`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L53-L56[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(clear-adapters registry-value)
+----
+
+Removes all adapters from `registry-value`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L53-L56[source,window=_blank]
+
+'''
+
+[#get-adapter]
+== get-adapter
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-adapter api)
+(get-adapter registry-value api)
+----
+
+Returns the adapter for an API key.
+
+With one argument, uses the default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L58-L65[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-adapter api)
+(get-adapter registry-value api)
+----
+
+Returns the adapter for an API key.
+
+With one argument, uses the default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L58-L65[source,window=_blank]
+
+'''
+
+[#get-adapters]
+== get-adapters
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-adapters)
+(get-adapters registry-value)
+----
+
+Returns all adapters in the registry.
+
+With no argument, uses the default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L67-L74[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-adapters)
+(get-adapters registry-value)
+----
+
+Returns all adapters in the registry.
+
+With no argument, uses the default registry.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/registry.cljc#L67-L74[source,window=_blank]

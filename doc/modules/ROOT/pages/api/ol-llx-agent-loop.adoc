@@ -1,0 +1,448 @@
+= ol.llx.agent.loop
+
+_platforms: clj, cljs_
+
+
+[#empty-queue]
+== empty-queue
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L5-L7[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L5-L7[source,window=_blank]
+
+'''
+
+[#handle-command]
+== handle-command
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(handle-command state cmd)
+----
+
+Pure command handler. Takes state + command, returns `[state' signals]`.
+ Handles global state mutations directly and translates FSM-driving
+ commands into signals for the graph.
+
+ Commands that only mutate state (e.g. `:ol.llx.agent.command/steer`) return an empty
+ signals vector. Commands that drive the FSM (e.g. `:ol.llx.agent.command/prompt`)
+ return one or more signals to be fed into the transition functions.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L217[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(handle-command state cmd)
+----
+
+Pure command handler. Takes state + command, returns `[state' signals]`.
+ Handles global state mutations directly and translates FSM-driving
+ commands into signals for the graph.
+
+ Commands that only mutate state (e.g. `:ol.llx.agent.command/steer`) return an empty
+ signals vector. Commands that drive the FSM (e.g. `:ol.llx.agent.command/prompt`)
+ return one or more signals to be fed into the transition functions.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L217[source,window=_blank]
+
+'''
+
+[#idle-transition]
+== idle-transition
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(idle-transition state msg)
+----
+
+Pure transition from ::idle state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L219-L248[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(idle-transition state msg)
+----
+
+Pure transition from ::idle state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L219-L248[source,window=_blank]
+
+'''
+
+[#streaming-transition]
+== streaming-transition
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(streaming-transition state msg)
+----
+
+Pure transition from ::streaming state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L250-L304[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(streaming-transition state msg)
+----
+
+Pure transition from ::streaming state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L250-L304[source,window=_blank]
+
+'''
+
+[#tool-executing-transition]
+== tool-executing-transition
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(tool-executing-transition state msg)
+----
+
+Pure transition from ::tool-executing state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L306-L331[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(tool-executing-transition state msg)
+----
+
+Pure transition from ::tool-executing state. Returns [state' effects].
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L306-L331[source,window=_blank]
+
+'''
+
+[#closed-transition]
+== closed-transition
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(closed-transition state _msg)
+----
+
+Terminal state. No transitions possible.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L333-L336[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(closed-transition state _msg)
+----
+
+Terminal state. No transitions possible.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L333-L336[source,window=_blank]
+
+'''
+
+[#route-from-idle]
+== route-from-idle
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(route-from-idle state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L338-L339[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(route-from-idle state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L338-L339[source,window=_blank]
+
+'''
+
+[#route-from-streaming]
+== route-from-streaming
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(route-from-streaming state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(route-from-streaming state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
+
+'''
+
+[#route-from-tool-executing]
+== route-from-tool-executing
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(route-from-tool-executing state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L349[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(route-from-tool-executing state)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L349[source,window=_blank]
+
+'''
+
+[#command-QMARK-]
+== command?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(command? input)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L351-L353[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(command? input)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L351-L353[source,window=_blank]
+
+'''
+
+[#graph]
+== graph
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+Agent state machine as data.
+
+ Transitions: `(state, msg) -> [state', effects]`
+   Pure transition fns. Take current state and a signal, return
+   new state and a vector of effect descriptions to execute.
+
+ Routes: `(state') -> phase-key`
+   Pure routing fns. Take the post-transition state and return
+   the keyword of the next phase to enter.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L375-L393[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+Agent state machine as data.
+
+ Transitions: `(state, msg) -> [state', effects]`
+   Pure transition fns. Take current state and a signal, return
+   new state and a vector of effect descriptions to execute.
+
+ Routes: `(state') -> phase-key`
+   Pure routing fns. Take the post-transition state and return
+   the keyword of the next phase to enter.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L375-L393[source,window=_blank]
+
+'''
+
+[#step]
+== step
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(step state input)
+(step g state input)
+----
+
+Pure step function. Takes state + input (command or signal), returns `[state' effects]`.
+
+ Commands are processed by `handle-command` which may produce signals.
+ Signals are processed by the graph transition + routing fns.
+
+ Emits `:ol.llx.agent.event/agent-end` automatically when the agent transitions from a non-idle phase back to `::idle`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L395-L413[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(step state input)
+(step g state input)
+----
+
+Pure step function. Takes state + input (command or signal), returns `[state' effects]`.
+
+ Commands are processed by `handle-command` which may produce signals.
+ Signals are processed by the graph transition + routing fns.
+
+ Emits `:ol.llx.agent.event/agent-end` automatically when the agent transitions from a non-idle phase back to `::idle`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L395-L413[source,window=_blank]

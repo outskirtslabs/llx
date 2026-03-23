@@ -1,0 +1,368 @@
+= ol.llx.agent.schema
+
+_platforms: clj, cljs_
+
+
+[#state-atom-QMARK-]
+== state-atom?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(state-atom? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L13-L16[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(state-atom? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L13-L16[source,window=_blank]
+
+'''
+
+[#queue-QMARK-]
+== queue?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(queue? coll)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L18-L21[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(queue? coll)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L18-L21[source,window=_blank]
+
+'''
+
+[#multiplexer-QMARK-]
+== multiplexer?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(multiplexer? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L23-L25[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(multiplexer? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L23-L25[source,window=_blank]
+
+'''
+
+[#schema-registry-QMARK-]
+== schema-registry?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(schema-registry? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L27-L29[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(schema-registry? x)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L27-L29[source,window=_blank]
+
+'''
+
+[#canonical-message-roles]
+== canonical-message-roles
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L31-L31[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L31-L31[source,window=_blank]
+
+'''
+
+[#custom-message-role-QMARK-]
+== custom-message-role?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(custom-message-role? role)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L33-L36[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(custom-message-role? role)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L33-L36[source,window=_blank]
+
+'''
+
+[#message-dispatch]
+== message-dispatch
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(message-dispatch message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L38-L40[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(message-dispatch message)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L38-L40[source,window=_blank]
+
+'''
+
+[#schemas]
+== schemas
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(schemas {:keys [custom-message-schemas]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L513[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(schemas {:keys [custom-message-schemas]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L513[source,window=_blank]
+
+'''
+
+[#custom-schemas]
+== custom-schemas
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(custom-schemas opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L515-L518[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(custom-schemas opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L515-L518[source,window=_blank]
+
+'''
+
+[#registry]
+== registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(registry opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L520-L524[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(registry opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L520-L524[source,window=_blank]
+
+'''
+
+[#validate-BANG-]
+== validate!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(validate! schema-registry schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L529-L538[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(validate! schema-registry schema-id data)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L529-L538[source,window=_blank]

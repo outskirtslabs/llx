@@ -1,0 +1,226 @@
+= ol.llx.ai.impl.models
+
+_platforms: clj, cljs_
+
+
+[#get-model]
+== get-model
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-model provider model-id)
+----
+
+Returns a model map for `provider` and `model-id`, or `nil` when not found.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L10-L13[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-model provider model-id)
+----
+
+Returns a model map for `provider` and `model-id`, or `nil` when not found.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L10-L13[source,window=_blank]
+
+'''
+
+[#get-providers]
+== get-providers
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-providers)
+----
+
+Returns supported providers as a deterministic sorted vector.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L15-L20[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-providers)
+----
+
+Returns supported providers as a deterministic sorted vector.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L15-L20[source,window=_blank]
+
+'''
+
+[#get-models]
+== get-models
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-models provider)
+----
+
+Returns all models for `provider` as a deterministic vector sorted by `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L22-L27[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-models provider)
+----
+
+Returns all models for `provider` as a deterministic vector sorted by `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L22-L27[source,window=_blank]
+
+'''
+
+[#calculate-cost]
+== calculate-cost
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(calculate-cost model usage)
+----
+
+Calculates usage cost totals for `model` rates and `usage` token counts.
+
+Returns a map with `:input`, `:output`, `:cache-read`, `:cache-write`, and `:total`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L29-L51[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(calculate-cost model usage)
+----
+
+Calculates usage cost totals for `model` rates and `usage` token counts.
+
+Returns a map with `:input`, `:output`, `:cache-read`, `:cache-write`, and `:total`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L29-L51[source,window=_blank]
+
+'''
+
+[#supports-xhigh-QMARK-]
+== supports-xhigh?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(supports-xhigh? model)
+----
+
+Returns true when `model` supports xhigh reasoning effort.
+
+Supports explicit capability flags and known model/API compatibility rules.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L53-L64[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(supports-xhigh? model)
+----
+
+Returns true when `model` supports xhigh reasoning effort.
+
+Supports explicit capability flags and known model/API compatibility rules.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L53-L64[source,window=_blank]
+
+'''
+
+[#models-equal-QMARK-]
+== models-equal?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(models-equal? a b)
+----
+
+Returns true when both models are non-nil and share the same `:provider` and `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L66-L72[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(models-equal? a b)
+----
+
+Returns true when both models are non-nil and share the same `:provider` and `:id`.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/models.cljc#L66-L72[source,window=_blank]

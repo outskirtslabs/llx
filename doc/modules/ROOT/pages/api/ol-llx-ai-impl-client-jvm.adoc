@@ -1,0 +1,67 @@
+= ol.llx.ai.impl.client.jvm
+
+[#start-jvm-source-BANG-]
+== start-jvm-source!
+
+
+
+
+[source,clojure]
+----
+(start-jvm-source! {:keys [response payload-ch cancelled?] :as input})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/jvm.clj#L62-L88[source,window=_blank]
+
+'''
+
+[#open-stream-jvm-BANG-]
+== open-stream-jvm!
+
+
+
+
+[source,clojure]
+----
+(open-stream-jvm! {:keys [adapter env model request request-opts]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/jvm.clj#L90-L106[source,window=_blank]
+
+'''
+
+[#run-stream-BANG-]
+== run-stream!
+
+
+
+
+[source,clojure]
+----
+(run-stream! {:keys [adapter env model request request-opts] :as input})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/jvm.clj#L108-L126[source,window=_blank]
+
+'''
+
+[#default-env]
+== default-env
+
+
+
+
+[source,clojure]
+----
+(default-env)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/jvm.clj#L128-L144[source,window=_blank]

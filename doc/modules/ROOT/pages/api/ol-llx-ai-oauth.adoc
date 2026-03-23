@@ -1,0 +1,174 @@
+= ol.llx.ai.oauth
+
+_platforms: clj, cljs_
+
+
+[#register-oauth-provider-BANG-]
+== register-oauth-provider!
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(register-oauth-provider! provider)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L13-L15[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(register-oauth-provider! provider)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L13-L15[source,window=_blank]
+
+'''
+
+[#get-oauth-provider]
+== get-oauth-provider
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-oauth-provider provider-id)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L17-L19[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-oauth-provider provider-id)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L17-L19[source,window=_blank]
+
+'''
+
+[#get-oauth-providers]
+== get-oauth-providers
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-oauth-providers)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L21-L23[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-oauth-providers)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L21-L23[source,window=_blank]
+
+'''
+
+[#refresh-oauth-token]
+== refresh-oauth-token
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(refresh-oauth-token provider-id credentials)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L25-L27[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(refresh-oauth-token provider-id credentials)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L25-L27[source,window=_blank]
+
+'''
+
+[#get-oauth-api-key]
+== get-oauth-api-key
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(get-oauth-api-key provider-id credentials-by-provider)
+(get-oauth-api-key provider-id credentials-by-provider opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L29-L33[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(get-oauth-api-key provider-id credentials-by-provider)
+(get-oauth-api-key provider-id credentials-by-provider opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/oauth.cljc#L29-L33[source,window=_blank]

@@ -1,0 +1,50 @@
+= ol.llx.ai.impl.client.node
+
+[#start-node-source-BANG-]
+== start-node-source!
+
+
+
+
+[source,clojure]
+----
+(start-node-source! {:keys [response payload-ch cancelled?] :as input})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/node.cljs#L107-L164[source,window=_blank]
+
+'''
+
+[#run-stream-BANG-]
+== run-stream!
+
+
+
+
+[source,clojure]
+----
+(run-stream! {:keys [adapter env model request request-opts] :as input})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/node.cljs#L166-L216[source,window=_blank]
+
+'''
+
+[#default-env]
+== default-env
+
+
+
+
+[source,clojure]
+----
+(default-env)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/client/node.cljs#L218-L240[source,window=_blank]

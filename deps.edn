@@ -44,5 +44,8 @@
            {:project {:name        com.outskirtslabs/llx
                       :url         "https://github.com/outskirtslabs/llx"
                       :license     {:id "EUPL-1.2"}
-                      :description "Unified LLM client for supported providers with cross-provider context handoff for CLJ, CLJS, and CLJD"
+                      :description "Unified LLM API and agent runtime for Clojure, ClojureScript, and Clojure Dart"
+                      :platforms   [:clj :cljs :cljd]
+                      :created     "2026-02-09"
+                      :status      :experimental
                       :version     "0.0.1"}}}}

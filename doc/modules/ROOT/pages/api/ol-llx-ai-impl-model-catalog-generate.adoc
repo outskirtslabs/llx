@@ -1,0 +1,160 @@
+= ol.llx.ai.impl.model-catalog.generate
+
+[#supported-provider-rules]
+== supported-provider-rules
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L10-L14[source,window=_blank]
+
+'''
+
+[#default-generated-artifact-path]
+== default-generated-artifact-path
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L16-L16[source,window=_blank]
+
+'''
+
+[#default-overrides-path]
+== default-overrides-path
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L17-L17[source,window=_blank]
+
+'''
+
+[#models-dev-url]
+== models-dev-url
+
+
+
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L18-L18[source,window=_blank]
+
+'''
+
+[#fetch-models-dev-data]
+== fetch-models-dev-data
+
+
+
+
+[source,clojure]
+----
+(fetch-models-dev-data)
+----
+
+Fetches and decodes the models.dev catalog JSON as a Clojure map.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L20-L28[source,window=_blank]
+
+'''
+
+[#build-catalog]
+== build-catalog
+
+
+
+
+[source,clojure]
+----
+(build-catalog {:keys [models-dev-data overrides]})
+----
+
+Builds canonical model entries from models.dev source data and local override patches.
+
+`overrides` is a map of `model-id -> patch-map`.
+Existing source models are patched in a fine-grained way (nested maps merged).
+If a model id is absent in source, the patch map must include a full valid model definition.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L201-L221[source,window=_blank]
+
+'''
+
+[#render-generated-source]
+== render-generated-source
+
+
+
+
+[source,clojure]
+----
+(render-generated-source catalog)
+----
+
+Renders deterministic source for `ol.llx.ai.impl.models-generated` from normalized catalog entries.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L236-L248[source,window=_blank]
+
+'''
+
+[#write-generated-artifact-BANG-]
+== write-generated-artifact!
+
+
+
+
+[source,clojure]
+----
+(write-generated-artifact! {:keys [path content]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L250-L253[source,window=_blank]
+
+'''
+
+[#generate-models-BANG-]
+== generate-models!
+
+
+
+
+[source,clojure]
+----
+(generate-models! opts)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L259-L269[source,window=_blank]
+
+'''
+
+[#-main]
+== -main
+
+
+
+
+[source,clojure]
+----
+(-main & _args)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/model_catalog/generate.clj#L271-L274[source,window=_blank]

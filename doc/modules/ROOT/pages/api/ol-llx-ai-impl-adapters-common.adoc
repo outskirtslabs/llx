@@ -1,0 +1,138 @@
+= ol.llx.ai.impl.adapters.common
+
+_platforms: clj, cljs_
+
+
+[#trim-trailing-slash]
+== trim-trailing-slash
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(trim-trailing-slash s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L3-L9[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(trim-trailing-slash s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L3-L9[source,window=_blank]
+
+'''
+
+[#parse-json-safe]
+== parse-json-safe
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(parse-json-safe env s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L11-L15[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(parse-json-safe env s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L11-L15[source,window=_blank]
+
+'''
+
+[#parse-json-lenient]
+== parse-json-lenient
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(parse-json-lenient env s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L17-L23[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(parse-json-lenient env s)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L17-L23[source,window=_blank]
+
+'''
+
+[#empty-usage]
+== empty-usage
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(empty-usage)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L25-L36[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(empty-usage)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/common.cljc#L25-L36[source,window=_blank]

@@ -1,0 +1,1196 @@
+= ol.llx.ai.impl.errors
+
+_platforms: clj, cljs_
+
+
+[#client-errors]
+== client-errors
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L7-L17[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L7-L17[source,window=_blank]
+
+'''
+
+[#transient-errors]
+== transient-errors
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L19-L23[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L19-L23[source,window=_blank]
+
+'''
+
+[#response-errors]
+== response-errors
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L25-L27[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L25-L27[source,window=_blank]
+
+'''
+
+[#all-error-types]
+== all-error-types
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L29-L30[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L29-L30[source,window=_blank]
+
+'''
+
+[#rate-limit]
+== rate-limit
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(rate-limit provider message & {:keys [http-status retry-after request-id provider-code]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L46-L55[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(rate-limit provider message & {:keys [http-status retry-after request-id provider-code]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L46-L55[source,window=_blank]
+
+'''
+
+[#server-error]
+== server-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(server-error provider message & {:keys [http-status provider-code request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L57-L65[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(server-error provider message & {:keys [http-status provider-code request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L57-L65[source,window=_blank]
+
+'''
+
+[#timeout-error]
+== timeout-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(timeout-error provider message & {:keys [timeout-ms request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L67-L74[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(timeout-error provider message & {:keys [timeout-ms request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L67-L74[source,window=_blank]
+
+'''
+
+[#connection-error]
+== connection-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(connection-error provider message & {:keys [request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L76-L82[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(connection-error provider message & {:keys [request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L76-L82[source,window=_blank]
+
+'''
+
+[#authentication-error]
+== authentication-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(authentication-error provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L84-L90[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(authentication-error provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L84-L90[source,window=_blank]
+
+'''
+
+[#authorization-error]
+== authorization-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(authorization-error provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L92-L98[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(authorization-error provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L92-L98[source,window=_blank]
+
+'''
+
+[#invalid-request]
+== invalid-request
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(invalid-request message & {:keys [provider http-status context]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L100-L107[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(invalid-request message & {:keys [provider http-status context]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L100-L107[source,window=_blank]
+
+'''
+
+[#model-not-found]
+== model-not-found
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(model-not-found provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L109-L115[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(model-not-found provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L109-L115[source,window=_blank]
+
+'''
+
+[#quota-exceeded]
+== quota-exceeded
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(quota-exceeded provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L117-L123[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(quota-exceeded provider message & {:keys [http-status]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L117-L123[source,window=_blank]
+
+'''
+
+[#retry-delay-exceeded]
+== retry-delay-exceeded
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(retry-delay-exceeded provider requested-delay-ms max-delay-ms & {:keys [request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L125-L141[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(retry-delay-exceeded provider requested-delay-ms max-delay-ms & {:keys [request-id]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L125-L141[source,window=_blank]
+
+'''
+
+[#content-filter]
+== content-filter
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(content-filter provider message & {:keys [provider-code]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L143-L149[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(content-filter provider message & {:keys [provider-code]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L143-L149[source,window=_blank]
+
+'''
+
+[#invalid-response]
+== invalid-response
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(invalid-response provider message & {:keys [context]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L151-L157[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(invalid-response provider message & {:keys [context]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L151-L157[source,window=_blank]
+
+'''
+
+[#streaming-error]
+== streaming-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(streaming-error provider message & {:keys [recoverable?]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L159-L164[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(streaming-error provider message & {:keys [recoverable?]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L159-L164[source,window=_blank]
+
+'''
+
+[#provider-error]
+== provider-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(provider-error provider message & {:keys [http-status provider-code request-id recoverable?]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L166-L174[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(provider-error provider message & {:keys [http-status provider-code request-id recoverable?]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L166-L174[source,window=_blank]
+
+'''
+
+[#unsupported-reasoning-level]
+== unsupported-reasoning-level
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(unsupported-reasoning-level model-id requested-level)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L176-L184[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(unsupported-reasoning-level model-id requested-level)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L176-L184[source,window=_blank]
+
+'''
+
+[#tool-not-found]
+== tool-not-found
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(tool-not-found tool-name available-tools)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L186-L195[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(tool-not-found tool-name available-tools)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L186-L195[source,window=_blank]
+
+'''
+
+[#validation-error]
+== validation-error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(validation-error tool-name args errors)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L197-L208[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(validation-error tool-name args errors)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L197-L208[source,window=_blank]
+
+'''
+
+[#http-status--GT-error]
+== http-status->error
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(http-status->error status provider message & {:keys [provider-code retry-after request-id body]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L210-L230[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(http-status->error status provider message & {:keys [provider-code retry-after request-id body]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L210-L230[source,window=_blank]
+
+'''
+
+[#extract-retry-after]
+== extract-retry-after
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(extract-retry-after headers & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L243-L254[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(extract-retry-after headers & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L243-L254[source,window=_blank]
+
+'''
+
+[#extract-retry-after-from-message]
+== extract-retry-after-from-message
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(extract-retry-after-from-message message & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L256-L264[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(extract-retry-after-from-message message & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L256-L264[source,window=_blank]
+
+'''
+
+[#extract-retry-after-hint]
+== extract-retry-after-hint
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(extract-retry-after-hint headers message & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L266-L269[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(extract-retry-after-hint headers message & {:keys [max-seconds] :or {max-seconds 60}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L266-L269[source,window=_blank]
+
+'''
+
+[#llx-error-QMARK-]
+== llx-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(llx-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L271-L274[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(llx-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L271-L274[source,window=_blank]
+
+'''
+
+[#recoverable-QMARK-]
+== recoverable?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(recoverable? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L276-L279[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(recoverable? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L276-L279[source,window=_blank]
+
+'''
+
+[#rate-limit-error-QMARK-]
+== rate-limit-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(rate-limit-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L281-L284[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(rate-limit-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L281-L284[source,window=_blank]
+
+'''
+
+[#quota-exceeded-error-QMARK-]
+== quota-exceeded-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(quota-exceeded-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L286-L289[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(quota-exceeded-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L286-L289[source,window=_blank]
+
+'''
+
+[#rate-limited-error-QMARK-]
+== rate-limited-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(rate-limited-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L291-L294[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(rate-limited-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L291-L294[source,window=_blank]
+
+'''
+
+[#timeout-error-QMARK-]
+== timeout-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(timeout-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L296-L299[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(timeout-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L296-L299[source,window=_blank]
+
+'''
+
+[#client-error-QMARK-]
+== client-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(client-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L301-L304[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(client-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L301-L304[source,window=_blank]
+
+'''
+
+[#transient-error-QMARK-]
+== transient-error?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(transient-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L306-L309[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(transient-error? ex)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L306-L309[source,window=_blank]
+
+'''
+
+[#should-retry-QMARK-]
+== should-retry?
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(should-retry? ex & {:keys [max-retries current-retry] :or {max-retries 2 current-retry 0}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L311-L315[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(should-retry? ex & {:keys [max-retries current-retry] :or {max-retries 2 current-retry 0}})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L311-L315[source,window=_blank]
+
+'''
+
+[#retry-delay-ms]
+== retry-delay-ms
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(retry-delay-ms ex retry-count)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L317-L332[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(retry-delay-ms ex retry-count)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L317-L332[source,window=_blank]
+
+'''
+
+[#retry-loop-async]
+== retry-loop-async
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(retry-loop-async f max-retries sleep-fn)
+(retry-loop-async f max-retries sleep-fn {:keys [call-id provider max-retry-delay-ms]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L334-L377[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(retry-loop-async f max-retries sleep-fn)
+(retry-loop-async f max-retries sleep-fn {:keys [call-id provider max-retry-delay-ms]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/errors.cljc#L334-L377[source,window=_blank]
