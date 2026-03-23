@@ -1,9 +1,10 @@
 {:deps  {}
- :paths ["test/bb"]
+ :paths ["scripts" "test/bb"]
  :tasks {:requires
          ([clojure.string :as str]
           [clojure.pprint :refer [print-table]]
           [ol.llx.bb.live-env :as live-env]
+          [ol.llx.scripts.diff-upstream :as diff-upstream]
           [babashka.tasks :refer [shell]])
 
          :init
@@ -75,6 +76,10 @@
          {:doc  "Generate built-in model catalog artifact"
           :task (do (clojure* "-M:dev" "-m" "ol.llx.ai.impl.model-catalog.generate")
                     (shell "cljfmt --quiet fix src/ol/llx/ai/impl/models_generated.cljc"))}
+
+         diff-upstream
+         {:doc  "Summarize upstream commits for selected paths"
+          :task (apply diff-upstream/-main *command-line-args*)}
 
          oauth:providers
          {:doc  "List available OAuth providers"
