@@ -24,7 +24,7 @@
                           com.cnuernber/charred                    {:mvn/version "1.038"}
                           djblue/portal                            {:mvn/version "0.63.0"}
                           criterium/criterium                      {:mvn/version "0.4.6"}
-                          thheller/shadow-cljs                     {:mvn/version "RELEASE"}
+                          thheller/shadow-cljs                     {:mvn/version "3.3.6"}
                           com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.7.0"}
                           lambdaisland/kaocha                      {:mvn/version "1.91.1392"}
                           lambdaisland/kaocha-cljs2                {:mvn/version "0.2.72"}
