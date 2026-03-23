@@ -1,5 +1,5 @@
 (ns ol.llx.agent
-  "Public runtime wrapper for the TEA agent loop.
+  "Public runtime wrapper for the agent loop.
 
    This namespace wires runtime state, effect environment dependencies,
    and subscription management around `ol.llx.agent.loop` + `ol.llx.agent.fx`."
@@ -167,18 +167,18 @@
         nil))))
 
 (defn prompt
-  "Submits a prompt command to the TEA runtime."
+  "Submits a prompt command to the agent runtime."
   [agent messages]
   (dispatch! agent {:type     :ol.llx.agent.command/prompt
                     :messages (validate-with-agent-registry! agent :ol.llx.agent/messages (or messages []))}))
 
 (defn continue
-  "Submits a continue command to the TEA runtime."
+  "Submits a continue command to the agent runtime."
   [agent]
   (dispatch! agent {:type :ol.llx.agent.command/continue}))
 
 (defn abort
-  "Submits an abort command to the TEA runtime."
+  "Submits an abort command to the agent runtime."
   [agent]
   (dispatch! agent {:type :ol.llx.agent.command/abort}))
 

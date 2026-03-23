@@ -1,5 +1,5 @@
 (ns ol.llx.agent.fx
-  "Effect interpreter for the TEA agent.
+  "Effect interpreter for the agent runtime.
 
    The pure state machine in `ol.llx.agent.loop` emits inert effect maps.
    This namespace interprets those maps into concrete side effects.

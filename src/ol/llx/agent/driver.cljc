@@ -1,5 +1,5 @@
 (ns ol.llx.agent.driver
-  "TEA driver loop for the agent runtime.
+  "Driver loop for the agent runtime.
 
    The driver is the sole owner of state transitions. It steps inputs
    through `ol.llx.agent.loop/step`, interprets resulting effects via
@@ -48,7 +48,7 @@
    effects))
 
 (defn run
-  "TEA driver loop. Processes a single input through the state machine,
+  "Driver loop. Processes a single input through the state machine,
    interprets resulting effects, and multiplexes signals from all active
    channels back through `loop/step` until the system settles.
 
