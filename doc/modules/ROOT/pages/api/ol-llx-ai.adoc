@@ -69,20 +69,22 @@ Adapter `build-request` boundaries also validate adapter-specific schemas:
 
 Common provider option keys:
 
-| key                  | description                                                 |
-|----------------------|-------------------------------------------------------------|
-| `:max-output-tokens` | Requested output token cap.                                 |
-| `:temperature`       | Sampling temperature.                                       |
-| `:top-p`             | Nucleus sampling probability.                               |
-| `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
-| `:session-id`        | Optional session identifier for provider-side caching/routing. |
-| `:api-key`           | Provider API key override for this call.                    |
-| `:headers`           | Additional provider request headers.                        |
-| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
-| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
-| `:metadata`          | Request metadata map forwarded to adapter payload builders. |
-| `:registry`          | Per-call adapter registry override.                         |
-| `:max-retries`       | Retry count for transient failures (default `2`).           |
+[options="header"]
+|===
+| key | description
+| `:max-output-tokens` | Requested output token cap.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Provider reasoning map (shape depends on adapter).
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+| `:max-retries` | Retry count for transient failures (default `2`).
+|===
 
 Returns a promise that resolves to one canonical assistant message map.
 Errors reject the promise with structured LLX exception data.
@@ -118,20 +120,22 @@ Adapter `build-request` boundaries also validate adapter-specific schemas:
 
 Common provider option keys:
 
-| key                  | description                                                 |
-|----------------------|-------------------------------------------------------------|
-| `:max-output-tokens` | Requested output token cap.                                 |
-| `:temperature`       | Sampling temperature.                                       |
-| `:top-p`             | Nucleus sampling probability.                               |
-| `:reasoning`         | Provider reasoning map (shape depends on adapter).          |
-| `:session-id`        | Optional session identifier for provider-side caching/routing. |
-| `:api-key`           | Provider API key override for this call.                    |
-| `:headers`           | Additional provider request headers.                        |
-| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
-| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
-| `:metadata`          | Request metadata map forwarded to adapter payload builders. |
-| `:registry`          | Per-call adapter registry override.                         |
-| `:max-retries`       | Retry count for transient failures (default `2`).           |
+[options="header"]
+|===
+| key | description
+| `:max-output-tokens` | Requested output token cap.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Provider reasoning map (shape depends on adapter).
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+| `:max-retries` | Retry count for transient failures (default `2`).
+|===
 
 Returns a promise that resolves to one canonical assistant message map.
 Errors reject the promise with structured LLX exception data.
@@ -168,20 +172,22 @@ enforced at each adapter `build-request` boundary.
 
 Common provider option keys:
 
-| key                  | description                                                |
-|----------------------|------------------------------------------------------------|
-| `:max-output-tokens` | Requested output token cap.                                |
-| `:temperature`       | Sampling temperature.                                      |
-| `:top-p`             | Nucleus sampling probability.                              |
-| `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
-| `:session-id`        | Optional session identifier for provider-side caching/routing. |
-| `:api-key`           | Provider API key override for this call.                   |
-| `:headers`           | Additional provider request headers.                       |
-| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
-| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
-| `:metadata`          | Request metadata map forwarded to adapter payload builders.|
-| `:registry`          | Per-call adapter registry override.                        |
-| `:max-retries`       | Retry count for transient failures (default `2`).          |
+[options="header"]
+|===
+| key | description
+| `:max-output-tokens` | Requested output token cap.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Provider reasoning map (shape depends on adapter).
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+| `:max-retries` | Retry count for transient failures (default `2`).
+|===
 
 Returns a Promesa CSP channel emitting canonical LLX event maps.
 Stream completion emits terminal `:done` or `:error` and closes the channel.
@@ -213,20 +219,22 @@ enforced at each adapter `build-request` boundary.
 
 Common provider option keys:
 
-| key                  | description                                                |
-|----------------------|------------------------------------------------------------|
-| `:max-output-tokens` | Requested output token cap.                                |
-| `:temperature`       | Sampling temperature.                                      |
-| `:top-p`             | Nucleus sampling probability.                              |
-| `:reasoning`         | Provider reasoning map (shape depends on adapter).         |
-| `:session-id`        | Optional session identifier for provider-side caching/routing. |
-| `:api-key`           | Provider API key override for this call.                   |
-| `:headers`           | Additional provider request headers.                       |
-| `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
-| `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
-| `:metadata`          | Request metadata map forwarded to adapter payload builders.|
-| `:registry`          | Per-call adapter registry override.                        |
-| `:max-retries`       | Retry count for transient failures (default `2`).          |
+[options="header"]
+|===
+| key | description
+| `:max-output-tokens` | Requested output token cap.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Provider reasoning map (shape depends on adapter).
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+| `:max-retries` | Retry count for transient failures (default `2`).
+|===
 
 Returns a Promesa CSP channel emitting canonical LLX event maps.
 Stream completion emits terminal `:done` or `:error` and closes the channel.
@@ -266,21 +274,23 @@ For example:
 
 Unified option keys:
 
-| key                 | description                                                       |
-|---------------------|-------------------------------------------------------------------|
-| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
-| `:temperature`      | Sampling temperature.                                             |
-| `:top-p`            | Nucleus sampling probability.                                     |
-| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
-| `:reasoning-effort` | Alias for `:reasoning`.                                           |
-| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
-| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
-| `:api-key`          | Provider API key override for this call.                          |
-| `:headers`          | Additional provider request headers.                              |
-| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
-| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
-| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
-| `:registry`         | Per-call adapter registry override.                               |
+[options="header"]
+|===
+| key | description
+| `:max-tokens` | Requested output cap. Defaults to `min(model.max-tokens, 32000)`.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`).
+| `:reasoning-effort` | Alias for `:reasoning`.
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+|===
 
 Returns a promise that resolves to one canonical assistant message map.
 Errors reject the promise with structured LLX exception data.
@@ -314,21 +324,23 @@ For example:
 
 Unified option keys:
 
-| key                 | description                                                       |
-|---------------------|-------------------------------------------------------------------|
-| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
-| `:temperature`      | Sampling temperature.                                             |
-| `:top-p`            | Nucleus sampling probability.                                     |
-| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
-| `:reasoning-effort` | Alias for `:reasoning`.                                           |
-| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
-| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
-| `:api-key`          | Provider API key override for this call.                          |
-| `:headers`          | Additional provider request headers.                              |
-| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
-| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
-| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
-| `:registry`         | Per-call adapter registry override.                               |
+[options="header"]
+|===
+| key | description
+| `:max-tokens` | Requested output cap. Defaults to `min(model.max-tokens, 32000)`.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`).
+| `:reasoning-effort` | Alias for `:reasoning`.
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+|===
 
 Returns a promise that resolves to one canonical assistant message map.
 Errors reject the promise with structured LLX exception data.
@@ -363,21 +375,23 @@ This is the unified path and is recommended for most callers.
 
 Unified option keys:
 
-| key                 | description                                                       |
-|---------------------|-------------------------------------------------------------------|
-| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
-| `:temperature`      | Sampling temperature.                                             |
-| `:top-p`            | Nucleus sampling probability.                                     |
-| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
-| `:reasoning-effort` | Alias for `:reasoning`.                                           |
-| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
-| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
-| `:api-key`          | Provider API key override for this call.                          |
-| `:headers`          | Additional provider request headers.                              |
-| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
-| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
-| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
-| `:registry`         | Per-call adapter registry override.                               |
+[options="header"]
+|===
+| key | description
+| `:max-tokens` | Requested output cap. Defaults to `min(model.max-tokens, 32000)`.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`).
+| `:reasoning-effort` | Alias for `:reasoning`.
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+|===
 
 Returns a Promesa CSP channel emitting canonical LLX event maps.
 Stream completion emits terminal `:done` or `:error` and closes the channel.
@@ -406,21 +420,23 @@ This is the unified path and is recommended for most callers.
 
 Unified option keys:
 
-| key                 | description                                                       |
-|---------------------|-------------------------------------------------------------------|
-| `:max-tokens`       | Requested output cap. Defaults to `min(model.max-tokens, 32000)`. |
-| `:temperature`      | Sampling temperature.                                             |
-| `:top-p`            | Nucleus sampling probability.                                     |
-| `:reasoning`        | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`). |
-| `:reasoning-effort` | Alias for `:reasoning`.                                           |
-| `:session-id`       | Optional session identifier for provider-side caching/routing.    |
-| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).  |
-| `:api-key`          | Provider API key override for this call.                          |
-| `:headers`          | Additional provider request headers.                              |
-| `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
-| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
-| `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
-| `:registry`         | Per-call adapter registry override.                               |
+[options="header"]
+|===
+| key | description
+| `:max-tokens` | Requested output cap. Defaults to `min(model.max-tokens, 32000)`.
+| `:temperature` | Sampling temperature.
+| `:top-p` | Nucleus sampling probability.
+| `:reasoning` | Reasoning level keyword (`:minimal` `:low` `:medium` `:high` `:xhigh`).
+| `:reasoning-effort` | Alias for `:reasoning`.
+| `:session-id` | Optional session identifier for provider-side caching/routing.
+| `:thinking-budgets` | Optional token budgets per reasoning level (provider-dependent).
+| `:api-key` | Provider API key override for this call.
+| `:headers` | Additional provider request headers.
+| `:signal` | Abort/cancel signal forwarded to runtime/provider layer.
+| `:max-retry-delay-ms` | Optional cap for server-requested retry delays.
+| `:metadata` | Request metadata map forwarded to adapter payload builders.
+| `:registry` | Per-call adapter registry override.
+|===
 
 Returns a Promesa CSP channel emitting canonical LLX event maps.
 Stream completion emits terminal `:done` or `:error` and closes the channel.
