@@ -8,11 +8,24 @@ image:https://img.shields.io/badge/doc-outskirtslabs-orange.svg[doc,link=https:/
 image:https://img.shields.io/badge/status-experimental-orange.svg[status: experimental,link=https://docs.outskirtslabs.com/open-source-vital-signs#experimental]
 image:https://img.shields.io/clojars/v/com.outskirtslabs/llx.svg[Clojars Project,link=https://clojars.org/com.outskirtslabs/llx]
 
-`ol.llx` packages two related layers: `ol.llx.ai` for provider-neutral LLM calls and context handoff, and `ol.llx.agent` for multi-turn agent execution on top of that API.
+== ol.llx.ai
 
-`ol.llx.ai` keeps context portable across providers and models by normalizing messages, stream events, tool-call state, and serialized context as far as each provider allows. In practice, that lets you switch models, including across providers, in the middle of a conversation without rebuilding context by hand.
+`ol.llx.ai` targets JVM Clojure, ClojureScript, and ClojureDart. Under the hood it is built around the API families that cover most of the current LLM ecosystem: OpenAI Completions, OpenAI Responses, Anthropic Messages, and Google Generative AI.
 
-`ol.llx.agent` builds on the same model abstraction with a pure finite state machine for streaming inference, concurrent tool execution, steering interrupts, and resumable conversation state.
+It absorbs provider quirks around streaming, tool calls, reasoning traces, and model behavior to present a unified API without relying on vendor SDKs or Java wrappers.
+
+== ol.llx.agent
+
+`ol.llx.agent` sits on top of `ol.llx.ai` and handles the multi-turn agent loop.
+
+Feature highlights:
+
+* tools run concurrently and can be aborted mid-execution
+* the steering queue can interrupt an active run, skip pending tools, and re-prompt
+* the follow-up queue can defer messages until the current turn finishes
+* event subscriptions expose structured turn, message, and tool lifecycle events
+* agent state can be snapshotted and rehydrated by the application
+* custom message roles allow app-specific history that is filtered before LLM submission
 
 Project status: *https://docs.outskirtslabs.com/open-source-vital-signs#experimental[Experimental]*.
 
@@ -64,26 +77,8 @@ Only git dep usage will be supported for now while we are in the experimental ph
 
 * https://docs.outskirtslabs.com/ol.llx/next/[Docs]
 * https://docs.outskirtslabs.com/ol.llx/next/api[API Reference]
+* link:examples/minimal-coding-agent/README.md[Example: Minimal Coding Agent]
 * https://github.com/outskirtslabs/llx/issues[Support via GitHub Issues]
-
-== ol.llx.ai
-
-`ol.llx.ai` targets JVM Clojure, ClojureScript, and ClojureDart. Under the hood it is built around the API families that cover most of the current LLM ecosystem: OpenAI Completions, OpenAI Responses, Anthropic Messages, and Google Generative AI.
-
-It absorbs provider quirks around streaming, tool calls, reasoning traces, and model behavior to present a unified API without relying on vendor SDKs or Java wrappers.
-
-== ol.llx.agent
-
-`ol.llx.agent` sits on top of `ol.llx.ai` and handles the multi-turn agent loop.
-
-Feature highlights:
-
-* tools run concurrently and can be aborted mid-execution
-* the steering queue can interrupt an active run, skip pending tools, and re-prompt
-* the follow-up queue can defer messages until the current turn finishes
-* event subscriptions expose structured turn, message, and tool lifecycle events
-* agent state can be snapshotted and rehydrated by the application
-* custom message roles allow app-specific history that is filtered before LLM submission
 
 == License
 
