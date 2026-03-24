@@ -18,13 +18,12 @@ Project status: *https://docs.outskirtslabs.com/open-source-vital-signs#experime
 
 == Installation
 
+Only git dep usage will be supported for now while we are in the experimental phase.
+
 [source,clojure]
 ----
 ;; deps.edn
-{:deps {com.outskirtslabs/llx {:mvn/version "0.0.1"}}}
-
-;; Leiningen
-[com.outskirtslabs/llx "0.0.1"]
+{:deps {io.github.outskirtslabs/llx {:git/sha "3427a11a5ddff01d21b6c6fe24374cac270ecf62"}}}
 ----
 
 == Quick Start
