@@ -171,7 +171,7 @@
             provider-code (get-in body [:error :type])
             request-id    (get headers "x-request-id")
             retry-after   (errors/extract-retry-after-hint headers message)]
-        (trove/log! {:level :info
+        (trove/log! {:level :debug
                      :id    :ol.llx.obs/http-status-error
                      :data  {:call-id       (:call/id env)
                              :operation     operation
@@ -319,7 +319,7 @@
                                              (if (p/deferred? response)
                                                (p/then response handle)
                                                (p/resolved (handle response)))))]
-           (trove/log! {:level :info
+           (trove/log! {:level :debug
                         :id    :ol.llx.obs/call-start
                         :data  {:call-id            (:call/id call-env)
                                 :operation          :complete
@@ -337,7 +337,7 @@
                          (let [{:keys [assistant-message]} (schema/assert-valid!
                                                             :ol.llx/runtime-finalize-result
                                                             ((:finalize adapter) call-env {:model model :response response}))]
-                           (trove/log! {:level :info
+                           (trove/log! {:level :debug
                                         :id    :ol.llx.obs/call-finished
                                         :data  {:call-id             (:call/id call-env)
                                                 :operation           :complete
@@ -392,7 +392,7 @@
              out                       (sp/chan :buf (sp/sliding-buffer 64))]
          (when-not run-stream!
            (throw (ex-info "Environment missing :stream/run! runtime hook" {})))
-         (trove/log! {:level :info
+         (trove/log! {:level :debug
                       :id    :ol.llx.obs/call-start
                       :data  {:call-id            (:call/id call-env)
                               :operation          :stream

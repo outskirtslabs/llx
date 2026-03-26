@@ -308,13 +308,13 @@
                                             done-event (util/first-event logs* :ol.llx.obs/call-finished)]
                                         (is (util/submap?
                                              {:id    :ol.llx.obs/call-start
-                                              :level :info
+                                              :level :debug
                                               :data  {:operation :complete
                                                       :model-id  "gpt-4o-mini"}}
                                              (util/strip-generated start [:call-id :provider :api :message-count :has-tools? :has-system-prompt?])))
                                         (is (util/submap?
                                              {:id    :ol.llx.obs/call-finished
-                                              :level :info
+                                              :level :debug
                                               :data  {:operation   :complete
                                                       :stop-reason :stop}}
                                              (util/strip-generated done-event [:call-id :provider :api :model-id :usage :content-block-count])))
@@ -339,7 +339,7 @@
                                              failed (util/first-event logs* :ol.llx.obs/call-error)]
                                          (is (util/submap?
                                               {:id    :ol.llx.obs/http-status-error
-                                               :level :info
+                                               :level :debug
                                                :data  {:status 401}}
                                               (util/strip-generated status [:call-id :operation :provider :api :model-id :request-id :provider-code :retry-after :error-type])))
                                          (is (util/submap?

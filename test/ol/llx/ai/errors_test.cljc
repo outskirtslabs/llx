@@ -384,7 +384,7 @@
                event      (util/first-event logs* :ol.llx.obs/retry-scheduled)]
            (is (util/submap?
                 {:id    :ol.llx.obs/retry-scheduled
-                 :level :info
+                 :level :debug
                  :data  {:call-id      "call_1"
                          :attempt      0
                          :next-attempt 1
@@ -412,7 +412,7 @@
                                 (let [event (util/first-event logs* :ol.llx.obs/retry-scheduled)]
                                   (is (util/submap?
                                        {:id    :ol.llx.obs/retry-scheduled
-                                        :level :info
+                                        :level :debug
                                         :data  {:call-id      "call_1"
                                                 :attempt      0
                                                 :next-attempt 1

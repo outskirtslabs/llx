@@ -109,7 +109,7 @@
 
 (defn emit-start*
   [{:keys [emit! cancel-fn env model]}]
-  (trove/log! {:level :info
+  (trove/log! {:level :debug
                :id    :ol.llx.obs/stream-start
                :data  {:call-id  (:call/id env)
                        :provider (:provider model)
@@ -182,7 +182,7 @@
                   (if-not events-ok?
                     false
                     (do
-                      (trove/log! {:level :info
+                      (trove/log! {:level :debug
                                    :id    :ol.llx.obs/stream-done
                                    :data  {:call-id             (:call/id env)
                                            :provider            (:provider model)

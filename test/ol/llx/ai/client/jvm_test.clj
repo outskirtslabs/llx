@@ -224,7 +224,7 @@
               item  (util/first-event logs* :ol.llx.obs/stream-item-received)
               done  (util/first-event logs* :ol.llx.obs/stream-done)]
           (is (util/submap?
-               {:id   :ol.llx.obs/stream-start                                                               :level :info
+               {:id   :ol.llx.obs/stream-start                                                               :level :debug
                 :data {:call-id "call_1" :provider :openai :api :openai-completions :model-id "gpt-4o-mini"}}
                (util/strip-generated start)))
           (is (util/submap?
@@ -233,7 +233,7 @@
                        :item-index 0        :llx-event-type :text-start :done? false}}
                (util/strip-generated item)))
           (is (util/submap?
-               {:id   :ol.llx.obs/stream-done                                                                              :level :info
+               {:id   :ol.llx.obs/stream-done                                                                              :level :debug
                 :data {:call-id     "call_1" :provider            :openai :api :openai-completions :model-id "gpt-4o-mini"
                        :stop-reason :stop    :content-block-count 1}}
                (util/strip-generated done [:usage]))))))))

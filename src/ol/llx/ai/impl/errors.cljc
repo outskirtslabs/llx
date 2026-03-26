@@ -359,7 +359,7 @@
                            (retry-delay-exceeded provider delay-ms max-retry-delay-ms
                                                  :request-id (:request-id exd)))
                           (do
-                            (trove/log! {:level :info
+                            (trove/log! {:level :debug
                                          :id    :ol.llx.obs/retry-scheduled
                                          :data  {:call-id      call-id
                                                  :attempt      attempt
