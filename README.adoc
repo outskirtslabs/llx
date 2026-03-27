@@ -36,7 +36,7 @@ Only git dep usage will be supported for now while we are in the experimental ph
 [source,clojure]
 ----
 ;; deps.edn
-{:deps {io.github.outskirtslabs/llx {:git/sha "a24f7b0cb6c4a95a5a204a9c31989b6f09446573"}}}
+{:deps {io.github.outskirtslabs/llx {:git/sha "39ecaa7d63d21cb9779f117c3bb0a7ca3c23890e"}}}
 ----
 
 == Quick Start
