@@ -79,9 +79,11 @@
              {:role  "user"
               :parts [{:text "Tool result image:"}
                       {:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}
-             {:role "user" :parts [{:text "Now summarize in one sentence."}]}]
+            {:role "user" :parts [{:text "Now summarize in one sentence."}]}]
             :generationConfig
-            {:temperature 0.25 :maxOutputTokens 256}
+            {:temperature    0.25
+             :maxOutputTokens 256
+             :thinkingConfig {:thinkingBudget 0}}
             :systemInstruction
             {:role "user" :parts [{:text "You are a helpful assistant."}]}
             :tools
@@ -421,6 +423,14 @@
          (thinking-config google-25-pro-model :high)))
   (is (= {:includeThoughts true :thinkingBudget 24576}
          (thinking-config google-model :high))))
+
+(deftest reasoning-config-disables-thinking-by-default-for-gemini-25
+  (is (= {:thinkingBudget 0}
+         (thinking-config google-model nil))))
+
+(deftest reasoning-config-disables-thinking-by-default-for-gemini-3
+  (is (= {:thinkingLevel "MINIMAL"}
+         (thinking-config google-gemini3-model nil))))
 
 (deftest reasoning-config-omitted-when-model-not-reasoning
   (is (nil? (thinking-config (assoc-in google-model [:capabilities :reasoning?] false)

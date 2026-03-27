@@ -277,20 +277,33 @@
 
       :else -1)))
 
+(defn- disabled-thinking-config
+  [model]
+  (cond
+    (gemini-3-pro-model? model)
+    {:thinkingLevel "LOW"}
+
+    (gemini-3-flash-model? model)
+    {:thinkingLevel "MINIMAL"}
+
+    :else
+    {:thinkingBudget 0}))
+
 (defn- reasoning->thinking-config
   [model reasoning thinking-budgets]
-  (when (and (true? (get-in model [:capabilities :reasoning?]))
-             (map? reasoning))
-    (let [effort (or (:level reasoning) (:effort reasoning) :medium)]
-      (cond
-        (or (gemini-3-pro-model? model) (gemini-3-flash-model? model))
-        {:includeThoughts true
-         :thinkingLevel   (gemini3-thinking-level effort model)}
-
-        :else
-        (let [budget (google-thinking-budget model effort thinking-budgets)]
+  (when (true? (get-in model [:capabilities :reasoning?]))
+    (if (map? reasoning)
+      (let [effort (or (:level reasoning) (:effort reasoning) :medium)]
+        (cond
+          (or (gemini-3-pro-model? model) (gemini-3-flash-model? model))
           {:includeThoughts true
-           :thinkingBudget  budget})))))
+           :thinkingLevel   (gemini3-thinking-level effort model)}
+
+          :else
+          (let [budget (google-thinking-budget model effort thinking-budgets)]
+            {:includeThoughts true
+             :thinkingBudget  budget})))
+      (disabled-thinking-config model))))
 
 (>defn build-request
        ([env model context opts]
