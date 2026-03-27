@@ -322,11 +322,8 @@
                                        :include ["reasoning.encrypted_content"])
 
                                 (and (true? (get-in model [:capabilities :reasoning?]))
-                                     (not (map? (:reasoning opts)))
-                                     (str/starts-with? (:id model) "gpt-5"))
-                                (update :input conj {:role    "developer"
-                                                     :content [{:type "input_text"
-                                                                :text "# Juice: 0 !important"}]}))
+                                     (not (map? (:reasoning opts))))
+                                (assoc :reasoning {:effort "none"}))
               sanitized       ((:unicode/sanitize-payload env) payload)
               body            ((:json/encode env) sanitized)
               headers         (cond-> {"Content-Type"  "application/json"

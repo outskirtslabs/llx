@@ -86,6 +86,12 @@
     (is (nil? (:max_output_tokens payload)))
     (is (nil? (:prompt_cache_retention payload)))))
 
+(deftest build-request-disables-reasoning-when-no-reasoning-opts
+  (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+        request (sut/build-request (stub-env) codex-model context {:api-key account-token} false)
+        payload (util/json-read (:body request) {:key-fn keyword})]
+    (is (= {:effort "none"} (:reasoning payload)))))
+
 (deftest build-request-rejects-token-missing-account-id
   (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}]
     (is (thrown-with-msg?

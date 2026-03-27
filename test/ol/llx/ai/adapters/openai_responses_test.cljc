@@ -132,6 +132,17 @@
     (is (= "msg_original_1" (:id item)))
     (is (= "final_answer" (:phase item)))))
 
+(deftest build-request-disables-reasoning-when-no-reasoning-opts
+  (let [context {:messages [{:role :user :content "hello" :timestamp 1}]}
+        request (sut/build-request (stub-env) openai-responses-model context {:api-key "openai-key"} false)
+        payload (util/json-read (:body request) {:key-fn keyword})
+        texts   (mapcat (fn [item]
+                          (map :text (:content item)))
+                        (filter #(= "developer" (:role %)) (:input payload)))]
+    (is (= {:effort "none"} (:reasoning payload)))
+    (is (nil? (:include payload)))
+    (is (not-any? #{"# Juice: 0 !important"} texts))))
+
 (deftest normalize-tool-call-id-normalizes-pipe-ids-and-preserves-pairing
   (let [messages  (fixture "pipe_id_prefilled")
         out       (transform-messages/for-target-model
