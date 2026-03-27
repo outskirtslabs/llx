@@ -147,17 +147,35 @@
     (is (<= (count (second (str/split call-id #"\|" 2))) 64))
     (is (= call-id result-id))))
 
-(deftest normalize-tool-call-id-uses-plain-slice-without-hash-suffix
-  (let [prefix   (apply str (repeat 90 "a"))
-        long-id1 (str "call_" prefix "111|item_" prefix "111")
-        out-1    (sut/normalize-tool-call-id long-id1 openai-responses-model nil)
-        [c1 i1]  (str/split out-1 #"\|" 2)
-        expect-c (subs (str "call_" prefix "111") 0 64)
-        expect-i (str "fc_" (subs (str "item_" prefix "111") 0 61))]
-    (is (<= (count c1) 64))
+(deftest normalize-tool-call-id-hashes-foreign-item-ids
+  (let [prefix           (apply str (repeat 90 "a"))
+        source-id        (str "call_" prefix "111|item_" prefix "111")
+        source-assistant {:provider :anthropic
+                          :api      :anthropic-messages
+                          :model    "claude-sonnet-4-5"}
+        out-1            (sut/normalize-tool-call-id source-id openai-responses-model source-assistant)
+        out-2            (sut/normalize-tool-call-id source-id openai-responses-model source-assistant)
+        [c1 i1]          (str/split out-1 #"\|" 2)
+        [c2 i2]          (str/split out-2 #"\|" 2)
+        expected-call-id (subs (str "call_" prefix "111") 0 64)
+        old-item-shape   (str "fc_" (subs (str "item_" prefix "111") 0 61))]
+    (is (= expected-call-id c1))
+    (is (= c1 c2))
+    (is (= i1 i2))
+    (is (str/starts-with? i1 "fc_"))
     (is (<= (count i1) 64))
-    (is (= expect-c c1))
-    (is (= expect-i i1))))
+    (is (not= old-item-shape i1))))
+
+(deftest normalize-tool-call-id-preserves-same-provider-item-ids
+  (let [prefix            (apply str (repeat 90 "a"))
+        source-id         (str "call_" prefix "111|item_" prefix "111")
+        source-assistant  {:provider :openai
+                           :api      :openai-responses
+                           :model    "gpt-5-mini"}
+        out-id            (sut/normalize-tool-call-id source-id openai-responses-model source-assistant)
+        [call-id item-id] (str/split out-id #"\|" 2)]
+    (is (= (subs (str "call_" prefix "111") 0 64) call-id))
+    (is (= (str "fc_" (subs (str "item_" prefix "111") 0 61)) item-id))))
 
 (deftest normalize-tool-call-id-trims-trailing-underscores-and-enforces-fc-prefix
   (let [source "call/abc___|item/xyz___"

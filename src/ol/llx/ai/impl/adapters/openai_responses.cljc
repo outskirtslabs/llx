@@ -66,15 +66,34 @@
       (unicode/truncate 64)
       (str/replace #"_+$" "")))
 
+(defn- foreign-tool-call?
+  [target-model source-assistant-message]
+  (and (map? source-assistant-message)
+       (or (not= (:provider source-assistant-message) (:provider target-model))
+           (not= (:api source-assistant-message) (:api target-model)))))
+
+(defn- short-hash
+  [s]
+  (let [h (hash (str (or s "")))]
+    (if (neg? h)
+      (str "n" (- h))
+      (str h))))
+
+(defn- hashed-item-id
+  [item-id]
+  (sanitize-and-limit-id (str "fc_" (short-hash item-id))))
+
 (defn normalize-tool-call-id
-  [tool-call-id target-model _source-assistant-message]
+  [tool-call-id target-model source-assistant-message]
   (let [provider (keyword (or (:provider target-model) :unknown))]
     (if (and (allowed-tool-call-id-providers provider)
              (string? tool-call-id)
              (str/includes? tool-call-id "|"))
       (let [[call-id item-id] (str/split tool-call-id #"\|" 2)
             call-id           (sanitize-and-limit-id call-id)
-            item-id           (sanitize-and-limit-id item-id)
+            item-id           (if (foreign-tool-call? target-model source-assistant-message)
+                                (hashed-item-id item-id)
+                                (sanitize-and-limit-id item-id))
             item-id           (if (str/starts-with? item-id "fc") item-id (str "fc_" item-id))
             item-id           (sanitize-and-limit-id item-id)]
         (str call-id "|" item-id))
