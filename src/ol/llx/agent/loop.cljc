@@ -290,16 +290,14 @@
          (assoc ::phase ::idle)
          (assoc :error (:error msg)))
      [{::fx/type :emit-event :event {:type :ol.llx.agent.event/message-end :message {:stop-reason :error}}}
-      {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}
-      {::fx/type :emit-event :event {:type :ol.llx.agent.event/agent-end :messages (:messages state)}}]]
+      {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}]]
 
     :ol.llx.agent.signal/abort
     [(-> state
-         (assoc ::phase ::closed)
+         (assoc ::phase ::idle)
          (assoc :stream-message nil))
      [{::fx/type :emit-event :event {:type :ol.llx.agent.event/message-end :message {:stop-reason :aborted}}}
-      {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}
-      {::fx/type :emit-event :event {:type :ol.llx.agent.event/agent-end :messages (:messages state)}}]]
+      {::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}]]
 
     [state []]))
 
@@ -323,10 +321,9 @@
 
     :ol.llx.agent.signal/abort
     [(-> state
-         (assoc ::phase ::closed)
+         (assoc ::phase ::idle)
          (assoc :pending-tool-calls []))
-     [{::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}
-      {::fx/type :emit-event :event {:type :ol.llx.agent.event/agent-end :messages (:messages state)}}]]
+     [{::fx/type :emit-event :event {:type :ol.llx.agent.event/turn-end}}]]
 
     [state []]))
 
@@ -343,6 +340,7 @@
 
 (defn route-from-tool-executing [state]
   (case (::phase state)
+    ::idle ::idle
     ::closed ::closed
     (if (seq (:pending-tool-calls state))
       ::tool-executing

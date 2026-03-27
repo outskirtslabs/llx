@@ -62,15 +62,36 @@
   [ch]
   (util/collect-events* ch 2000))
 
+(defn- runtime-state
+  [public-state active-run]
+  {:public-state public-state
+   :runtime      {:status      :running
+                  :closing?    false
+                  :next-run-id 2
+                  :active-run  active-run}})
+
+(defn- effect-handle-signals*
+  [handle]
+  (read-signals* (:signals> handle)))
+
 (defn- test-env
   [state overrides]
-  (merge {:state_          (atom state)
-          :command>        (sp/chan)
-          :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
-          :schema-registry (schema/registry {})
-          :convert-to-llm  identity
-          :abort-signal    nil}
-         overrides))
+  (let [run-signal      (get overrides :run-signal ::run-signal)
+        provider-signal (get overrides :provider-signal run-signal)
+        active-run      (or (:active-run overrides)
+                            {:id              1
+                             :signal          run-signal
+                             :provider-signal provider-signal
+                             :cancel!         (fn [] true)
+                             :cancelled?      (constantly false)
+                             :effect-handles  {}})]
+    (merge {:state_          (atom (runtime-state state active-run))
+            :command>        (sp/chan)
+            :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
+            :schema-registry (schema/registry {})
+            :convert-to-llm  identity
+            :abort-signal    ::upstream-signal}
+           (dissoc overrides :active-run :run-signal :provider-signal))))
 
 (defn- tool-call
   ([]
@@ -90,7 +111,8 @@
   [model tools overrides]
   (test-env
    (base-state model [] :off tools)
-   (merge {:abort-signal ::abort-signal}
+   (merge {:abort-signal ::upstream-signal
+           :run-signal   ::run-signal}
           overrides)))
 
 (defn- execute-tool-behaviors*
@@ -138,18 +160,18 @@
                                                    :execute (fn [_tool-call-id _args _abort-signal _on-update]
                                                               {:content [{:type :text :text "from env"}]}))]
                              :abort-signal ::abort-signal})]
-    (p/let [success-signals    (read-signals* (fx/execute-fx success-env {:ol.llx.agent.fx/type :execute-tool
-                                                                          :tool-call            success-call}))
-            missing-signals    (read-signals* (fx/execute-fx missing-env {:ol.llx.agent.fx/type :execute-tool
-                                                                          :tool-call            missing-call}))
-            validation-signals (read-signals* (fx/execute-fx validation-env {:ol.llx.agent.fx/type :execute-tool
-                                                                             :tool-call            invalid-call}))
-            throw-signals      (read-signals* (fx/execute-fx throw-env {:ol.llx.agent.fx/type :execute-tool
-                                                                        :tool-call            success-call}))
-            malformed-signals  (read-signals* (fx/execute-fx malformed-env {:ol.llx.agent.fx/type :execute-tool
-                                                                            :tool-call            success-call}))
-            stale-env-signals  (read-signals* (fx/execute-fx stale-env-tools {:ol.llx.agent.fx/type :execute-tool
-                                                                              :tool-call            success-call}))]
+    (p/let [success-signals    (effect-handle-signals* (fx/execute-fx success-env {:ol.llx.agent.fx/type :execute-tool
+                                                                                   :tool-call            success-call}))
+            missing-signals    (effect-handle-signals* (fx/execute-fx missing-env {:ol.llx.agent.fx/type :execute-tool
+                                                                                   :tool-call            missing-call}))
+            validation-signals (effect-handle-signals* (fx/execute-fx validation-env {:ol.llx.agent.fx/type :execute-tool
+                                                                                      :tool-call            invalid-call}))
+            throw-signals      (effect-handle-signals* (fx/execute-fx throw-env {:ol.llx.agent.fx/type :execute-tool
+                                                                                 :tool-call            success-call}))
+            malformed-signals  (effect-handle-signals* (fx/execute-fx malformed-env {:ol.llx.agent.fx/type :execute-tool
+                                                                                     :tool-call            success-call}))
+            stale-env-signals  (effect-handle-signals* (fx/execute-fx stale-env-tools {:ol.llx.agent.fx/type :execute-tool
+                                                                                       :tool-call            success-call}))]
       {:success-seen       @success-seen*
        :validation-called? @validation-called*
        :success-signals    success-signals
@@ -183,7 +205,7 @@
   (is (= {:progress 50} (get-in success-signals [0 :partial-result])))
   (is (= {:tool-call-id "tc-1"
           :args         {:path "/tmp/input.txt"}
-          :abort-signal ::abort-signal}
+          :abort-signal ::run-signal}
          success-seen))
   (let [result-message (get-in success-signals [1 :tool-result-message])]
     (is (= result-message (get-in success-signals [1 :result])))
@@ -251,7 +273,8 @@
                                                           {:type :text-delta :text "Hel"}
                                                           {:type :text-delta :text "lo"}
                                                           {:type :done :assistant-message final-message}]))
-                                  :abort-signal       ::abort-signal
+                                  :abort-signal       ::upstream-signal
+                                  :run-signal         ::run-signal
                                   :session-id         "session-1"
                                   :get-api-key        (fn [provider]
                                                         (swap! seen* assoc :get-api-key-provider provider)
@@ -259,7 +282,8 @@
                                   :thinking-budgets   {:high 1234}
                                   :max-retry-delay-ms 2500})
            out                  (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm :messages input-messages})
-           signals              (util/await! (read-signals* out) 3000 ::timeout)]
+           signals              (util/await! (effect-handle-signals* out) 3000 ::timeout)]
+       (is (fn? (:cancel! out)))
        (is (not (util/timeout-result? signals)))
        (is (= [:ol.llx.agent.signal/llm-start
                :ol.llx.agent.signal/llm-chunk
@@ -272,7 +296,7 @@
        (is (= "Hello" (get-in (nth signals 3) [:chunk :content 0 :text])))
        (is (= final-message (:message (last signals))))
        (is (= {:messages input-messages
-               :signal   ::abort-signal}
+               :signal   ::run-signal}
               (:transform-input @seen*)))
        (is (= transformed-messages (:convert-input @seen*)))
        (is (= model (get-in @seen* [:stream-input :model])))
@@ -281,7 +305,7 @@
                :tools         [{:name "read_file"}]}
               (get-in @seen* [:stream-input :context])))
        (is (= :medium (get-in @seen* [:stream-input :options :reasoning])))
-       (is (= ::abort-signal (get-in @seen* [:stream-input :options :signal])))
+       (is (= ::run-signal (get-in @seen* [:stream-input :options :signal])))
        (is (= "token" (get-in @seen* [:stream-input :options :api-key])))
        (is (= "openai" (:get-api-key-provider @seen*)))
        (is (= "session-1" (get-in @seen* [:stream-input :options :session-id])))
@@ -315,7 +339,8 @@
                                                                       {:type :text-delta :text "Hel"}
                                                                       {:type :text-delta :text "lo"}
                                                                       {:type :done :assistant-message final-message}]))
-                                              :abort-signal       ::abort-signal
+                                              :abort-signal       ::upstream-signal
+                                              :run-signal         ::run-signal
                                               :session-id         "session-1"
                                               :get-api-key        (fn [provider]
                                                                     (swap! seen* assoc :get-api-key-provider provider)
@@ -323,7 +348,8 @@
                                               :thinking-budgets   {:high 1234}
                                               :max-retry-delay-ms 2500})
                        out                  (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm :messages input-messages})]
-                   (-> (read-signals* out)
+                   (is (fn? (:cancel! out)))
+                   (-> (effect-handle-signals* out)
                        (p/then (fn [signals]
                                  (is (not (util/timeout-result? signals)))
                                  (is (= [:ol.llx.agent.signal/llm-start
@@ -337,7 +363,7 @@
                                  (is (= "Hello" (get-in (nth signals 3) [:chunk :content 0 :text])))
                                  (is (= final-message (:message (last signals))))
                                  (is (= {:messages input-messages
-                                         :signal   ::abort-signal}
+                                         :signal   ::run-signal}
                                         (:transform-input @seen*)))
                                  (is (= transformed-messages (:convert-input @seen*)))
                                  (is (= model (get-in @seen* [:stream-input :model])))
@@ -346,7 +372,7 @@
                                          :tools         [{:name "read_file"}]}
                                         (get-in @seen* [:stream-input :context])))
                                  (is (= :medium (get-in @seen* [:stream-input :options :reasoning])))
-                                 (is (= ::abort-signal (get-in @seen* [:stream-input :options :signal])))
+                                 (is (= ::run-signal (get-in @seen* [:stream-input :options :signal])))
                                  (is (= "token" (get-in @seen* [:stream-input :options :api-key])))
                                  (is (= "openai" (:get-api-key-provider @seen*)))
                                  (is (= "session-1" (get-in @seen* [:stream-input :options :session-id])))
@@ -372,14 +398,15 @@
          (let [env     (test-env
                         (base-state model [{:role :user :content "x" :timestamp 1}] :low [])
                         {:convert-to-llm     identity
-                         :abort-signal       ::abort-signal
+                         :abort-signal       ::upstream-signal
+                         :run-signal         ::run-signal
                          :session-id         "session-default"
                          :get-api-key        (fn [_provider] "resolved-key")
                          :thinking-budgets   {:low 4321}
                          :max-retry-delay-ms 1500})
                out     (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                            :messages             [{:role :user :content "hi" :timestamp 2}]})
-               signals (util/await! (read-signals* out) 3000 ::timeout)]
+               signals (util/await! (effect-handle-signals* out) 3000 ::timeout)]
            (is (not (util/timeout-result? signals)))
            (is (= [:ol.llx.agent.signal/llm-start :ol.llx.agent.signal/llm-done] (mapv :type signals)))
            (is (= ::ai-env (:runtime-env @seen*)))
@@ -389,7 +416,7 @@
                    :tools         []}
                   (:context @seen*)))
            (is (= :low (get-in @seen* [:options :reasoning])))
-           (is (= ::abort-signal (get-in @seen* [:options :signal])))
+           (is (= ::run-signal (get-in @seen* [:options :signal])))
            (is (= "session-default" (get-in @seen* [:options :session-id])))
            (is (= "resolved-key" (get-in @seen* [:options :api-key])))
            (is (= {:low 4321} (get-in @seen* [:options :thinking-budgets])))
@@ -411,14 +438,15 @@
                      (let [env (test-env
                                 (base-state model [{:role :user :content "x" :timestamp 1}] :low [])
                                 {:convert-to-llm     identity
-                                 :abort-signal       ::abort-signal
+                                 :abort-signal       ::upstream-signal
+                                 :run-signal         ::run-signal
                                  :session-id         "session-default"
                                  :get-api-key        (fn [_provider] "resolved-key")
                                  :thinking-budgets   {:low 4321}
                                  :max-retry-delay-ms 1500})
                            out (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                                    :messages             [{:role :user :content "hi" :timestamp 2}]})]
-                       (-> (read-signals* out)
+                       (-> (effect-handle-signals* out)
                            (p/then (fn [signals]
                                      (is (not (util/timeout-result? signals)))
                                      (is (= [:ol.llx.agent.signal/llm-start :ol.llx.agent.signal/llm-done]
@@ -430,7 +458,7 @@
                                              :tools         []}
                                             (:context @seen*)))
                                      (is (= :low (get-in @seen* [:options :reasoning])))
-                                     (is (= ::abort-signal (get-in @seen* [:options :signal])))
+                                     (is (= ::run-signal (get-in @seen* [:options :signal])))
                                      (is (= "session-default" (get-in @seen* [:options :session-id])))
                                      (is (= "resolved-key" (get-in @seen* [:options :api-key])))
                                      (is (= {:low 4321} (get-in @seen* [:options :thinking-budgets])))
@@ -447,7 +475,7 @@
                     {:convert-to-llm (fn [_] (throw (ex-info "boom" {:type ::hook-failed})))})
            out     (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                        :messages             [{:role :user :content "hi" :timestamp 1}]})
-           signals (util/await! (read-signals* out) 3000 ::timeout)]
+           signals (util/await! (effect-handle-signals* out) 3000 ::timeout)]
        (is (not (util/timeout-result? signals)))
        (is (= 1 (count signals)))
        (is (= :ol.llx.agent.signal/llm-error (:type (first signals))))
@@ -460,7 +488,7 @@
                               {:convert-to-llm (fn [_] (throw (ex-info "boom" {:type ::hook-failed})))})
                        out   (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                                  :messages             [{:role :user :content "hi" :timestamp 1}]})]
-                   (-> (read-signals* out)
+                   (-> (effect-handle-signals* out)
                        (p/then (fn [signals]
                                  (is (not (util/timeout-result? signals)))
                                  (is (= 1 (count signals)))
@@ -479,7 +507,7 @@
                                                        {:type "text_start"}]))})
            out     (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                        :messages             [{:role :user :content "hi" :timestamp 1}]})
-           signals (util/await! (read-signals* out) 3000 ::timeout)]
+           signals (util/await! (effect-handle-signals* out) 3000 ::timeout)]
        (is (not (util/timeout-result? signals)))
        (is (= [:ol.llx.agent.signal/llm-start :ol.llx.agent.signal/llm-error]
               (mapv :type signals))))
@@ -493,7 +521,7 @@
                                                                  {:type "text_start"}]))})
                        out   (fx/execute-fx env {:ol.llx.agent.fx/type :call-llm
                                                  :messages             [{:role :user :content "hi" :timestamp 1}]})]
-                   (-> (read-signals* out)
+                   (-> (effect-handle-signals* out)
                        (p/then (fn [signals]
                                  (is (not (util/timeout-result? signals)))
                                  (is (= [:ol.llx.agent.signal/llm-start :ol.llx.agent.signal/llm-error]

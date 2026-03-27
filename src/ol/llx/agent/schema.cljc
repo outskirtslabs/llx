@@ -99,6 +99,9 @@
       [:error-message {:optional true} :string]
       [:timestamp {:optional true} :ol.llx/timestamp-ms]]
 
+     :ol.llx.agent/run-id
+     :ol.llx/non-neg-int
+
      :ol.llx.agent/event-stop-message
      [:map
       [:stop-reason :ol.llx/stop-reason]]
@@ -108,6 +111,7 @@
       :ol.llx.agent.command/prompt ;; start inference with new messages
       :ol.llx.agent.command/continue ;; resume with queued steering or follow-up messages
       :ol.llx.agent.command/abort ;; cancel the running loop
+      :ol.llx.agent.command/close ;; terminate the runtime
       :ol.llx.agent.command/steer ;; inject a steering message mid-run
       :ol.llx.agent.command/follow-up ;; queue a message for after the agent finishes
       :ol.llx.agent.command/set-system-prompt ;; replace the system prompt
@@ -137,6 +141,10 @@
      :ol.llx.agent/command-abort
      [:map
       [:type [:= :ol.llx.agent.command/abort]]]
+
+     :ol.llx.agent/command-close
+     [:map
+      [:type [:= :ol.llx.agent.command/close]]]
 
      :ol.llx.agent/command-steer
      [:map
@@ -213,6 +221,7 @@
       [:ol.llx.agent.command/prompt :ol.llx.agent/command-prompt]
       [:ol.llx.agent.command/continue :ol.llx.agent/command-continue]
       [:ol.llx.agent.command/abort :ol.llx.agent/command-abort]
+      [:ol.llx.agent.command/close :ol.llx.agent/command-close]
       [:ol.llx.agent.command/steer :ol.llx.agent/command-steer]
       [:ol.llx.agent.command/follow-up :ol.llx.agent/command-follow-up]
       [:ol.llx.agent.command/set-system-prompt :ol.llx.agent/command-set-system-prompt]
@@ -266,32 +275,38 @@
      :ol.llx.agent/signal-llm-start
      [:map
       [:type [:= :ol.llx.agent.signal/llm-start]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:message :ol.llx.agent/partial-assistant-message]]
 
      :ol.llx.agent/signal-llm-chunk
      [:map
       [:type [:= :ol.llx.agent.signal/llm-chunk]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:chunk :ol.llx.agent/partial-assistant-message]]
 
      :ol.llx.agent/signal-llm-done
      [:map
       [:type [:= :ol.llx.agent.signal/llm-done]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:message :ol.llx/message-assistant]]
 
      :ol.llx.agent/signal-llm-error
      [:map
       [:type [:= :ol.llx.agent.signal/llm-error]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:error :any]]
 
      :ol.llx.agent/signal-tool-result
      [:map
       [:type [:= :ol.llx.agent.signal/tool-result]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:result :ol.llx/message-tool-result]
       [:tool-result-message :ol.llx/message-tool-result]]
 
      :ol.llx.agent/signal-tool-error
      [:map
       [:type [:= :ol.llx.agent.signal/tool-error]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:tool-call-id :ol.llx/id-string]
       [:error :any]
       [:tool-result-message :ol.llx/message-tool-result]]
@@ -299,6 +314,7 @@
      :ol.llx.agent/signal-tool-update
      [:map
       [:type [:= :ol.llx.agent.signal/tool-update]]
+      [:run-id {:optional true} :ol.llx.agent/run-id]
       [:tool-call-id :ol.llx/id-string]
       [:tool-name :ol.llx/id-string]
       [:partial-result :map]]
@@ -436,7 +452,12 @@
       [:reject :ol.llx.agent.fx/effect-reject]]
 
      :ol.llx.agent.fx/result
-     [:or :ol.llx.agent/channel :nil]
+     [:or :ol.llx.agent.fx/handle :nil]
+
+     :ol.llx.agent.fx/handle
+     [:map
+      [:signals> :ol.llx.agent/channel]
+      [:cancel! :ol.llx/fn]]
 
      :ol.llx.agent/create-agent-opts
      [:map
@@ -479,6 +500,27 @@
       [:thinking-budgets {:optional true} :ol.llx.agent/thinking-budgets]
       [:max-retry-delay-ms {:optional true} :ol.llx/non-neg-int]
       [:abort-signal {:optional true} :any]]
+
+     :ol.llx.agent/runtime-active-run
+     [:map
+      [:id :ol.llx.agent/run-id]
+      [:signal :any]
+      [:cancel! :ol.llx/fn]
+      [:cancelled? :ol.llx/fn]
+      [:effect-handles [:map-of :ol.llx.agent/channel :ol.llx.agent.fx/handle]]
+      [:reply {:optional true} [:maybe :ol.llx/deferred]]]
+
+     :ol.llx.agent/runtime
+     [:map
+      [:status :keyword]
+      [:closing? :boolean]
+      [:next-run-id :ol.llx.agent/run-id]
+      [:active-run [:maybe :ol.llx.agent/runtime-active-run]]]
+
+     :ol.llx.agent/runtime-state
+     [:map
+      [:public-state :ol.llx.agent.loop/state]
+      [:runtime :ol.llx.agent/runtime]]
 
      :ol.llx.agent.loop/phase
      [:enum

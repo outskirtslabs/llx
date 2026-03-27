@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is]]
    [ol.llx.agent :as agent]
    [ol.llx.ai :as ai]
+   [ol.llx.agent.loop :as loop]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -54,6 +55,19 @@
 
         :else
         (recur (conj events event))))))
+
+(defn- wait-for-value!
+  [value-fn timeout-ms label]
+  (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
+    (loop []
+      (if-let [value (value-fn)]
+        value
+        (if (< (System/currentTimeMillis) deadline)
+          (do
+            (Thread/sleep 10)
+            (recur))
+          (throw (ex-info (str "Timed out waiting for " label)
+                          {:label label :timeout-ms timeout-ms})))))))
 
 (deftest prompt-continues-through-queued-steering-without-stalling-test
   (let [model                 (ai/get-model :openai "gpt-4o")
@@ -114,4 +128,110 @@
           (is (= 1 (count (filter #(= :ol.llx.agent.event/agent-end (:type %)) events))))))
       (finally
         (agent/unsubscribe runtime events>)
+        (p/await (agent/close runtime))))))
+
+(deftest abort-drops-stale-llm-events-and-allows-reuse-test
+  (let [model       (ai/get-model :openai "gpt-4o")
+        stream-ch*  (atom nil)
+        call-count* (atom 0)
+        stream-fn   (fn [_stream-model _context _opts]
+                      (swap! call-count* inc)
+                      (let [ch (sp/chan :buf 8)]
+                        (reset! stream-ch* ch)
+                        ch))
+        runtime     (agent/create-agent {:model          model
+                                         :tools          []
+                                         :convert-to-llm identity
+                                         :stream-fn      stream-fn})
+        events>     (agent/subscribe runtime)]
+    (try
+      (let [prompt*      (agent/prompt runtime [{:role :user :content "hello" :timestamp 1}])
+            first-stream (wait-for-value! #(deref stream-ch*) 1000 "first stream channel")]
+        (sp/offer first-stream {:type :start})
+        (is (true? (p/await (agent/abort runtime))))
+        (sp/offer first-stream {:type              :done
+                                :assistant-message (assistant-message model "late" 2)})
+        (sp/close first-stream)
+        (is (true? (p/await prompt*)))
+        (is (true? (p/await (agent/wait-for-idle runtime 1000))))
+        (let [state (agent/state runtime)]
+          (is (= ::loop/idle (::loop/phase state)))
+          (is (= [{:role :user :content "hello" :timestamp 1}]
+                 (:messages state))))
+        (let [prompt*       (agent/prompt runtime [{:role :user :content "again" :timestamp 3}])
+              second-stream (wait-for-value! #(let [ch @stream-ch*]
+                                                (when (and ch (not= ch first-stream))
+                                                  ch))
+                                             1000
+                                             "second stream channel")]
+          (sp/offer second-stream {:type :start})
+          (sp/offer second-stream {:type              :done
+                                   :assistant-message (assistant-message model "fresh" 4)})
+          (sp/close second-stream)
+          (is (true? (p/await prompt*))))
+        (is (true? (p/await (agent/wait-for-idle runtime 1000))))
+        (let [state              (agent/state runtime)
+              assistant-messages (filter #(= :assistant (:role %)) (:messages state))]
+          (is (= 2 @call-count*))
+          (is (= ["fresh"] (mapv #(get-in % [:content 0 :text]) assistant-messages)))))
+      (finally
+        (agent/unsubscribe runtime events>)
+        (p/await (agent/close runtime))))))
+
+(deftest abort-cancels-tool-execution-and-returns-to-idle-test
+  (let [model         (ai/get-model :openai "gpt-4o")
+        stream-ch*    (atom nil)
+        tool-aborted* (promise)
+        tool-ran*     (atom 0)
+        blocking-tool {:name         "slow_tool"
+                       :description  "Blocks until cancelled."
+                       :input-schema [:map]
+                       :execute      (fn [_id _args abort-signal _on-update]
+                                       (swap! tool-ran* inc)
+                                       (let [result (p/deferred)]
+                                         (future
+                                           (loop []
+                                             (if @abort-signal
+                                               (do
+                                                 (deliver tool-aborted* true)
+                                                 (p/resolve result {:content [{:type :text :text "tool finished"}]}))
+                                               (do
+                                                 (Thread/sleep 10)
+                                                 (recur)))))
+                                         result))}
+        runtime       (agent/create-agent {:model          model
+                                           :tools          [blocking-tool]
+                                           :convert-to-llm identity
+                                           :stream-fn      (fn [_stream-model _context _opts]
+                                                             (let [ch (sp/chan :buf 8)]
+                                                               (reset! stream-ch* ch)
+                                                               ch))})
+        prompt*       (agent/prompt runtime [{:role :user :content "run tool" :timestamp 1}])]
+    (try
+      (let [stream-ch (wait-for-value! #(deref stream-ch*) 1000 "tool stream channel")]
+        (sp/offer stream-ch {:type :start})
+        (sp/offer stream-ch {:type              :done
+                             :assistant-message {:role        :assistant
+                                                 :content     [{:type      :tool-call
+                                                                :id        "tc-1"
+                                                                :name      "slow_tool"
+                                                                :arguments {}}]
+                                                 :api         (:api model)
+                                                 :provider    (:provider model)
+                                                 :model       (:id model)
+                                                 :usage       (zero-usage)
+                                                 :stop-reason :tool-use
+                                                 :timestamp   1}})
+        (sp/close stream-ch))
+      (is (true? (wait-for-value! #(when (= ::loop/tool-executing (::loop/phase (agent/state runtime)))
+                                     true)
+                                  3000
+                                  "tool execution")))
+      (is (true? (p/await (agent/abort runtime))))
+      (is (true? (deref tool-aborted* 1000 false)))
+      (is (true? (p/await prompt*)))
+      (is (true? (p/await (agent/wait-for-idle runtime 1000))))
+      (is (= 1 @tool-ran*))
+      (is (= ::loop/idle (::loop/phase (agent/state runtime))))
+      (finally
         (p/await (agent/close runtime))))))

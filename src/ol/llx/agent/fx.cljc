@@ -25,7 +25,7 @@
 
 (defn- fx-emit-event
   [env effect]
-  (sp/offer (:events-mx> env) (:event effect))
+  (sp/put (:events-mx> env) (:event effect))
   nil)
 
 (defn- fx-reject

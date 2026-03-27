@@ -57,20 +57,26 @@
         events-mx>   (sp/mult :buf (sp/sliding-buffer default-subscription-buffer-size))
         optional-env (->> (select-keys opts [:session-id :get-api-key :thinking-budgets :max-retry-delay-ms])
                           (remove (comp nil? val))
-                          (into {}))]
-    (m/coerce :ol.llx.agent/env
-              (merge
-               {:state_            (atom state)
-                :command>          command>
-                :events-mx>        events-mx>
-                :schema-registry   schema-registry
-                :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
-                :transform-context (:transform-context opts)
-                :stream-fn         (:stream-fn opts)
-                :abort-signal      (:abort-signal opts)}
-               optional-env)
-              default-transformer
-              {:registry schema-registry})))
+                          (into {}))
+        env          (m/coerce :ol.llx.agent/env
+                               (merge
+                                {:state_            (atom {:public-state state
+                                                           :runtime      {:status      :running
+                                                                          :closing?    false
+                                                                          :next-run-id 1
+                                                                          :active-run  nil}})
+                                 :command>          command>
+                                 :events-mx>        events-mx>
+                                 :schema-registry   schema-registry
+                                 :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
+                                 :transform-context (:transform-context opts)
+                                 :stream-fn         (:stream-fn opts)
+                                 :abort-signal      (:abort-signal opts)}
+                                optional-env)
+                               default-transformer
+                               {:registry schema-registry})]
+    (driver/start! env)
+    env))
 
 (>defn create-agent
        "Creates an agent runtime handle.
@@ -127,7 +133,7 @@
 (defn state
   "Returns the current agent state snapshot."
   [agent]
-  @(:state_ agent))
+  (:public-state @(:state_ agent)))
 
 (defn- validate-with-agent-registry!
   [agent schema-id data]
@@ -270,9 +276,6 @@
   (dispatch! agent {:type :ol.llx.agent.command/reset}))
 
 (defn close
-  "Closes the command channel and marks state as closed."
+  "Closes the runtime."
   [agent]
-  (sp/close (:command> agent))
-  (sp/close (:events-mx> agent))
-  (swap! (:state_ agent) assoc ::loop/phase ::loop/closed)
-  (p/resolved true))
+  (dispatch! agent {:type :ol.llx.agent.command/close}))

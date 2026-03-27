@@ -53,10 +53,12 @@
                      :timestamp    (now-ms)}))
 
 (defn fx-execute-tool
-  [{:keys [state_ abort-signal schema-registry]} effect]
-  (let [out       (sp/chan)
-        tool-call (:tool-call effect)]
-    (-> (p/let [tools          (:tools @state_)
+  [{:keys [state_ schema-registry]} effect]
+  (let [out                 (sp/chan)
+        tool-call           (:tool-call effect)
+        {:keys [id signal]} (get-in @state_ [:runtime :active-run])
+        public-state        (:public-state @state_)]
+    (-> (p/let [tools          (:tools public-state)
                 validated-args (ai/validate-tool-call tools tool-call)
                 tool-name      (:name tool-call)
                 tool           (or (resolve-tool tools tool-name)
@@ -67,6 +69,7 @@
                 execute-fn     (:execute tool)
                 on-update      (fn [partial-result]
                                  (sp/put out {:type           :ol.llx.agent.signal/tool-update
+                                              :run-id         id
                                               :tool-call-id   (:id tool-call)
                                               :tool-name      (:name tool-call)
                                               :partial-result (if (map? partial-result)
@@ -74,18 +77,23 @@
                                                                 {:value partial-result})}))
                 raw-result     (execute-fn (:id tool-call)
                                            validated-args
-                                           abort-signal
+                                           signal
                                            on-update)
                 result-message (success-tool-result-message schema-registry tool-call raw-result)]
           (sp/put out {:type                :ol.llx.agent.signal/tool-result
+                       :run-id              id
                        :result              result-message
                        :tool-result-message result-message}))
         (p/catch (fn [error]
                    (let [tool-result-message (error-tool-result-message schema-registry tool-call error)]
                      (sp/put out {:type                :ol.llx.agent.signal/tool-error
+                                  :run-id              id
                                   :tool-call-id        (:id tool-call)
                                   :error               error
                                   :tool-result-message tool-result-message}))))
         (p/finally (fn [_ _]
                      (sp/close out))))
-    out))
+    {:signals> out
+     :cancel!  (fn []
+                 (sp/close out)
+                 true)}))

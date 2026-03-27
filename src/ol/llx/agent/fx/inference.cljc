@@ -71,49 +71,49 @@
       (update partial :content conj block))))
 
 (>defn llm-event->step
-       [model partial event]
-       [:ol.llx/model [:maybe :ol.llx.agent/partial-assistant-message] :ol.llx/event => LlmEventStep]
+       [run-id model partial event]
+       [:ol.llx.agent/run-id :ol.llx/model [:maybe :ol.llx.agent/partial-assistant-message] :ol.llx/event => LlmEventStep]
        (let [event-type (:type event)
              partial    (or partial
                             (base-partial-assistant-message model))]
          (case event-type
            :start
            {:partial partial
-            :signal  {:type :ol.llx.agent.signal/llm-start :message partial}
+            :signal  {:type :ol.llx.agent.signal/llm-start :run-id run-id :message partial}
             :done?   false}
 
            :text-start
            (let [partial (ensure-text-block partial)]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :text-delta
            (let [partial (update-last-text partial (:text event))]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :text-end
            {:partial partial
-            :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+            :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
             :done?   false}
 
            :thinking-start
            (let [partial (ensure-thinking-block partial)]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :thinking-delta
            (let [partial (update-last-thinking partial (:thinking event))]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :thinking-end
            {:partial partial
-            :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+            :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
             :done?   false}
 
            :toolcall-start
@@ -121,7 +121,7 @@
                                                     :name      (:name event)
                                                     :arguments (:arguments event)})]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :toolcall-delta
@@ -129,7 +129,7 @@
                                                     :name      (:name event)
                                                     :arguments (:arguments event)})]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :toolcall-end
@@ -137,19 +137,21 @@
                                                     :name      (:name event)
                                                     :arguments (:arguments event)})]
              {:partial partial
-              :signal  {:type :ol.llx.agent.signal/llm-chunk :chunk partial}
+              :signal  {:type :ol.llx.agent.signal/llm-chunk :run-id run-id :chunk partial}
               :done?   false})
 
            :done
            {:partial partial
             :signal  {:type    :ol.llx.agent.signal/llm-done
+                      :run-id  run-id
                       :message (:assistant-message event)}
             :done?   true}
 
            :error
            {:partial partial
-            :signal  {:type  :ol.llx.agent.signal/llm-error
-                      :error (:assistant-message event)}
+            :signal  {:type   :ol.llx.agent.signal/llm-error
+                      :run-id run-id
+                      :error  (:assistant-message event)}
             :done?   true}
 
            {:partial partial
@@ -175,10 +177,20 @@
     (some? resolved-api-key)
     (assoc :api-key resolved-api-key)))
 
+(defn- public-state
+  [state_]
+  (:public-state @state_))
+
+(defn- active-run
+  [state_]
+  (get-in @state_ [:runtime :active-run]))
+
 (defn fx-call-llm
-  [{:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect]
+  [{:keys [state_ convert-to-llm transform-context stream-fn get-api-key] :as env} effect]
   (let [out                                           (sp/chan)
-        {:keys [model system-prompt tools] :as state} @state_
+        stream-ch*                                    (atom nil)
+        {:keys [id signal]}                           (active-run state_)
+        {:keys [model system-prompt tools] :as state} (public-state state_)
         default-env-fn                                ai/default-env
         ai-stream-fn                                  ai/stream
         default-stream-fn                             (fn [stream-model context options]
@@ -189,20 +201,21 @@
                                                          :messages      llm-messages
                                                          :tools         tools})]
     (-> (p/let [messages         (if transform-context
-                                   (transform-context (:messages effect) abort-signal)
+                                   (transform-context (:messages effect) signal)
                                    (:messages effect))
                 llm-messages     (convert-to-llm messages)
                 resolved-api-key (if get-api-key
                                    (get-api-key (name (:provider model)))
                                    nil)
-                options          (stream-options env state resolved-api-key)
+                options          (stream-options (assoc env :abort-signal signal) state resolved-api-key)
                 llm-context      (context llm-messages)
                 stream-ch        (stream-fn model llm-context options)]
+          (reset! stream-ch* stream-ch)
           (p/loop [partial nil]
             (p/let [event (sp/take stream-ch)]
               (if (nil? event)
                 nil
-                (let [{:keys [partial signal done?]} (llm-event->step model partial event)]
+                (let [{:keys [partial signal done?]} (llm-event->step id model partial event)]
                   (if signal
                     (p/let [_ (sp/put out signal)]
                       (if done?
@@ -210,8 +223,14 @@
                         (p/recur partial)))
                     (p/recur partial)))))))
         (p/catch (fn [error]
-                   (sp/put out {:type  :ol.llx.agent.signal/llm-error
-                                :error error})))
+                   (sp/put out {:type   :ol.llx.agent.signal/llm-error
+                                :run-id id
+                                :error  error})))
         (p/finally (fn [_ _]
                      (sp/close out))))
-    out))
+    {:signals> out
+     :cancel!  (fn []
+                 (when-let [stream-ch @stream-ch*]
+                   (sp/close stream-ch))
+                 (sp/close out)
+                 true)}))

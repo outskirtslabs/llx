@@ -487,26 +487,24 @@
       (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
       (is (= "connection reset" (:error state'))))
 
-    (testing "emits message-end, turn-end, and agent-end"
-      (is (= [:emit-event :emit-event :emit-event] (fx-types effects)))
+    (testing "emits message-end and turn-end"
+      (is (= [:emit-event :emit-event] (fx-types effects)))
       (is (= :ol.llx.agent.event/message-end (get-in effects [0 :event :type])))
-      (is (= :ol.llx.agent.event/turn-end (get-in effects [1 :event :type])))
-      (is (= :ol.llx.agent.event/agent-end (get-in effects [2 :event :type]))))))
+      (is (= :ol.llx.agent.event/turn-end (get-in effects [1 :event :type]))))))
 
 (deftest streaming-transition-abort-test
   (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
                                       :messages                [{:role :user :content "hello"}]
                                       :stream-message          {:role :assistant :content "partial"}})
         [state' effects] (sut/streaming-transition state {:type :ol.llx.agent.signal/abort})]
-    (testing "transitions to closed and clears stream-message"
-      (is (= :ol.llx.agent.loop/closed (:ol.llx.agent.loop/phase state')))
+    (testing "transitions to idle and clears stream-message"
+      (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
       (is (nil? (:stream-message state'))))
 
-    (testing "emits message-end, turn-end, and agent-end"
-      (is (= [:emit-event :emit-event :emit-event] (fx-types effects)))
+    (testing "emits message-end and turn-end"
+      (is (= [:emit-event :emit-event] (fx-types effects)))
       (is (= :ol.llx.agent.event/message-end (get-in effects [0 :event :type])))
-      (is (= :ol.llx.agent.event/turn-end (get-in effects [1 :event :type])))
-      (is (= :ol.llx.agent.event/agent-end (get-in effects [2 :event :type]))))))
+      (is (= :ol.llx.agent.event/turn-end (get-in effects [1 :event :type]))))))
 
 (deftest streaming-transition-unknown-signal-test
   (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming})
@@ -758,14 +756,13 @@
                                       :pending-tool-calls      [{:id "tc-1"} {:id "tc-2"}]
                                       :messages                [{:role :user :content "x"}]})
         [state' effects] (sut/tool-executing-transition state {:type :ol.llx.agent.signal/abort})]
-    (testing "transitions to closed and clears pending-tool-calls"
-      (is (= :ol.llx.agent.loop/closed (:ol.llx.agent.loop/phase state')))
+    (testing "transitions to idle and clears pending-tool-calls"
+      (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
       (is (= [] (:pending-tool-calls state'))))
 
-    (testing "emits turn-end and agent-end"
-      (is (= [:emit-event :emit-event] (fx-types effects)))
-      (is (= :ol.llx.agent.event/turn-end (get-in effects [0 :event :type])))
-      (is (= :ol.llx.agent.event/agent-end (get-in effects [1 :event :type]))))))
+    (testing "emits turn-end"
+      (is (= [:emit-event] (fx-types effects)))
+      (is (= :ol.llx.agent.event/turn-end (get-in effects [0 :event :type]))))))
 
 (deftest tool-executing-transition-unknown-signal-test
   (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/tool-executing
@@ -850,29 +847,29 @@
     (is (= :ol.llx.agent.loop/tool-executing (:ol.llx.agent.loop/phase state')))
     (is (some #(= :execute-tool (::fx/type %)) effects))))
 
-(deftest step-abort-from-streaming-to-closed-test
+(deftest step-abort-from-streaming-to-idle-test
   (testing "abort signal from streaming"
     (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
                                         :messages                [{:role :user :content "hello"}]})
           [state' effects] (sut/step state {:type :ol.llx.agent.signal/abort})]
-      (is (= :ol.llx.agent.loop/closed (:ol.llx.agent.loop/phase state')))
-      (is (some #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects))))
+      (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
+      (is (= 1 (count (filter #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects))))))
 
   (testing "abort command from streaming"
     (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/streaming
                                         :messages                [{:role :user :content "hello"}]})
           [state' effects] (sut/step state {:type :ol.llx.agent.command/abort})]
-      (is (= :ol.llx.agent.loop/closed (:ol.llx.agent.loop/phase state')))
-      (is (some #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects)))))
+      (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
+      (is (= 1 (count (filter #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects)))))))
 
-(deftest step-abort-from-tool-executing-to-closed-test
+(deftest step-abort-from-tool-executing-to-idle-test
   (let [state            (state-with {:ol.llx.agent.loop/phase :ol.llx.agent.loop/tool-executing
                                       :pending-tool-calls      [{:id "tc-1"}]
                                       :messages                [{:role :user :content "x"}]})
         [state' effects] (sut/step state {:type :ol.llx.agent.command/abort})]
-    (is (= :ol.llx.agent.loop/closed (:ol.llx.agent.loop/phase state')))
+    (is (= :ol.llx.agent.loop/idle (:ol.llx.agent.loop/phase state')))
     (is (= [] (:pending-tool-calls state')))
-    (is (some #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects))))
+    (is (= 1 (count (filter #(= :ol.llx.agent.event/agent-end (get-in % [:event :type])) effects))))))
 
 (deftest step-full-happy-path-test
   (let [state         (initial-state)

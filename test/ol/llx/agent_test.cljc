@@ -53,6 +53,14 @@
    :steering-mode           :one-at-a-time
    :follow-up-mode          :one-at-a-time})
 
+(defn- wrapped-state
+  [public-state]
+  {:public-state public-state
+   :runtime      {:status      :running
+                  :closing?    false
+                  :next-run-id 1
+                  :active-run  nil}})
+
 (deftest create-agent-initializes-state-test
   (let [model         (ai/get-model :openai "gpt-4o")
         runtime-tool  (assoc read-file-tool :execute identity)
@@ -82,6 +90,7 @@
                          :messages
                          :steering-mode
                          :follow-up-mode])))
+    (is (= (wrapped-state state) @(:state_ agent)))
     (is (= {:tools    [runtime-tool]
             :messages []}
            (select-keys (sut/state derived-agent) [:tools :messages])))))
@@ -191,7 +200,8 @@
                :steering-mode           :one-at-a-time
                :follow-up-mode          :one-at-a-time}
         agent (sut/rehydrate-agent state required-env-opts)]
-    (is (= state (sut/state agent)))))
+    (is (= state (sut/state agent)))
+    (is (= (wrapped-state state) @(:state_ agent)))))
 
 (deftest subscribe-unsubscribe-test
   (let [agent      (sut/create-agent required-env-opts)
@@ -202,7 +212,10 @@
     (is (sp/chan? default-ch))
     (is (identical? custom-ch (sut/subscribe agent custom-ch)))
 
-    (sp/offer (:events-mx> agent) event-1)
+    #?(:clj
+       (p/await (sp/put (:events-mx> agent) event-1))
+       :cljs
+       (sp/put (:events-mx> agent) event-1))
     #?(:clj
        (do
          (is (= event-1 (sp/take! default-ch 200 ::timeout)))
@@ -215,7 +228,10 @@
     (is (sp/closed? default-ch))
     (is (sp/closed? custom-ch))
 
-    (sp/offer (:events-mx> agent) event-2)
+    #?(:clj
+       (p/await (sp/put (:events-mx> agent) event-2))
+       :cljs
+       (sp/put (:events-mx> agent) event-2))
     #?(:clj
        (do
          (is (nil? (sp/take! default-ch 50 ::timeout)))
