@@ -243,12 +243,15 @@
     (is (nil? (:temperature adaptive-payload)))
     (is (nil? (:temperature budget-payload)))))
 
-(deftest build-request-omits-thinking-when-no-reasoning-opts
+(deftest build-request-disables-thinking-when-no-reasoning-opts
   (let [context {:messages [{:role :user :content "just chat" :timestamp 1}]}
         request (sut/build-request (stub-env) anthropic-model context
                                    {:api-key "k"} false)
         payload (util/json-read (:body request) {:key-fn keyword})]
-    (is (= {:max_tokens 2730 :model "claude-sonnet-4-5" :stream false}
+    (is (= {:thinking   {:type "disabled"}
+            :max_tokens 2730
+            :model      "claude-sonnet-4-5"
+            :stream     false}
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
 
 (deftest build-request-omits-thinking-when-model-not-reasoning

@@ -216,6 +216,9 @@
                                     (supports-adaptive-thinking? (:id model)))
               budget?          (and reasoning-level reasoning-model?
                                     (not adaptive?))
+              disabled?        (and reasoning-model?
+                                    (not adaptive?)
+                                    (not budget?))
               base-max         (or (:max-output-tokens opts)
                                    (max 1 (long (/ (:max-tokens model) 3))))
               adjusted         (when budget?
@@ -252,7 +255,10 @@
 
                                  budget?
                                  (assoc :thinking {:type          "enabled"
-                                                   :budget_tokens (:thinking-budget adjusted)}))
+                                                   :budget_tokens (:thinking-budget adjusted)})
+
+                                 disabled?
+                                 (assoc :thinking {:type "disabled"}))
               base-url         (adapter-common/trim-trailing-slash (:base-url model))
               headers          (cond-> {"Content-Type"      "application/json"
                                         "anthropic-version" "2023-06-01"
