@@ -13,9 +13,7 @@
   [model usage]
   (let [cache-read (long (or (:cachedContentTokenCount usage) 0))
         prompt     (long (or (:promptTokenCount usage) 0))
-        ;; Google promptTokenCount is the canonical input total.
-        ;; cache-read is tracked separately but not subtracted from input.
-        input      prompt
+        input      (max 0 (- prompt cache-read))
         output     (+ (long (or (:candidatesTokenCount usage) 0))
                       (long (or (:thoughtsTokenCount usage) 0)))
         total      (long (or (:totalTokenCount usage)

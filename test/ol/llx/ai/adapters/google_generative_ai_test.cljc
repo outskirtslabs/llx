@@ -79,11 +79,11 @@
              {:role  "user"
               :parts [{:text "Tool result image:"}
                       {:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}
-            {:role "user" :parts [{:text "Now summarize in one sentence."}]}]
+             {:role "user" :parts [{:text "Now summarize in one sentence."}]}]
             :generationConfig
-            {:temperature    0.25
+            {:temperature     0.25
              :maxOutputTokens 256
-             :thinkingConfig {:thinkingBudget 0}}
+             :thinkingConfig  {:thinkingBudget 0}}
             :systemInstruction
             {:role "user" :parts [{:text "You are a helpful assistant."}]}
             :tools
@@ -246,7 +246,7 @@
             :api         :google-generative-ai
             :provider    :google
             :model       "gemini-2.5-flash"
-            :usage       {:input 12                                                                   :output 5 :cache-read 2 :cache-write 0 :total-tokens 19
+            :usage       {:input 10                                                                   :output 5 :cache-read 2 :cache-write 0 :total-tokens 19
                           :cost  {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
             :stop-reason :tool-use
             :timestamp   1730000000000}
@@ -263,7 +263,7 @@
                                             :cachedContentTokenCount 10
                                             :totalTokenCount         185}})}
         out      (sut/finalize (stub-env) {:model priced-google-model :response response})]
-    (is (= {:input 0.1 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.28}
+    (is (= {:input 0.09 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.27}
            (get-in out [:assistant-message :usage :cost])))))
 
 (deftest decode-event-stream-usage-calculates-costs
@@ -275,7 +275,7 @@
                                :cachedContentTokenCount 10
                                :totalTokenCount         185}}
         out   (sut/decode-event (stub-env) state (util/json-write chunk))]
-    (is (= {:input 0.1 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.28}
+    (is (= {:input 0.09 :output 0.15 :cache-read 0.03 :cache-write 0.0 :total 0.27}
            (get-in out [:state :assistant-message :usage :cost])))))
 
 (deftest thought-signature-alone-is-not-thinking
