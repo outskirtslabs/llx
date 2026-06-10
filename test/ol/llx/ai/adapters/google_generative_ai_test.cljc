@@ -209,14 +209,14 @@
                          {:name     "vision"
                           :response {:output "(see attached image)"}
                           :parts    [{:inlineData {:mimeType "image/png" :data "aGVsbG8="}}]}}]}]
-              :generationConfig                                                                   {:thinkingConfig {:thinkingLevel "MINIMAL"}}}
+              :generationConfig {:thinkingConfig {:thinkingLevel "MINIMAL"}}}
              multimodal-payload)))
     (testing "text-only model drops images from functionResponse"
       (is (= {:contents
               [{:role "user" :parts [{:text "use the tool"}]}
                {:role  "user"
                 :parts [{:functionResponse {:name "vision" :response {:output ""}}}]}]
-              :generationConfig                                                        {:thinkingConfig {:thinkingBudget 0}}}
+              :generationConfig {:thinkingConfig {:thinkingBudget 0}}}
              text-only-payload)))))
 
 (deftest decode-event-stream-contract

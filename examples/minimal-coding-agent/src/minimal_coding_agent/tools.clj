@@ -199,12 +199,12 @@
   (let [f (io/file path)]
     (when (not (.exists f))
       (throw (ex-info (str "File not found: " path) {:type :not-found})))
-    (let [raw                                                        (slurp f)
-          {:keys [bom text]}                                         (strip-bom raw)
-          line-ending                                                (detect-line-ending text)
-          norm-content                                               (normalize-to-lf text)
-          norm-old                                                   (normalize-to-lf oldText)
-          norm-new                                                   (normalize-to-lf newText)
+    (let [raw                (slurp f)
+          {:keys [bom text]} (strip-bom raw)
+          line-ending        (detect-line-ending text)
+          norm-content       (normalize-to-lf text)
+          norm-old           (normalize-to-lf oldText)
+          norm-new           (normalize-to-lf newText)
           {:keys [found index match-length content-for-replacement]}
           (fuzzy-find-text norm-content norm-old)]
       (when (not found)

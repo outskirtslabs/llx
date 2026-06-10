@@ -334,9 +334,9 @@
            (:total cost)))))
 
 (deftest decode-event-stream-contract
-  (let [env                                                                   (stub-env)
-        chunks                                                                (fixture "stream_events")
-        init-state                                                            {:model openai-responses-model}
+  (let [env             (stub-env)
+        chunks          (fixture "stream_events")
+        init-state      {:model openai-responses-model}
         {:keys [state events]}
         (reduce (fn [{:keys [state events]} chunk]
                   (let [{next-state :state next-events :events}
@@ -345,7 +345,7 @@
                      :events (into events next-events)}))
                 {:state init-state :events []}
                 chunks)
-        finalize-result                                                       (sut/finalize env state)]
+        finalize-result (sut/finalize env state)]
     (is (= [:thinking-start
             :thinking-delta
             :thinking-delta

@@ -264,9 +264,9 @@
            (select-keys payload [:thinking :output_config :max_tokens :model :stream])))))
 
 (deftest decode-event-stream-contract
-  (let [env                                                                   (stub-env)
-        chunks                                                                (fixture "stream_events")
-        init-state                                                            {:model anthropic-model}
+  (let [env             (stub-env)
+        chunks          (fixture "stream_events")
+        init-state      {:model anthropic-model}
         {:keys [state events]}
         (reduce (fn [{:keys [state events]} chunk]
                   (let [{next-state :state next-events :events}
@@ -275,7 +275,7 @@
                      :events (into events next-events)}))
                 {:state init-state :events []}
                 chunks)
-        finalize-result                                                       (sut/finalize env state)]
+        finalize-result (sut/finalize env state)]
     (is (= [:text-start
             :text-delta
             :text-delta

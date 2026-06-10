@@ -17,6 +17,17 @@
       devshell,
       ...
     }:
+    let
+      prepareWritableCljCache = ''
+        deps_cache="''${JAVA_TOOL_OPTIONS#-Duser.home=}"
+        export HOME="$(mktemp -d)"
+        cp -R -L "$deps_cache/.m2" "$HOME/.m2"
+        cp -R -L "$deps_cache/.gitlibs" "$HOME/.gitlibs"
+        cp -R -L "$deps_cache/.clojure" "$HOME/.clojure"
+        chmod -R u+w "$HOME"
+        export JAVA_TOOL_OPTIONS="-Duser.home=$HOME"
+      '';
+    in
     devenv.lib.mkFlake ./. {
       inherit inputs;
 
@@ -81,6 +92,7 @@
               buildCommand = ''
                 export JAVA_HOME="${pkgs.jdk25.home}"
                 export JAVA_CMD="${pkgs.jdk25}/bin/java"
+                ${prepareWritableCljCache}
                 clojure -M:dev:kaocha :unit
                 clojure -T:build jar
               '';
@@ -134,7 +146,7 @@
                 export JAVA_HOME="${pkgs.jdk25.home}"
                 export JAVA_CMD="${pkgs.jdk25}/bin/java"
                 export PATH="${pkgs.nodejs}/bin:$PATH"
-                export HOME=$(mktemp -d)
+                ${prepareWritableCljCache}
 
                 # start funnel in the background (required by kaocha-cljs2)
                 clojure -M:funnel &
