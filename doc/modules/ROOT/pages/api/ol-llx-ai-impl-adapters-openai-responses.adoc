@@ -14,12 +14,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(normalize-tool-call-id tool-call-id target-model _source-assistant-message)
+(normalize-tool-call-id tool-call-id target-model source-assistant-message)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L69-L81[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L86-L100[source,window=_blank]
 
 [discrete]
 === cljs
@@ -28,12 +28,12 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(normalize-tool-call-id tool-call-id target-model _source-assistant-message)
+(normalize-tool-call-id tool-call-id target-model source-assistant-message)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L69-L81[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L86-L100[source,window=_blank]
 
 '''
 
@@ -54,7 +54,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L275-L331[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L294-L347[source,window=_blank]
 
 [discrete]
 === cljs
@@ -69,7 +69,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L275-L331[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L294-L347[source,window=_blank]
 
 '''
 
@@ -89,7 +89,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L357-L569[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L373-L585[source,window=_blank]
 
 [discrete]
 === cljs
@@ -103,7 +103,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L357-L569[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L373-L585[source,window=_blank]
 
 '''
 
@@ -123,7 +123,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L633-L641[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L649-L657[source,window=_blank]
 
 [discrete]
 === cljs
@@ -137,7 +137,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L633-L641[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L649-L657[source,window=_blank]
 
 '''
 
@@ -157,7 +157,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L643-L668[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L659-L684[source,window=_blank]
 
 [discrete]
 === cljs
@@ -171,7 +171,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L643-L668[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L659-L684[source,window=_blank]
 
 '''
 
@@ -191,7 +191,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L670-L695[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L686-L711[source,window=_blank]
 
 [discrete]
 === cljs
@@ -205,7 +205,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L670-L695[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L686-L711[source,window=_blank]
 
 '''
 
@@ -225,7 +225,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L697-L702[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L713-L718[source,window=_blank]
 
 [discrete]
 === cljs
@@ -239,7 +239,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L697-L702[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L713-L718[source,window=_blank]
 
 '''
 
@@ -259,7 +259,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L704-L715[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L720-L731[source,window=_blank]
 
 [discrete]
 === cljs
@@ -273,4 +273,4 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L704-L715[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/openai_responses.cljc#L720-L731[source,window=_blank]

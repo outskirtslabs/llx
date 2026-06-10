@@ -14,12 +14,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(fx-execute-tool {:keys [state_ abort-signal schema-registry]} effect)
+(fx-execute-tool {:keys [state_]} effect)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/tools.cljc#L55-L91[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/tools.cljc#L55-L100[source,window=_blank]
 
 [discrete]
 === cljs
@@ -28,9 +28,9 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(fx-execute-tool {:keys [state_ abort-signal schema-registry]} effect)
+(fx-execute-tool {:keys [state_]} effect)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/tools.cljc#L55-L91[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/tools.cljc#L55-L100[source,window=_blank]

@@ -52,7 +52,7 @@ Pure command handler. Takes state + command, returns `[state' signals]`.
  return one or more signals to be fed into the transition functions.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L217[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L223[source,window=_blank]
 
 [discrete]
 === cljs
@@ -73,7 +73,7 @@ Pure command handler. Takes state + command, returns `[state' signals]`.
  return one or more signals to be fed into the transition functions.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L217[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L137-L223[source,window=_blank]
 
 '''
 
@@ -94,7 +94,7 @@ _platforms: clj_
 Pure transition from ::idle state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L219-L248[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L225-L254[source,window=_blank]
 
 [discrete]
 === cljs
@@ -109,7 +109,7 @@ _platforms: cljs_
 Pure transition from ::idle state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L219-L248[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L225-L254[source,window=_blank]
 
 '''
 
@@ -130,7 +130,7 @@ _platforms: clj_
 Pure transition from ::streaming state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L250-L304[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L256-L308[source,window=_blank]
 
 [discrete]
 === cljs
@@ -145,7 +145,7 @@ _platforms: cljs_
 Pure transition from ::streaming state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L250-L304[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L256-L308[source,window=_blank]
 
 '''
 
@@ -166,7 +166,7 @@ _platforms: clj_
 Pure transition from ::tool-executing state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L306-L331[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L310-L334[source,window=_blank]
 
 [discrete]
 === cljs
@@ -181,7 +181,7 @@ _platforms: cljs_
 Pure transition from ::tool-executing state. Returns [state' effects].
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L306-L331[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L310-L334[source,window=_blank]
 
 '''
 
@@ -202,7 +202,7 @@ _platforms: clj_
 Terminal state. No transitions possible.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L333-L336[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L336-L339[source,window=_blank]
 
 [discrete]
 === cljs
@@ -217,7 +217,7 @@ _platforms: cljs_
 Terminal state. No transitions possible.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L333-L336[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L336-L339[source,window=_blank]
 
 '''
 
@@ -237,7 +237,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L338-L339[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
 
 [discrete]
 === cljs
@@ -251,7 +251,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L338-L339[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
 
 '''
 
@@ -271,7 +271,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L345[source,window=_blank]
 
 [discrete]
 === cljs
@@ -285,7 +285,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L341-L342[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L345[source,window=_blank]
 
 '''
 
@@ -305,7 +305,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L349[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L347-L353[source,window=_blank]
 
 [discrete]
 === cljs
@@ -319,7 +319,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L344-L349[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L347-L353[source,window=_blank]
 
 '''
 
@@ -339,7 +339,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L351-L353[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L355-L357[source,window=_blank]
 
 [discrete]
 === cljs
@@ -353,7 +353,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L351-L353[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L355-L357[source,window=_blank]
 
 '''
 
@@ -378,7 +378,7 @@ Agent state machine as data.
    the keyword of the next phase to enter.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L375-L393[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L379-L397[source,window=_blank]
 
 [discrete]
 === cljs
@@ -397,7 +397,7 @@ Agent state machine as data.
    the keyword of the next phase to enter.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L375-L393[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L379-L397[source,window=_blank]
 
 '''
 
@@ -424,7 +424,7 @@ Pure step function. Takes state + input (command or signal), returns `[state' ef
  Emits `:ol.llx.agent.event/agent-end` automatically when the agent transitions from a non-idle phase back to `::idle`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L395-L413[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L399-L417[source,window=_blank]
 
 [discrete]
 === cljs
@@ -445,4 +445,4 @@ Pure step function. Takes state + input (command or signal), returns `[state' ef
  Emits `:ol.llx.agent.event/agent-end` automatically when the agent transitions from a non-idle phase back to `::idle`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L395-L413[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/loop.cljc#L399-L417[source,window=_blank]

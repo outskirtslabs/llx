@@ -2,26 +2,40 @@
 
 _platforms: clj, cljs_
 
-Driver loop for the agent runtime.
 
- The driver is the sole owner of state transitions. It steps inputs
- through `ol.llx.agent.loop/step`, interprets resulting effects via
- `ol.llx.agent.fx/execute-fx`, and feeds resulting signals back into
- `loop/step`.
+[#start-BANG-]
+== start!
 
- Multiplexing:
- - Tracks all active signal channels returned by signal-producing effects.
- - Includes `command>` in the `alts` set for external commands.
- - Removes channels when they close.
 
- Signal flow:
+[discrete]
+=== clj
 
- input (command/signal)
-   -> loop/step        -> [state', effects]
-   -> execute-fx       -> channels + fire-and-forget side effects
-   -> alts over active channels + command>
-   -> loop/step for each received signal
-   -> repeat until active channel set is empty.
+_platforms: clj_
+
+[source,clojure]
+----
+(start! env)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L277-L285[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(start! env)
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L277-L285[source,window=_blank]
+
+'''
 
 [#run]
 == run
@@ -34,34 +48,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(run env input)
+(run env command)
 ----
 
-Driver loop. Processes a single input through the state machine,
- interprets resulting effects, and multiplexes signals from all active
- channels back through `loop/step` until the system settles.
-
- The driver is the sole owner of state transitions — it is the only
- code that calls `loop/step` and mutates the state atom. Effect
- interpreters perform side effects but never step the state machine.
-
- Multiplexing: The driver maintains a set of active signal
- channels (from `:call-llm`, `:execute-tool`, etc.) plus the external
- `command>` channel. It uses `alts` to read from all of them
- concurrently. Multiple signal-producing effects can be active at
- once, enabling concurrent tool execution.
-
- Signal processing: When a signal arrives from any channel, it is
- stepped through `loop/step`. The resulting effects are processed:
- fire-and-forget effects execute inline, signal-producing effects add
- their channel to the active set. When a channel closes (effect
- complete), it is removed from the active set.
-
- Termination: The driver resolves when the active channel set is
- empty and all effects from the final step have been processed.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L50-L100[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L287-L294[source,window=_blank]
 
 [discrete]
 === cljs
@@ -70,31 +62,9 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(run env input)
+(run env command)
 ----
 
-Driver loop. Processes a single input through the state machine,
- interprets resulting effects, and multiplexes signals from all active
- channels back through `loop/step` until the system settles.
-
- The driver is the sole owner of state transitions — it is the only
- code that calls `loop/step` and mutates the state atom. Effect
- interpreters perform side effects but never step the state machine.
-
- Multiplexing: The driver maintains a set of active signal
- channels (from `:call-llm`, `:execute-tool`, etc.) plus the external
- `command>` channel. It uses `alts` to read from all of them
- concurrently. Multiple signal-producing effects can be active at
- once, enabling concurrent tool execution.
-
- Signal processing: When a signal arrives from any channel, it is
- stepped through `loop/step`. The resulting effects are processed:
- fire-and-forget effects execute inline, signal-producing effects add
- their channel to the active set. When a channel closes (effect
- complete), it is removed from the active set.
-
- Termination: The driver resolves when the active channel set is
- empty and all effects from the final step have been processed.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L50-L100[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/driver.cljc#L287-L294[source,window=_blank]

@@ -66,12 +66,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(llm-event->step model partial event)
+(llm-event->step run-id model partial event)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L157[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L159[source,window=_blank]
 
 [discrete]
 === cljs
@@ -80,12 +80,12 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(llm-event->step model partial event)
+(llm-event->step run-id model partial event)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L157[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L73-L159[source,window=_blank]
 
 '''
 
@@ -100,12 +100,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect)
+(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key] :as env} effect)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L178-L217[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L188-L236[source,window=_blank]
 
 [discrete]
 === cljs
@@ -114,9 +114,9 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key abort-signal] :as env} effect)
+(fx-call-llm {:keys [state_ convert-to-llm transform-context stream-fn get-api-key] :as env} effect)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L178-L217[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/fx/inference.cljc#L188-L236[source,window=_blank]

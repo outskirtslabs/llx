@@ -10,7 +10,7 @@ This release publishes 39 namespaces.
 | Public runtime wrapper for the agent loop.
 
 | xref:api/ol-llx-agent-driver.adoc[`ol.llx.agent.driver`]
-| Driver loop for the agent runtime.
+| -
 
 | xref:api/ol-llx-agent-fx.adoc[`ol.llx.agent.fx`]
 | Effect interpreter for the agent runtime.

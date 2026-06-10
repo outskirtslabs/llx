@@ -18,12 +18,12 @@ _platforms: clj_
 
 [source,clojure]
 ----
-(create-initial-state schema-registry opts)
+(create-initial-state schema-registry schema-config opts)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L24-L35[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L37-L49[source,window=_blank]
 
 [discrete]
 === cljs
@@ -32,12 +32,12 @@ _platforms: cljs_
 
 [source,clojure]
 ----
-(create-initial-state schema-registry opts)
+(create-initial-state schema-registry schema-config opts)
 ----
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L24-L35[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L37-L49[source,window=_blank]
 
 '''
 
@@ -59,7 +59,7 @@ Converts agent messages to LLM-compatible messages by keeping only maps
  whose `:role` is one of `:user`, `:assistant`, or `:tool-result`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L37-L45[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L51-L59[source,window=_blank]
 
 [discrete]
 === cljs
@@ -75,7 +75,7 @@ Converts agent messages to LLM-compatible messages by keeping only maps
  whose `:role` is one of `:user`, `:assistant`, or `:tool-result`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L37-L45[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L51-L59[source,window=_blank]
 
 '''
 
@@ -105,8 +105,8 @@ Creates an agent runtime handle.
                         `:tool-result`
  - `:transform-context` optional context transform hook
  - `:stream-fn`         optional stream hook; resolved at callsite
- - `:schema-registry`   extra Malli registry to be composed with the built-in schemas
- - `:custom-message-schemas` map of message dispatch keyword to schema keyword in the active registry
+ - `:schema-registry`   user-owned extra Malli schemas
+ - `:custom-message-schemas` user-owned custom message dispatch map
  - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
  - `:system-prompt`, `:model`, `:thinking-level`
  - `:steering-mode`, `:follow-up-mode`
@@ -115,7 +115,7 @@ Creates an agent runtime handle.
 For state rehydration, use <<rehydrate-agent,`rehydrate-agent`>>.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L75-L105[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L89-L119[source,window=_blank]
 
 [discrete]
 === cljs
@@ -139,8 +139,8 @@ Creates an agent runtime handle.
                         `:tool-result`
  - `:transform-context` optional context transform hook
  - `:stream-fn`         optional stream hook; resolved at callsite
- - `:schema-registry`   extra Malli registry to be composed with the built-in schemas
- - `:custom-message-schemas` map of message dispatch keyword to schema keyword in the active registry
+ - `:schema-registry`   user-owned extra Malli schemas
+ - `:custom-message-schemas` user-owned custom message dispatch map
  - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
  - `:system-prompt`, `:model`, `:thinking-level`
  - `:steering-mode`, `:follow-up-mode`
@@ -149,7 +149,7 @@ Creates an agent runtime handle.
 For state rehydration, use <<rehydrate-agent,`rehydrate-agent`>>.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L75-L105[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L89-L119[source,window=_blank]
 
 '''
 
@@ -174,14 +174,12 @@ Creates an agent runtime from a previously persisted state snapshot.
  - `:convert-to-llm` (optional; see <<create-agent,`create-agent`>>)
  - `:transform-context` (optional; see <<create-agent,`create-agent`>>)
  - `:stream-fn` (optional; see <<create-agent,`create-agent`>>)
- - `:schema-registry` (optional; see <<create-agent,`create-agent`>>)
- - `:custom-message-schemas` (optional; see <<create-agent,`create-agent`>>)
  - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
 - `:tools`
 - `:abort-signal`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L107-L125[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L121-L136[source,window=_blank]
 
 [discrete]
 === cljs
@@ -200,14 +198,12 @@ Creates an agent runtime from a previously persisted state snapshot.
  - `:convert-to-llm` (optional; see <<create-agent,`create-agent`>>)
  - `:transform-context` (optional; see <<create-agent,`create-agent`>>)
  - `:stream-fn` (optional; see <<create-agent,`create-agent`>>)
- - `:schema-registry` (optional; see <<create-agent,`create-agent`>>)
- - `:custom-message-schemas` (optional; see <<create-agent,`create-agent`>>)
  - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
 - `:tools`
 - `:abort-signal`.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L107-L125[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L121-L136[source,window=_blank]
 
 '''
 
@@ -228,7 +224,7 @@ _platforms: clj_
 Returns the current agent state snapshot.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L127-L130[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L138-L141[source,window=_blank]
 
 [discrete]
 === cljs
@@ -243,7 +239,7 @@ _platforms: cljs_
 Returns the current agent state snapshot.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L127-L130[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L138-L141[source,window=_blank]
 
 '''
 
@@ -268,7 +264,7 @@ Subscribes a channel to the agent event stream.
  - `(subscribe agent ch)` taps the provided channel and returns it.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L136-L146[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L147-L157[source,window=_blank]
 
 [discrete]
 === cljs
@@ -287,7 +283,7 @@ Subscribes a channel to the agent event stream.
  - `(subscribe agent ch)` taps the provided channel and returns it.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L136-L146[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L147-L157[source,window=_blank]
 
 '''
 
@@ -308,7 +304,7 @@ _platforms: clj_
 Unsubscribes a channel from the agent event stream and closes it.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L148-L153[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L159-L164[source,window=_blank]
 
 [discrete]
 === cljs
@@ -323,41 +319,7 @@ _platforms: cljs_
 Unsubscribes a channel from the agent event stream and closes it.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L148-L153[source,window=_blank]
-
-'''
-
-[#dispatch-BANG-]
-== dispatch!
-
-
-[discrete]
-=== clj
-
-_platforms: clj_
-
-[source,clojure]
-----
-(dispatch! agent command)
-----
-
-
-[.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L155-L158[source,window=_blank]
-
-[discrete]
-=== cljs
-
-_platforms: cljs_
-
-[source,clojure]
-----
-(dispatch! agent command)
-----
-
-
-[.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L155-L158[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L159-L164[source,window=_blank]
 
 '''
 
@@ -378,7 +340,7 @@ _platforms: clj_
 Submits a prompt command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L169-L173[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L182-L186[source,window=_blank]
 
 [discrete]
 === cljs
@@ -393,7 +355,7 @@ _platforms: cljs_
 Submits a prompt command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L169-L173[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L182-L186[source,window=_blank]
 
 '''
 
@@ -414,7 +376,7 @@ _platforms: clj_
 Submits a continue command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L175-L178[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L188-L191[source,window=_blank]
 
 [discrete]
 === cljs
@@ -429,7 +391,7 @@ _platforms: cljs_
 Submits a continue command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L175-L178[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L188-L191[source,window=_blank]
 
 '''
 
@@ -450,7 +412,7 @@ _platforms: clj_
 Submits an abort command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L180-L183[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L193-L196[source,window=_blank]
 
 [discrete]
 === cljs
@@ -465,7 +427,7 @@ _platforms: cljs_
 Submits an abort command to the agent runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L180-L183[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L193-L196[source,window=_blank]
 
 '''
 
@@ -486,7 +448,7 @@ _platforms: clj_
 Queues steering messages.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L185-L188[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L198-L201[source,window=_blank]
 
 [discrete]
 === cljs
@@ -501,7 +463,7 @@ _platforms: cljs_
 Queues steering messages.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L185-L188[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L198-L201[source,window=_blank]
 
 '''
 
@@ -522,7 +484,7 @@ _platforms: clj_
 Queues follow-up messages.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L190-L193[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L203-L206[source,window=_blank]
 
 [discrete]
 === cljs
@@ -537,7 +499,7 @@ _platforms: cljs_
 Queues follow-up messages.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L190-L193[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L203-L206[source,window=_blank]
 
 '''
 
@@ -562,7 +524,7 @@ Waits until the agent reaches `:ol.llx.agent.loop/idle` or `:ol.llx.agent.loop/c
  exhausted.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L195-L214[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L208-L227[source,window=_blank]
 
 [discrete]
 === cljs
@@ -581,7 +543,7 @@ Waits until the agent reaches `:ol.llx.agent.loop/idle` or `:ol.llx.agent.loop/c
  exhausted.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L195-L214[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L208-L227[source,window=_blank]
 
 '''
 
@@ -601,7 +563,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L216-L219[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L229-L232[source,window=_blank]
 
 [discrete]
 === cljs
@@ -615,7 +577,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L216-L219[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L229-L232[source,window=_blank]
 
 '''
 
@@ -635,7 +597,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L221-L223[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L234-L236[source,window=_blank]
 
 [discrete]
 === cljs
@@ -649,7 +611,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L221-L223[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L234-L236[source,window=_blank]
 
 '''
 
@@ -669,7 +631,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L225-L228[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L238-L241[source,window=_blank]
 
 [discrete]
 === cljs
@@ -683,7 +645,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L225-L228[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L238-L241[source,window=_blank]
 
 '''
 
@@ -703,7 +665,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L230-L232[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L243-L245[source,window=_blank]
 
 [discrete]
 === cljs
@@ -717,7 +679,59 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L230-L232[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L243-L245[source,window=_blank]
+
+'''
+
+[#set-schema-config]
+== set-schema-config
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(set-schema-config agent schema-config-update)
+----
+
+Replaces the agent's user-owned schema configuration.
+
+`schema-config-update` may include `:schema-registry` and/or
+`:custom-message-schemas`. `nil` for either field preserves the current
+user-owned value.
+
+This setter is accepted in any phase. It affects future validation and
+future tool execution only; already queued messages and already running
+tool executions keep using the registry they started with.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L257-L278[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(set-schema-config agent schema-config-update)
+----
+
+Replaces the agent's user-owned schema configuration.
+
+`schema-config-update` may include `:schema-registry` and/or
+`:custom-message-schemas`. `nil` for either field preserves the current
+user-owned value.
+
+This setter is accepted in any phase. It affects future validation and
+future tool execution only; already queued messages and already running
+tool executions keep using the registry they started with.
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L257-L278[source,window=_blank]
 
 '''
 
@@ -737,7 +751,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L234-L236[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L280-L282[source,window=_blank]
 
 [discrete]
 === cljs
@@ -751,7 +765,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L234-L236[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L280-L282[source,window=_blank]
 
 '''
 
@@ -771,7 +785,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L238-L240[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L284-L286[source,window=_blank]
 
 [discrete]
 === cljs
@@ -785,7 +799,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L238-L240[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L284-L286[source,window=_blank]
 
 '''
 
@@ -805,7 +819,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L242-L245[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L288-L291[source,window=_blank]
 
 [discrete]
 === cljs
@@ -819,7 +833,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L242-L245[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L288-L291[source,window=_blank]
 
 '''
 
@@ -839,7 +853,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L247-L250[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L293-L296[source,window=_blank]
 
 [discrete]
 === cljs
@@ -853,7 +867,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L247-L250[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L293-L296[source,window=_blank]
 
 '''
 
@@ -873,7 +887,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L252-L254[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L298-L300[source,window=_blank]
 
 [discrete]
 === cljs
@@ -887,7 +901,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L252-L254[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L298-L300[source,window=_blank]
 
 '''
 
@@ -907,7 +921,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L256-L258[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L302-L304[source,window=_blank]
 
 [discrete]
 === cljs
@@ -921,7 +935,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L256-L258[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L302-L304[source,window=_blank]
 
 '''
 
@@ -941,7 +955,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L260-L262[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L306-L308[source,window=_blank]
 
 [discrete]
 === cljs
@@ -955,7 +969,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L260-L262[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L306-L308[source,window=_blank]
 
 '''
 
@@ -975,7 +989,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L264-L266[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L310-L312[source,window=_blank]
 
 [discrete]
 === cljs
@@ -989,7 +1003,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L264-L266[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L310-L312[source,window=_blank]
 
 '''
 
@@ -1009,7 +1023,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L268-L270[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L314-L316[source,window=_blank]
 
 [discrete]
 === cljs
@@ -1023,7 +1037,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L268-L270[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L314-L316[source,window=_blank]
 
 '''
 
@@ -1041,10 +1055,10 @@ _platforms: clj_
 (close agent)
 ----
 
-Closes the command channel and marks state as closed.
+Closes the runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L272-L278[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L318-L321[source,window=_blank]
 
 [discrete]
 === cljs
@@ -1056,7 +1070,7 @@ _platforms: cljs_
 (close agent)
 ----
 
-Closes the command channel and marks state as closed.
+Closes the runtime.
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L272-L278[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent.cljc#L318-L321[source,window=_blank]

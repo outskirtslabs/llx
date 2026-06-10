@@ -249,7 +249,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L513[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L574[source,window=_blank]
 
 [discrete]
 === cljs
@@ -263,7 +263,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L513[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L47-L574[source,window=_blank]
 
 '''
 
@@ -283,7 +283,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L515-L518[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L576-L579[source,window=_blank]
 
 [discrete]
 === cljs
@@ -297,7 +297,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L515-L518[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L576-L579[source,window=_blank]
 
 '''
 
@@ -317,7 +317,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L520-L524[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L581-L585[source,window=_blank]
 
 [discrete]
 === cljs
@@ -331,7 +331,41 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L520-L524[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L581-L585[source,window=_blank]
+
+'''
+
+[#derive-active-registry]
+== derive-active-registry
+
+
+[discrete]
+=== clj
+
+_platforms: clj_
+
+[source,clojure]
+----
+(derive-active-registry {:keys [schema-registry custom-message-schemas]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L587-L591[source,window=_blank]
+
+[discrete]
+=== cljs
+
+_platforms: cljs_
+
+[source,clojure]
+----
+(derive-active-registry {:keys [schema-registry custom-message-schemas]})
+----
+
+
+[.api-source]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L587-L591[source,window=_blank]
 
 '''
 
@@ -351,7 +385,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L529-L538[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L596-L605[source,window=_blank]
 
 [discrete]
 === cljs
@@ -365,4 +399,4 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L529-L538[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/agent/schema.cljc#L596-L605[source,window=_blank]

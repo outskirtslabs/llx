@@ -19,7 +19,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L73-L80[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L71-L78[source,window=_blank]
 
 [discrete]
 === cljs
@@ -33,7 +33,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L73-L80[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L71-L78[source,window=_blank]
 
 '''
 
@@ -54,7 +54,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L295-L354[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L306-L365[source,window=_blank]
 
 [discrete]
 === cljs
@@ -69,7 +69,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L295-L354[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L306-L365[source,window=_blank]
 
 '''
 
@@ -89,7 +89,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L472-L497[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L483-L508[source,window=_blank]
 
 [discrete]
 === cljs
@@ -103,7 +103,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L472-L497[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L483-L508[source,window=_blank]
 
 '''
 
@@ -123,7 +123,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L551-L562[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L562-L573[source,window=_blank]
 
 [discrete]
 === cljs
@@ -137,7 +137,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L551-L562[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L562-L573[source,window=_blank]
 
 '''
 
@@ -157,7 +157,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L564-L589[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L575-L600[source,window=_blank]
 
 [discrete]
 === cljs
@@ -171,7 +171,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L564-L589[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L575-L600[source,window=_blank]
 
 '''
 
@@ -191,7 +191,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L591-L616[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L602-L627[source,window=_blank]
 
 [discrete]
 === cljs
@@ -205,7 +205,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L591-L616[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L602-L627[source,window=_blank]
 
 '''
 
@@ -225,7 +225,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L618-L623[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L629-L634[source,window=_blank]
 
 [discrete]
 === cljs
@@ -239,7 +239,7 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L618-L623[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L629-L634[source,window=_blank]
 
 '''
 
@@ -259,7 +259,7 @@ _platforms: clj_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L625-L635[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L636-L646[source,window=_blank]
 
 [discrete]
 === cljs
@@ -273,4 +273,4 @@ _platforms: cljs_
 
 
 [.api-source]
-link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L625-L635[source,window=_blank]
+link:https://github.com/outskirtslabs/llx/blob/main/src/ol/llx/ai/impl/adapters/google_generative_ai.cljc#L636-L646[source,window=_blank]
