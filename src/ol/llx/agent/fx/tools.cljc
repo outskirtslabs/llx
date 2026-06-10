@@ -53,13 +53,14 @@
                      :timestamp    (now-ms)}))
 
 (defn fx-execute-tool
-  [{:keys [state_ schema-registry]} effect]
+  [{:keys [state_]} effect]
   (let [out                 (sp/chan)
         tool-call           (:tool-call effect)
         {:keys [id signal]} (get-in @state_ [:runtime :active-run])
-        public-state        (:public-state @state_)]
+        public-state        (:public-state @state_)
+        schema-registry     (schema/derive-active-registry public-state)]
     (-> (p/let [tools          (:tools public-state)
-                validated-args (ai/validate-tool-call tools tool-call)
+                validated-args (ai/validate-tool-call schema-registry tools tool-call)
                 tool-name      (:name tool-call)
                 tool           (or (resolve-tool tools tool-name)
                                    (throw

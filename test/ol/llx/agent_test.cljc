@@ -35,13 +35,35 @@
    (merge (agent.schema/schemas {:custom-message-schemas custom-message-schemas})
           schema-registry)))
 
-(defn- base-state
+(def custom-notification-schemas
+  {:my-app/notification :my/message-notification})
+
+(def custom-notification-registry
+  {:my/message-notification
+   [:map
+    [:role [:= :my-app/notification]]
+    [:text :string]
+    [:timestamp :int]]})
+
+(def custom-notification-message
+  {:role      :my-app/notification
+   :text      "Heads up"
+   :timestamp 1})
+
+(def canonical-user-message
+  {:role      :user
+   :content   "hello"
+   :timestamp 2})
+
+(defn base-state
   [messages]
   {:ol.llx.agent.loop/phase :ol.llx.agent.loop/idle
    :system-prompt           ""
    :model                   (ai/get-model :openai "gpt-5.2-codex")
    :thinking-level          :off
    :tools                   []
+   :schema-registry         {}
+   :custom-message-schemas  {}
    :messages                messages
    :stream-message          nil
    :pending-tool-calls      []
@@ -75,25 +97,32 @@
                        (merge required-env-opts
                               {:tools [runtime-tool]}))
         state         (sut/state agent)]
-    (is (= {:system-prompt  "System prompt"
-            :model          model
-            :thinking-level :high
-            :tools          [runtime-tool]
-            :messages       []
-            :steering-mode  :all
-            :follow-up-mode :all}
+    (is (= {:system-prompt          "System prompt"
+            :model                  model
+            :thinking-level         :high
+            :tools                  [runtime-tool]
+            :schema-registry        {}
+            :custom-message-schemas {}
+            :messages               []
+            :steering-mode          :all
+            :follow-up-mode         :all}
            (select-keys state
                         [:system-prompt
                          :model
                          :thinking-level
                          :tools
+                         :schema-registry
+                         :custom-message-schemas
                          :messages
                          :steering-mode
                          :follow-up-mode])))
     (is (= (wrapped-state state) @(:state_ agent)))
-    (is (= {:tools    [runtime-tool]
-            :messages []}
-           (select-keys (sut/state derived-agent) [:tools :messages])))))
+    (is (= {:tools                  [runtime-tool]
+            :schema-registry        {}
+            :custom-message-schemas {}
+            :messages               []}
+           (select-keys (sut/state derived-agent)
+                        [:tools :schema-registry :custom-message-schemas :messages])))))
 
 (deftest create-agent-requires-env-contract-test
   (is (thrown? #?(:clj clojure.lang.ExceptionInfo
@@ -189,6 +218,8 @@
                :model                   model
                :thinking-level          :medium
                :tools                   [tool]
+               :schema-registry         {}
+               :custom-message-schemas  {}
                :messages                [{:role :user :content "old" :timestamp 1}]
                :stream-message          nil
                :pending-tool-calls      []
@@ -380,20 +411,97 @@
             {:type :ol.llx.agent.command/replace-messages :messages [custom-message]}]
            @seen*))))
 
+(deftest set-schema-config-updates-custom-message-validation-on-live-agent-test
+  #?(:clj
+     (let [set-schema-config (ns-resolve 'ol.llx.agent 'set-schema-config)
+           agent             (sut/create-agent required-env-opts)]
+       (is (some? set-schema-config))
+       (when set-schema-config
+         (is (thrown? Exception
+                      (sut/replace-messages agent [custom-notification-message])))
+         (is (= true
+                (p/await
+                 (set-schema-config agent {:schema-registry        custom-notification-registry
+                                           :custom-message-schemas custom-notification-schemas}))))
+         (is (= true
+                (p/await (sut/replace-messages agent [custom-notification-message]))))
+         (is (= [custom-notification-message] (:messages (sut/state agent))))
+         (is (= custom-notification-registry (:schema-registry (sut/state agent))))
+         (is (= custom-notification-schemas (:custom-message-schemas (sut/state agent))))))
+     :cljs
+     (is true)))
+
+(deftest set-schema-config-clears-user-additions-without-removing-canonical-schemas-test
+  #?(:clj
+     (let [set-schema-config (ns-resolve 'ol.llx.agent 'set-schema-config)
+           agent             (sut/create-agent
+                              (merge required-env-opts
+                                     {:schema-registry        custom-notification-registry
+                                      :custom-message-schemas custom-notification-schemas}))]
+       (is (some? set-schema-config))
+       (when set-schema-config
+         (is (= true
+                (p/await
+                 (set-schema-config agent {:schema-registry        {}
+                                           :custom-message-schemas {}}))))
+         (is (thrown? Exception
+                      (sut/append-message agent custom-notification-message)))
+         (is (= true
+                (p/await (sut/replace-messages agent [canonical-user-message]))))
+         (is (= [canonical-user-message] (:messages (sut/state agent))))
+         (is (= {} (:schema-registry (sut/state agent))))
+         (is (= {} (:custom-message-schemas (sut/state agent))))))
+     :cljs
+     (is true)))
+
+(deftest set-schema-config-ignores-nil-fields-test
+  #?(:clj
+     (let [set-schema-config (ns-resolve 'ol.llx.agent 'set-schema-config)]
+       (is (some? set-schema-config))
+       (when set-schema-config
+         (testing "nil schema-registry preserves the current user registry"
+           (let [agent (sut/create-agent
+                        (merge required-env-opts
+                               {:schema-registry        custom-notification-registry
+                                :custom-message-schemas custom-notification-schemas}))]
+             (is (= true
+                    (p/await
+                     (set-schema-config agent {:schema-registry        nil
+                                               :custom-message-schemas custom-notification-schemas}))))
+             (is (= true
+                    (p/await (sut/replace-messages agent [custom-notification-message]))))
+             (is (= custom-notification-registry (:schema-registry (sut/state agent))))))
+         (testing "nil custom-message-schemas preserves the current dispatch map"
+           (let [agent (sut/create-agent
+                        (merge required-env-opts
+                               {:schema-registry        custom-notification-registry
+                                :custom-message-schemas custom-notification-schemas}))]
+             (is (= true
+                    (p/await
+                     (set-schema-config agent {:schema-registry        custom-notification-registry
+                                               :custom-message-schemas nil}))))
+             (is (= true
+                    (p/await (sut/replace-messages agent [custom-notification-message]))))
+             (is (= custom-notification-schemas (:custom-message-schemas (sut/state agent))))))))
+     :cljs
+     (is true)))
+
 (deftest rehydrate-agent-custom-message-validation-test
-  (let [custom-message {:role :my-app/notification :text "rehydrated" :timestamp 1}
-        opts           (merge required-env-opts
-                              {:custom-message-schemas {:my-app/notification :my/message-notification}
-                               :schema-registry        {:my/message-notification
-                                                        [:map
-                                                         [:role [:= :my-app/notification]]
-                                                         [:text :string]
-                                                         [:timestamp :int]]}})
-        valid-state    (base-state [custom-message])]
-    (is (= valid-state
-           (sut/state (sut/rehydrate-agent valid-state opts))))
-    (is (thrown? #?(:clj Exception :cljs js/Error)
-                 (sut/rehydrate-agent (update-in valid-state [:messages 0] dissoc :text) opts)))))
+  #?(:clj
+     (let [valid-state (assoc (base-state [{:role      :my-app/notification
+                                            :text      "rehydrated"
+                                            :timestamp 1}])
+                              :schema-registry custom-notification-registry
+                              :custom-message-schemas custom-notification-schemas)
+           agent       (sut/rehydrate-agent valid-state required-env-opts)]
+       (is (= valid-state (sut/state agent)))
+       (is (= true
+              (p/await (sut/replace-messages agent [custom-notification-message]))))
+       (is (thrown? Exception
+                    (sut/rehydrate-agent (update-in valid-state [:messages 0] dissoc :text)
+                                         required-env-opts))))
+     :cljs
+     (is true)))
 
 (deftest create-agent-rejects-missing-custom-schema-registration-test
   (is (thrown? #?(:clj Exception :cljs js/Error)
@@ -468,6 +576,8 @@
    :model                   (ai/get-model :openai "gpt-5.2-codex")
    :thinking-level          :off
    :tools                   [(tool-schema-valid-runtime-tool)]
+   :schema-registry         {}
+   :custom-message-schemas  {}
    :messages                []
    :stream-message          nil
    :pending-tool-calls      [(tool-schema-valid-tool-call)]

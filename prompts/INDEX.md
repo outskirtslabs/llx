@@ -1,0 +1,53 @@
+# Prompts Index
+
+- `000-clojure-architecture-and-malli-report.md` - pre-planning architecture and Malli research reference.
+- `000-pi-ai-package-research-report.md` - pre-planning Pi AI package parity research reference.
+- `000-polyceph-comparison.md` - pre-planning comparison notes reference.
+- `001-openai-stream-and-registry.md` - phase 001 implemented OpenAI-completions stream + registry foundation.
+- `002-cross-provider-handoff-transform-spike.md` - phase 002 implemented shared handoff/transform replay core.
+- `003-anthropic-adapter-foundation-and-first-cross-provider-handoff.md` - phase 003 implemented Anthropic adapter foundation and reduced live handoff coverage.
+- `004-openai-responses-adapter-and-reasoning-replay-hardening.md` - phase 004 plan drafted for OpenAI Responses parity and reasoning replay hardening.
+- `005-guardrails-and-malli-boundary-invariants.md` - phase 005 plan drafted for Guardrails boundary contracts and deeper Malli internal map invariants.
+- `006-google-generative-ai-adapter-and-cross-provider-handoff-parity.md` - phase 006 plan drafted for Google Generative AI adapter parity and Google cross-provider handoff coverage.
+- `0065-boundary-map-shape-contract-hardening-before-mistral.md` - phase 006.5 plan drafted for strict open-map Malli/Guardrails boundary contracts before Mistral work.
+- `007-mistral-compat-parity-on-openai-completions.md` - phase 007 plan drafted for Mistral parity via OpenAI-completions compat behavior.
+- `008-supported-provider-full-parity-polish-and-api-completion.md` - phase 008 plan drafted for supported-provider full parity closeout and missing public API/util completion.
+- `009-supported-provider-model-catalog-generation-pipeline.md` - phase 009 plan drafted for deterministic LLX-owned model-catalog generation from models.dev with supported-provider scope.
+- `010-anthropic-oauth-claude-stealth-mode-parity.md` - phase 010 plan drafted for Anthropic OAuth Claude stealth-mode parity (tool-name normalization, OAuth identity headers, and round-trip restoration).
+- `011-structured-error-handling-and-retry-support.md` - phase 011 implemented structured error taxonomy, retry with exponential backoff, and Java exception wrapping for SDK-equivalent transient failure resilience.
+- `012-xhigh-tool-validation-unicode-overflow-image-live-parity.md` - phase 012 plan drafted for structured unsupported-xhigh errors, runtime tool-argument validation, outbound surrogate sanitization, and live overflow plus image/tool-result image parity coverage.
+- `013-cost-calculation-parity-for-supported-providers.md` - phase 013 plan drafted for provider adapter cost-calculation parity across OpenAI Completions, Anthropic Messages, and Google Generative AI with progress-checklist reconciliation.
+- `014-trove-logging-observability-parity.md` - phase 014 plan drafted for direct Trove-based payload trace and lifecycle observability signals across adapters, client, runtime, and retry boundaries without callback hooks.
+- `015-tool-call-id-normalization-exact-port-alignment.md` - phase 015 plan drafted for exact upstream tool-call ID normalization parity across transform mapping and adapter-specific normalization branches in supported LLX scope.
+- `016-public-api-namespace-refactor.md` - phase 016 plan drafted for explicit public API boundaries via `llx.ai` facade namespaces and `llx.ai.impl.*` implementation namespaces with delegating wrapper conventions.
+- `017-promesa-async-migration.md` - phase 017 plan reset to define a public async-neutral `llx.ai.stream` core API plus optional `llx.ai.promesa.csp` adapter, keeping Promesa out of required core dependencies.
+- `018-cljs-node-runtime-parity-and-test-expansion.md` - phase 018 plan drafted to move CLJS Node runtime from scaffolding to functional complete/stream execution, with upstream abort wiring and expanded CLJS runtime tests.
+- `019-promesa-core-async-first-migration.md` - phase 019 plan drafted to make Promesa a core dependency and migrate LLX complete/stream core workflows to async-first semantics across runtimes.
+- `020-codebase-quality-pass-report.md` - quality audit report for duplicate helpers, dead-code candidates, and structural maintainability smells in `llx/src`.
+- `021-llx-agent-loop-core-parity.md` - phase 021 plan drafted for llx.agent helper + low-level loop parity including streaming, steering, follow-up, and sequential tool execution behavior.
+- `022-pre-planning-discovery-agent-loop-comparative-analysis-for-llx-agent.md` - pre-planning comparative synthesis across external loop architectures and llx.agent design options.
+- `022-llx-agent-functional-channel-runtime-parity.md` - phase 022 runtime slice implemented: functional Promesa-channel runtime handle, command coordination (`prompt/continue/steer/follow-up/abort/reset/wait`), queue-mode semantics, subscription multiplexer, and focused runtime parity tests.
+- `023-llx-agent-parity-report.md` - first llx.agent parity report against Pi agent behavior.
+- `024-llx-agent-parity-report-second-pass.md` - second-pass llx.agent parity review and gap analysis.
+- `025-llx-agent-statechart-clean-port.md` - statechart-oriented clean-port plan for the agent runtime.
+- `026-tea-test-plan.md` - TEA/runtime testing plan notes.
+- `027-tea-next-steps.md` - TEA/runtime follow-up planning notes.
+- `028-agent-opts-parity.md` - phase 028 plan for agent option parity and runtime configuration forwarding.
+- `029-tool-execution.md` - phase 029 implemented agent tool execution schemas, fx behavior, and loop continuation coverage.
+- `030-openai-subscription-sso-login.md` - OpenAI subscription SSO/OAuth login parity planning.
+- `031-pi-mono-update.md` - pi-mono upstream update review and parity recommendations.
+- `032-model-catalog-upgrade.md` - model catalog upgrade planning.
+- `033-openai-responses-gemini-replay.md` - OpenAI Responses and Gemini replay parity planning.
+- `034-anthropic-sonnet-4-6-redacted-thinking.md` - Anthropic Sonnet 4.6 redacted-thinking parity planning.
+- `035-example-coding-agent.md` - example coding-agent planning notes.
+- `036-bramble-coding-agent.md` - Bramble coding-agent planning notes.
+- `037-pi-mono-update.md` - pi-mono upstream update report for v0.57.1 through v0.61.0 deltas.
+- `038-skills.md` - skill-related planning notes.
+- `039-pi-mono-update.md` - pi-mono upstream update report for v0.61.1 through v0.62.0 deltas.
+- `040-abort-cancellation.md` - first abort-cancellation implementation plan.
+- `040-abort-cancellation-v2.md` - implemented long-lived driver and run-scoped abort cancellation plan.
+- `041-tool-log-rendering_report.md` - research report on Pi tool rendering/debug output and LLX-native logging options.
+- `042-dynamic-schema-config.md` - dynamic live agent schema configuration implementation plan.
+- `043-pi-tool-call-streaming_report.md` - report explaining Pi's streamed tool-call preview versus actual tool execution timing.
+- `PROMPTS.md` - scratchpad/task notes from interactive sessions.
+- `planning-next-session.md` - reusable workflow/runbook for planning and executing upcoming sessions.

@@ -55,7 +55,7 @@
      - `:abort-signal`       — abort token for cancellation"
        [env effect]
        [:ol.llx.agent/env ::effect => ::result]
-       (let [schema-registry (:schema-registry env)]
+       (let [schema-registry (schema/derive-active-registry (:public-state @(:state_ env)))]
          (schema/validate! schema-registry :ol.llx.agent/env env)
          (schema/validate! schema-registry ::effect effect)
          (case (::type effect)

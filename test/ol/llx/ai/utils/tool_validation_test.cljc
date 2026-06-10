@@ -3,6 +3,8 @@
    #?@(:clj [[clojure.test :refer [deftest is testing]]]
        :cljs [[cljs.test :refer-macros [deftest is testing]]])
    [clojure.string :as str]
+   [malli.registry :as mr]
+   [ol.llx.ai.impl.schema :as schema]
    [ol.llx.ai.impl.utils.tool-validation :as sut]))
 
 (def tools
@@ -10,7 +12,12 @@
     :description  "Search the web"
     :input-schema [:map {:closed true}
                    [:q :string]
-                   [:limit {:optional true} :int]]}])
+                   [:limit {:optional true} :int]]}
+   {:name         "search-with-defaults"
+    :description  "Search the web with defaults"
+    :input-schema [:map {:closed true}
+                   [:q :string]
+                   [:limit {:optional true :default 10} :int]]}])
 
 (deftest validate-tool-call
   (testing "success case"
@@ -28,7 +35,7 @@
       (is (some? ex))
       (is (= :ol.llx/tool-not-found (-> ex ex-data :type)))
       (is (= "unknown-tool" (-> ex ex-data :tool-name)))
-      (is (= ["search"] (-> ex ex-data :available-tools)))))
+      (is (= ["search" "search-with-defaults"] (-> ex ex-data :available-tools)))))
   (testing "validation errors are structured"
     (let [ex (try
                (sut/validate-tool-call tools {:name "search" :arguments {:q 123}})
@@ -68,4 +75,31 @@
                (catch #?(:clj clojure.lang.ExceptionInfo :cljs js/Error) e e))]
       (is (some? ex))
       (is (str/includes? (ex-message ex) "unknown")
-          "error message should mention unknown tool name"))))
+          "error message should mention unknown tool name")))
+  (testing "coerces string values using the input schema"
+    (is (= {:q "clojure" :limit 3}
+           (sut/validate-tool-call
+            tools
+            {:name      "search"
+             :arguments {:q "clojure" :limit "3"}}))))
+  (testing "applies schema defaults from the input schema"
+    (is (= {:q "clojure" :limit 10}
+           (sut/validate-tool-call
+            tools
+            {:name      "search-with-defaults"
+             :arguments {:q "clojure"}})))
+    (testing "resolves custom schema references from the active registry"
+      (let [registry (mr/composite-registry
+                      (schema/registry)
+                      {:tool/limit :int})
+            tools    [{:name         "search-with-registry"
+                       :description  "Search using a registry-backed schema"
+                       :input-schema [:map {:closed true}
+                                      [:q :string]
+                                      [:limit :tool/limit]]}]]
+        (is (= {:q "clojure" :limit 3}
+               (sut/validate-tool-call
+                registry
+                tools
+                {:name      "search-with-registry"
+                 :arguments {:q "clojure" :limit "3"}})))))))

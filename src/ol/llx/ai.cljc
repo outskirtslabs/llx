@@ -192,9 +192,15 @@
   (impl.models/models-equal? a b))
 
 (defn validate-tool-call
-  "Validates a `tool-call` entry against matching tool definitions in `tools`."
-  [tools tool-call]
-  (impl.tool-validation/validate-tool-call tools tool-call))
+  "Validates a `tool-call` entry against matching tool definitions in `tools`.
+
+  - `(validate-tool-call tools tool-call)` uses the default LLX registry.
+  - `(validate-tool-call schema-registry tools tool-call)` uses an explicit
+    active registry."
+  ([tools tool-call]
+   (impl.tool-validation/validate-tool-call (impl.schema/registry) tools tool-call))
+  ([schema-registry tools tool-call]
+   (impl.tool-validation/validate-tool-call schema-registry tools tool-call)))
 
 (defn context-overflow?
   "Returns true when the input matches known context-window overflow patterns."

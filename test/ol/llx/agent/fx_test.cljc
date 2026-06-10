@@ -41,6 +41,8 @@
    :model                   model
    :thinking-level          thinking-level
    :tools                   tools
+   :schema-registry         {}
+   :custom-message-schemas  {}
    :messages                messages
    :stream-message          nil
    :pending-tool-calls      []
@@ -562,3 +564,103 @@
                                  (assert-execute-tool-behaviors! results)))
                        (p/then (fn [_] (done)))
                        (p/catch (partial util/fail-and-done! done)))))))
+
+(deftest fx-execute-tool-uses-active-schema-registry-for-input-coercion-test
+  #?(:clj
+     (let [model      (ai/get-model :openai "gpt-4o")
+           seen-args* (atom nil)
+           env        (test-env
+                       (assoc (base-state model
+                                          []
+                                          :off
+                                          [{:name         "search"
+                                            :description  "Search"
+                                            :input-schema [:map [:limit :test/limit]]
+                                            :execute      (fn [_tool-call-id args _abort-signal _on-update]
+                                                            (reset! seen-args* args)
+                                                            {:content [{:type :text :text "ok"}]})}])
+                              :schema-registry {:test/limit :int})
+                       {})
+           out        (fx/execute-fx env {:ol.llx.agent.fx/type :execute-tool
+                                          :tool-call            {:id        "tc-1"
+                                                                 :name      "search"
+                                                                 :arguments {:limit "3"}}})
+           signals    (util/await! (effect-handle-signals* out) 3000 ::timeout)]
+       (is (not (util/timeout-result? signals)))
+       (is (= [:ol.llx.agent.signal/tool-result] (mapv :type signals)))
+       (is (= {:limit 3} @seen-args*)))
+     :cljs
+     (util/async done
+                 (let [model      (ai/get-model :openai "gpt-4o")
+                       seen-args* (atom nil)
+                       env        (test-env
+                                   (assoc (base-state model
+                                                      []
+                                                      :off
+                                                      [{:name         "search"
+                                                        :description  "Search"
+                                                        :input-schema [:map [:limit :test/limit]]
+                                                        :execute      (fn [_tool-call-id args _abort-signal _on-update]
+                                                                        (reset! seen-args* args)
+                                                                        {:content [{:type :text :text "ok"}]})}])
+                                          :schema-registry {:test/limit :int})
+                                   {})
+                       out        (fx/execute-fx env {:ol.llx.agent.fx/type :execute-tool
+                                                      :tool-call            {:id        "tc-1"
+                                                                             :name      "search"
+                                                                             :arguments {:limit "3"}}})]
+                   (-> (effect-handle-signals* out)
+                       (p/then (fn [signals]
+                                 (is (not (util/timeout-result? signals)))
+                                 (is (= [:ol.llx.agent.signal/tool-result] (mapv :type signals)))
+                                 (is (= {:limit 3} @seen-args*))))
+                       (p/then (fn [_] (done)))
+                       (p/catch (partial util/fail-and-done! done)))))))
+
+(deftest fx-execute-tool-uses-updated-schema-config-from-live-agent-test
+  #?(:clj
+     (let [create-agent      (ns-resolve 'ol.llx.agent 'create-agent)
+           set-schema-config (ns-resolve 'ol.llx.agent 'set-schema-config)
+           seen-args*        (atom nil)
+           tool              {:name         "search"
+                              :description  "Search"
+                              :input-schema [:map [:limit :test/limit]]
+                              :execute      (fn [_tool-call-id args _abort-signal _on-update]
+                                              (reset! seen-args* args)
+                                              {:content [{:type :text :text "ok"}]})}
+           agent             (when create-agent
+                               (create-agent {:convert-to-llm    identity
+                                              :transform-context identity
+                                              :stream-fn         (fn [_model _context _opts]
+                                                                   (sp/chan))
+                                              :tools             [tool]}))
+           tool-call         {:id "tc-1" :name "search" :arguments {:limit "3"}}
+           active-run        {:id             1
+                              :signal         ::run-signal
+                              :cancel!        (fn [] true)
+                              :cancelled?     (constantly false)
+                              :effect-handles {}}
+           execute!*         (fn []
+                               (swap! (:state_ agent) assoc-in [:runtime :active-run] active-run)
+                               (let [out (fx/execute-fx agent {:ol.llx.agent.fx/type :execute-tool
+                                                               :tool-call            tool-call})]
+                                 (util/await! (effect-handle-signals* out) 3000 ::timeout)))]
+       (is (some? create-agent))
+       (is (some? set-schema-config))
+       (when (and create-agent set-schema-config)
+         (let [before-signals (execute!*)]
+           (is (not (util/timeout-result? before-signals)))
+           (is (= [:ol.llx.agent.signal/tool-error] (mapv :type before-signals)))
+           (is (nil? @seen-args*)))
+         (swap! (:state_ agent) assoc-in [:runtime :active-run] nil)
+         (is (= true
+                (p/await
+                 (set-schema-config agent {:schema-registry        {:test/limit :int}
+                                           :custom-message-schemas {}}))))
+         (reset! seen-args* nil)
+         (let [after-signals (execute!*)]
+           (is (not (util/timeout-result? after-signals)))
+           (is (= [:ol.llx.agent.signal/tool-result] (mapv :type after-signals)))
+           (is (= {:limit 3} @seen-args*)))))
+     :cljs
+     (is true)))

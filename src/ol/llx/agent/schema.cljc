@@ -65,6 +65,16 @@
      :ol.llx.agent/custom-message-schemas
      [:map-of [:fn custom-message-role?] :keyword]
 
+     :ol.llx.agent/schema-config
+     [:map
+      [:schema-registry {:default {}} :ol.llx.agent/schema-registry]
+      [:custom-message-schemas {:default {}} :ol.llx.agent/custom-message-schemas]]
+
+     :ol.llx.agent/schema-config-update
+     [:map
+      [:schema-registry {:optional true} [:maybe :ol.llx.agent/schema-registry]]
+      [:custom-message-schemas {:optional true} [:maybe :ol.llx.agent/custom-message-schemas]]]
+
      :ol.llx.agent/thinking-budgets
      [:map
       [:minimal {:optional true} :ol.llx/non-neg-int]
@@ -118,6 +128,7 @@
       :ol.llx.agent.command/set-model ;; change the LLM model
       :ol.llx.agent.command/set-thinking-level ;; set reasoning level (off, low, medium, high, etc.)
       :ol.llx.agent.command/set-tools ;; replace the available tool set
+      :ol.llx.agent.command/set-schema-config ;; replace the user-owned schema config
       :ol.llx.agent.command/set-steering-mode ;; set steering dequeue mode (all or one-at-a-time)
       :ol.llx.agent.command/set-follow-up-mode ;; set follow-up dequeue mode (all or one-at-a-time)
       :ol.llx.agent.command/replace-messages ;; replace the entire message history
@@ -176,6 +187,12 @@
       [:type [:= :ol.llx.agent.command/set-tools]]
       [:tools :ol.llx.agent/tools]]
 
+     :ol.llx.agent/command-set-schema-config
+     [:merge
+      :ol.llx.agent/schema-config
+      [:map
+       [:type [:= :ol.llx.agent.command/set-schema-config]]]]
+
      :ol.llx.agent/command-set-steering-mode
      [:map
       [:type [:= :ol.llx.agent.command/set-steering-mode]]
@@ -228,6 +245,7 @@
       [:ol.llx.agent.command/set-model :ol.llx.agent/command-set-model]
       [:ol.llx.agent.command/set-thinking-level :ol.llx.agent/command-set-thinking-level]
       [:ol.llx.agent.command/set-tools :ol.llx.agent/command-set-tools]
+      [:ol.llx.agent.command/set-schema-config :ol.llx.agent/command-set-schema-config]
       [:ol.llx.agent.command/set-steering-mode :ol.llx.agent/command-set-steering-mode]
       [:ol.llx.agent.command/set-follow-up-mode :ol.llx.agent/command-set-follow-up-mode]
       [:ol.llx.agent.command/replace-messages :ol.llx.agent/command-replace-messages]
@@ -491,7 +509,6 @@
       [:state_ :ol.llx.agent/state-atom]
       [:command> :ol.llx.agent/channel]
       [:events-mx> :ol.llx.agent/multiplexer]
-      [:schema-registry :ol.llx.agent/schema-registry]
       [:convert-to-llm :ol.llx/fn]
       [:transform-context {:optional true} [:maybe :ol.llx/fn]]
       [:stream-fn {:optional true} [:maybe :ol.llx/fn]]
@@ -543,6 +560,8 @@
       [:model {:default (ai/get-model :openai "gpt-5.2-codex")} :ol.llx/model]
       [:thinking-level {:default :off} :ol.llx.agent.loop/thinking-level]
       [:tools {:default []} :ol.llx.agent/tools]
+      [:schema-registry {:default {}} :ol.llx.agent/schema-registry]
+      [:custom-message-schemas {:default {}} :ol.llx.agent/custom-message-schemas]
       [:messages {:default []} :ol.llx.agent/messages]
       [:stream-message {:default nil} [:maybe :ol.llx.agent/message]]
       [:pending-tool-calls {:default []} [:vector :ol.llx.agent/tool-call]]
@@ -564,6 +583,12 @@
   (merge (m/default-schemas)
          (mu/schemas)
          (custom-schemas opts)))
+
+(defn derive-active-registry
+  [{:keys [schema-registry custom-message-schemas]}]
+  (mr/composite-registry
+   (registry {:custom-message-schemas custom-message-schemas})
+   (or schema-registry {})))
 
 (gr.reg/merge-schemas! (merge (mu/schemas)
                               (custom-schemas {})))

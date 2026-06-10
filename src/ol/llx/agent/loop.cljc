@@ -180,6 +180,12 @@
     :ol.llx.agent.command/set-tools
     [(assoc state :tools (:tools cmd)) []]
 
+    :ol.llx.agent.command/set-schema-config
+    [(assoc state
+            :schema-registry (:schema-registry cmd)
+            :custom-message-schemas (:custom-message-schemas cmd))
+     []]
+
     :ol.llx.agent.command/set-steering-mode
     [(assoc state :steering-mode (:mode cmd)) []]
 

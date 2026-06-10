@@ -13,6 +13,8 @@
    :model                   (ai/get-model :openai "gpt-5.2-codex")
    :thinking-level          :off
    :tools                   []
+   :schema-registry         {}
+   :custom-message-schemas  {}
    :messages                []
    :stream-message          nil
    :pending-tool-calls      []
@@ -49,6 +51,8 @@
           :model                   (ai/get-model :openai "gpt-5.2-codex")
           :thinking-level          :off
           :tools                   []
+          :schema-registry         {}
+          :custom-message-schemas  {}
           :messages                []
           :stream-message          nil
           :pending-tool-calls      []
@@ -99,6 +103,22 @@
                                           {:type  :ol.llx.agent.command/set-tools
                                            :tools tools})]
     (is (= tools (:tools state')))
+    (is (= [] sigs))))
+
+(deftest handle-command-set-schema-config-test
+  (let [schema-registry        {:my/message-notification
+                                [:map
+                                 [:role [:= :my-app/notification]]
+                                 [:text :string]
+                                 [:timestamp :int]]}
+        custom-message-schemas {:my-app/notification :my/message-notification}
+        [state' sigs]          (sut/handle-command
+                                (initial-state)
+                                {:type                   :ol.llx.agent.command/set-schema-config
+                                 :schema-registry        schema-registry
+                                 :custom-message-schemas custom-message-schemas})]
+    (is (= schema-registry (:schema-registry state')))
+    (is (= custom-message-schemas (:custom-message-schemas state')))
     (is (= [] sigs))))
 
 (deftest handle-command-set-steering-mode-test

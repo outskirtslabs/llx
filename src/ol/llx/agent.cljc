@@ -5,13 +5,12 @@
    and subscription management around `ol.llx.agent.loop` + `ol.llx.agent.fx`."
   (:refer-clojure :exclude [reset!])
   (:require
-   [com.fulcrologic.guardrails.malli.core :refer [>defn >defn-]]
+   [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [ol.llx.agent.driver :as driver]
    [ol.llx.agent.loop :as loop]
    [ol.llx.agent.schema :as schema]
    [malli.core :as m]
    [malli.transform :as mt]
-   [malli.registry :as mr]
    [promesa.core :as p]
    [promesa.exec.csp :as sp]))
 
@@ -21,16 +20,31 @@
 (def ^:private default-transformer
   (mt/default-value-transformer {::mt/add-optional-keys true}))
 
+(def ^:private base-schema-registry
+  (schema/registry {}))
+
+(defn- schema-config
+  [m]
+  (m/coerce :ol.llx.agent/schema-config
+            (select-keys m [:schema-registry :custom-message-schemas])
+            default-transformer
+            {:registry base-schema-registry}))
+
+(defn- live-schema-registry
+  [public-state]
+  (schema/derive-active-registry (schema-config public-state)))
+
 (defn create-initial-state
-  [schema-registry opts]
+  [schema-registry schema-config opts]
   (m/coerce :ol.llx.agent.loop/state
-            (select-keys opts
-                         [:system-prompt
-                          :model
-                          :thinking-level
-                          :tools
-                          :steering-mode
-                          :follow-up-mode])
+            (merge schema-config
+                   (select-keys opts
+                                [:system-prompt
+                                 :model
+                                 :thinking-level
+                                 :tools
+                                 :steering-mode
+                                 :follow-up-mode]))
             default-transformer
             {:registry schema-registry}))
 
@@ -44,39 +58,33 @@
                       (#{:user :assistant :tool-result} (:role message))))
             vec))
 
-(defn- agent-schema-registry [opts]
-  (let [base-registry (schema/registry {:custom-message-schemas (:custom-message-schemas opts)})]
-    (if-let [extra-registry (:schema-registry opts)]
-      (mr/composite-registry base-registry extra-registry)
-      base-registry)))
-
 (defn- runtime-handle
-  [schema-registry state opts]
-  (schema/validate! schema-registry :ol.llx.agent.loop/state state)
-  (let [command>     (sp/chan :buf (sp/sliding-buffer 64))
-        events-mx>   (sp/mult :buf (sp/sliding-buffer default-subscription-buffer-size))
-        optional-env (->> (select-keys opts [:session-id :get-api-key :thinking-budgets :max-retry-delay-ms])
-                          (remove (comp nil? val))
-                          (into {}))
-        env          (m/coerce :ol.llx.agent/env
-                               (merge
-                                {:state_            (atom {:public-state state
-                                                           :runtime      {:status      :running
-                                                                          :closing?    false
-                                                                          :next-run-id 1
-                                                                          :active-run  nil}})
-                                 :command>          command>
-                                 :events-mx>        events-mx>
-                                 :schema-registry   schema-registry
-                                 :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
-                                 :transform-context (:transform-context opts)
-                                 :stream-fn         (:stream-fn opts)
-                                 :abort-signal      (:abort-signal opts)}
-                                optional-env)
-                               default-transformer
-                               {:registry schema-registry})]
-    (driver/start! env)
-    env))
+  [state opts]
+  (let [schema-registry (live-schema-registry state)]
+    (schema/validate! schema-registry :ol.llx.agent.loop/state state)
+    (let [command>     (sp/chan :buf (sp/sliding-buffer 64))
+          events-mx>   (sp/mult :buf (sp/sliding-buffer default-subscription-buffer-size))
+          optional-env (->> (select-keys opts [:session-id :get-api-key :thinking-budgets :max-retry-delay-ms])
+                            (remove (comp nil? val))
+                            (into {}))
+          env          (m/coerce :ol.llx.agent/env
+                                 (merge
+                                  {:state_            (atom {:public-state state
+                                                             :runtime      {:status      :running
+                                                                            :closing?    false
+                                                                            :next-run-id 1
+                                                                            :active-run  nil}})
+                                   :command>          command>
+                                   :events-mx>        events-mx>
+                                   :convert-to-llm    (or (:convert-to-llm opts) default-convert-to-llm)
+                                   :transform-context (:transform-context opts)
+                                   :stream-fn         (:stream-fn opts)
+                                   :abort-signal      (:abort-signal opts)}
+                                  optional-env)
+                                 default-transformer
+                                 {:registry schema-registry})]
+      (driver/start! env)
+      env)))
 
 (>defn create-agent
        "Creates an agent runtime handle.
@@ -90,8 +98,8 @@
                           `:tool-result`
    - `:transform-context` optional context transform hook
    - `:stream-fn`         optional stream hook; resolved at callsite
-   - `:schema-registry`   extra Malli registry to be composed with the built-in schemas
-   - `:custom-message-schemas` map of message dispatch keyword to schema keyword in the active registry
+   - `:schema-registry`   user-owned extra Malli schemas
+   - `:custom-message-schemas` user-owned custom message dispatch map
    - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
    - `:system-prompt`, `:model`, `:thinking-level`
    - `:steering-mode`, `:follow-up-mode`
@@ -103,11 +111,11 @@
         (create-agent {}))
        ([opts]
         [:ol.llx.agent/create-agent-opts => :ol.llx.agent/env]
-        (let [schema-registry (agent-schema-registry opts)
+        (let [schema-config   (schema-config opts)
+              schema-registry (schema/derive-active-registry schema-config)
               opts'           (->> opts
                                    (schema/validate! schema-registry :ol.llx.agent/create-agent-opts))]
-          (runtime-handle schema-registry
-                          (create-initial-state schema-registry opts')
+          (runtime-handle (create-initial-state schema-registry schema-config opts')
                           opts'))))
 
 (defn rehydrate-agent
@@ -118,15 +126,12 @@
    - `:convert-to-llm` (optional; see [[create-agent]])
    - `:transform-context` (optional; see [[create-agent]])
    - `:stream-fn` (optional; see [[create-agent]])
-   - `:schema-registry` (optional; see [[create-agent]])
-   - `:custom-message-schemas` (optional; see [[create-agent]])
    - `:session-id`, `:get-api-key`, `:thinking-budgets`, `:max-retry-delay-ms`
   - `:tools`
   - `:abort-signal`."
   [state opts]
-  (let [schema-registry (agent-schema-registry opts)]
-    (runtime-handle schema-registry
-                    state
+  (let [schema-registry (live-schema-registry state)]
+    (runtime-handle state
                     (->> opts
                          (schema/validate! schema-registry :ol.llx.agent/create-agent-opts)))))
 
@@ -137,7 +142,7 @@
 
 (defn- validate-with-agent-registry!
   [agent schema-id data]
-  (schema/validate! (:schema-registry agent) schema-id data))
+  (schema/validate! (live-schema-registry (state agent)) schema-id data))
 
 (defn subscribe
   "Subscribes a channel to the agent event stream.
@@ -158,10 +163,12 @@
   (sp/close ch)
   nil)
 
-(>defn- dispatch!
-        [agent command]
-        [:ol.llx.agent/env :ol.llx.agent/command => :ol.llx/deferred]
-        (driver/run agent command))
+(defn- dispatch!
+  [agent command]
+  (let [schema-registry (live-schema-registry (state agent))]
+    (schema/validate! schema-registry :ol.llx.agent/env agent)
+    (schema/validate! schema-registry :ol.llx.agent/command command)
+    (driver/run agent command)))
 
 (defn- dispatch-queued-messages!
   [agent command-type messages]
@@ -236,6 +243,39 @@
 (defn set-tools
   [agent tools]
   (dispatch! agent {:type :ol.llx.agent.command/set-tools :tools tools}))
+
+(defn- next-schema-config
+  [current incoming]
+  (reduce (fn [acc key]
+            (let [value (get incoming key ::missing)]
+              (if (or (= ::missing value) (nil? value))
+                acc
+                (assoc acc key value))))
+          current
+          [:schema-registry :custom-message-schemas]))
+
+(defn set-schema-config
+  "Replaces the agent's user-owned schema configuration.
+
+  `schema-config-update` may include `:schema-registry` and/or
+  `:custom-message-schemas`. `nil` for either field preserves the current
+  user-owned value.
+
+  This setter is accepted in any phase. It affects future validation and
+  future tool execution only; already queued messages and already running
+  tool executions keep using the registry they started with."
+  [agent schema-config-update]
+  (let [incoming          (m/coerce :ol.llx.agent/schema-config-update
+                                    (or schema-config-update {})
+                                    default-transformer
+                                    {:registry base-schema-registry})
+        current-config    (schema-config (state agent))
+        next-config       (next-schema-config current-config incoming)
+        schema-registry   (schema/derive-active-registry next-config)
+        next-public-state (merge (state agent) next-config)]
+    (schema/validate! schema-registry :ol.llx.agent/schema-config next-config)
+    (schema/validate! schema-registry :ol.llx.agent.loop/state next-public-state)
+    (dispatch! agent (assoc next-config :type :ol.llx.agent.command/set-schema-config))))
 
 (defn set-steering-mode
   [agent mode]
