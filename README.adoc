@@ -37,7 +37,7 @@ Only git dep usage will be supported for now while we are in the experimental ph
 ;; deps.edn
 {:deps {com.outskirtslabs/llx
         {:git/url "https://github.com/outskirtslabs/llx.git"
-         :git/sha "39ecaa7d63d21cb9779f117c3bb0a7ca3c23890e"}}}
+         :git/sha "ea558cd4fbc9518cd7a23bddc380c303fed549d1"}}}
 ----
 
 == Quick Start
