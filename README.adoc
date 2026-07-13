@@ -6,6 +6,7 @@ ____
 
 image:https://img.shields.io/badge/doc-outskirtslabs-orange.svg[doc,link=https://docs.outskirtslabs.com/ol.llx/next/]
 image:https://img.shields.io/badge/status-experimental-orange.svg[status: experimental,link=https://docs.outskirtslabs.com/open-source-vital-signs#experimental]
+image:https://ci.outskirtslabs.com/repos/github/outskirtslabs/llx/badge.svg[alt=nixbot,link=https://ci.outskirtslabs.com/repos/github/outskirtslabs/llx]
 
 == ol.llx.ai
 
