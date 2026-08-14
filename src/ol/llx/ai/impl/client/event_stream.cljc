@@ -87,7 +87,9 @@
               p/delay
               {:call-id            (:call/id env)
                :provider           (:provider model)
-               :max-retry-delay-ms (:max-retry-delay-ms request-opts)})
+               :max-retry-delay-ms (:max-retry-delay-ms request-opts)
+               :timeout-ms         (:timeout-ms request-opts)
+               :now-ms             (:clock/now-ms env)})
              (p/then (fn [response]
                        (schema/assert-valid! :ol.llx/http-response-map response))))))
 

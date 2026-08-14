@@ -65,13 +65,15 @@
                              :request-id request-id)))
 
 (defn timeout-error
-  [provider message & {:keys [timeout-ms request-id]}]
+  [provider message & {:keys [timeout-ms request-id context]}]
   (ex-info message
            (build-error-data :ol.llx/timeout message
                              :provider provider
                              :recoverable? true
                              :request-id request-id
-                             :context (when timeout-ms {:timeout-ms timeout-ms}))))
+                             :context (when (or timeout-ms context)
+                                        (cond-> (or context {})
+                                          timeout-ms (assoc :timeout-ms timeout-ms))))))
 
 (defn connection-error
   [provider message & {:keys [request-id]}]
@@ -139,6 +141,32 @@
                                :recoverable? false
                                :context {:requested-delay-ms requested-delay-ms
                                          :max-delay-ms       max-delay-ms}))))
+
+(defn- retry-wait-timeout-error
+  [provider timeout-ms attempt delay-ms cause]
+  (let [cause-data    (ex-data cause)
+        provider      (or provider (:provider cause-data))
+        provider-name (if provider (name provider) "unknown provider")
+        cause-type    (:type cause-data)
+        cause-name    (if cause-type
+                        (str/replace (name cause-type) #"-error$" "")
+                        "unknown")
+        context       (cond-> {:phase      :retry-wait
+                               :attempt    (inc attempt)
+                               :delay-ms   delay-ms
+                               :cause-type cause-type}
+                        (:http-status cause-data)
+                        (assoc :http-status (:http-status cause-data))
+
+                        (some? (:retry-after cause-data))
+                        (assoc :retry-after (:retry-after cause-data)))]
+    (timeout-error provider
+                   (str "Call timed out after " timeout-ms
+                        "ms while waiting to retry " provider-name
+                        " after a " cause-name " error.")
+                   :timeout-ms timeout-ms
+                   :request-id (:request-id cause-data)
+                   :context context)))
 
 (defn content-filter
   [provider message & {:keys [provider-code]}]
@@ -334,44 +362,70 @@
 (defn retry-loop-async
   ([f max-retries sleep-fn]
    (retry-loop-async f max-retries sleep-fn {}))
-  ([f max-retries sleep-fn {:keys [call-id provider max-retry-delay-ms]}]
-   (letfn [(sleep! [delay-ms]
-             (let [v (sleep-fn delay-ms)]
-               (if (p/deferred? v)
-                 v
-                 (p/resolved v))))
-           (step [attempt]
-             (-> (p/resolved nil)
-                 (p/then (fn [_] (f)))
-                 (p/catch
-                  (fn [ex]
-                    (if (should-retry? ex :max-retries max-retries
-                                       :current-retry attempt)
-                      (let [delay-ms (retry-delay-ms ex attempt)
-                            exd      (ex-data ex)
-                            provider (or provider (:provider exd))
-                            capped?  (and (some? max-retry-delay-ms)
-                                          (pos? max-retry-delay-ms)
-                                          (some? (:retry-after exd))
-                                          (> delay-ms max-retry-delay-ms))]
-                        (if capped?
-                          (p/rejected
-                           (retry-delay-exceeded provider delay-ms max-retry-delay-ms
-                                                 :request-id (:request-id exd)))
-                          (do
-                            (trove/log! {:level :debug
-                                         :id    :ol.llx.obs/retry-scheduled
-                                         :data  {:call-id      call-id
-                                                 :attempt      attempt
-                                                 :next-attempt (inc attempt)
-                                                 :max-retries  max-retries
-                                                 :delay-ms     delay-ms
-                                                 :error-type   (:type exd)
-                                                 :provider     provider
-                                                 :request-id   (:request-id exd)
-                                                 :retry-after  (:retry-after exd)}})
-                            (-> (sleep! delay-ms)
-                                (p/then (fn [_]
-                                          (step (inc attempt))))))))
-                      (p/rejected ex))))))]
-     (step 0))))
+  ([f max-retries sleep-fn
+    {:keys [call-id provider max-retry-delay-ms timeout-ms now-ms]}]
+   (let [now-ms      (or now-ms
+                         #?(:clj  #(System/currentTimeMillis)
+                            :cljs #(.now js/Date)))
+         deadline-ms (when (some? timeout-ms)
+                       (+ (long (now-ms)) timeout-ms))]
+     (letfn [(sleep! [delay-ms]
+               (let [v (sleep-fn delay-ms)]
+                 (if (p/deferred? v)
+                   v
+                   (p/resolved v))))
+             (attempt! []
+               (-> (p/resolved nil)
+                   (p/then (fn [_] (f)))
+                   (p/then (fn [value] [:ok value]))
+                   (p/catch (fn [ex] [:error ex]))))
+             (step [attempt]
+               (-> (attempt!)
+                   (p/then
+                    (fn [[status value]]
+                      (if (= :ok status)
+                        value
+                        (let [ex value]
+                          (if (should-retry? ex :max-retries max-retries
+                                             :current-retry attempt)
+                            (let [delay-ms       (retry-delay-ms ex attempt)
+                                  exd            (ex-data ex)
+                                  provider       (or provider (:provider exd))
+                                  remaining-ms   (when deadline-ms
+                                                   (- deadline-ms (long (now-ms))))
+                                  retry-timeout? (and (some? remaining-ms)
+                                                      (<= remaining-ms delay-ms))
+                                  wait-ms        (if retry-timeout?
+                                                   (max 0 remaining-ms)
+                                                   delay-ms)
+                                  capped?        (and (some? max-retry-delay-ms)
+                                                      (pos? max-retry-delay-ms)
+                                                      (some? (:retry-after exd))
+                                                      (> delay-ms max-retry-delay-ms))]
+                              (when capped?
+                                (throw
+                                 (retry-delay-exceeded
+                                  provider delay-ms max-retry-delay-ms
+                                  :request-id (:request-id exd))))
+                              (trove/log! {:level :debug
+                                           :id    :ol.llx.obs/retry-scheduled
+                                           :data  {:call-id      call-id
+                                                   :attempt      attempt
+                                                   :next-attempt (inc attempt)
+                                                   :max-retries  max-retries
+                                                   :delay-ms     delay-ms
+                                                   :error-type   (:type exd)
+                                                   :provider     provider
+                                                   :request-id   (:request-id exd)
+                                                   :retry-after  (:retry-after exd)
+                                                   :timeout-ms   timeout-ms}})
+                              (-> (sleep! wait-ms)
+                                  (p/then
+                                   (fn [_]
+                                     (if retry-timeout?
+                                       (throw
+                                        (retry-wait-timeout-error
+                                         provider timeout-ms attempt delay-ms ex))
+                                       (step (inc attempt)))))))
+                            (throw ex))))))))]
+       (step 0)))))

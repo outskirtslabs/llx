@@ -368,6 +368,116 @@
                                     (ex-data ex)))
                              (done))))))))
 
+(deftest retry-loop-async-times-out-while-waiting-to-retry
+  (letfn [(run-case []
+            (let [call-count (atom 0)
+                  sleep-ms   (atom [])]
+              {:call-count call-count
+               :sleep-ms   sleep-ms
+               :deferred   (sut/retry-loop-async
+                            (fn []
+                              (swap! call-count inc)
+                              (throw (sut/rate-limit "google" "rate limit"
+                                                     :retry-after 60)))
+                            2
+                            (fn [ms]
+                              (swap! sleep-ms conj ms)
+                              (p/resolved nil))
+                            {:provider   "google"
+                             :timeout-ms 50000
+                             :now-ms     (constantly 1000)})}))
+          (assert-timeout! [ex call-count sleep-ms]
+            (is (= {:type         :ol.llx/timeout
+                    :message      "Call timed out after 50000ms while waiting to retry google after a rate-limit error."
+                    :recoverable? true
+                    :provider     "google"
+                    :context      {:timeout-ms  50000
+                                   :phase       :retry-wait
+                                   :attempt     1
+                                   :delay-ms    60000
+                                   :cause-type  :ol.llx/rate-limit
+                                   :http-status 429
+                                   :retry-after 60}}
+                   (ex-data ex)))
+            (is (= {:call-count 1
+                    :sleep-ms   [50000]}
+                   {:call-count @call-count
+                    :sleep-ms   @sleep-ms})))]
+    #?(:clj
+       (let [{:keys [call-count sleep-ms deferred]} (run-case)
+             ex                                     (try
+                                                      (util/await! deferred)
+                                                      nil
+                                                      (catch clojure.lang.ExceptionInfo e
+                                                        e))]
+         (assert-timeout! ex call-count sleep-ms))
+       :cljs
+       (async done
+              (let [{:keys [call-count sleep-ms deferred]} (run-case)]
+                (-> deferred
+                    (p/then (fn [_]
+                              (is nil "expected retry timeout rejection")
+                              (done)))
+                    (p/catch (fn [ex]
+                               (assert-timeout! ex call-count sleep-ms)
+                               (done)))))))))
+
+(deftest retry-loop-async-uses-one-timeout-budget-across-retries
+  (letfn [(run-case []
+            (let [clock-ms   (atom 0)
+                  call-count (atom 0)
+                  sleep-ms   (atom [])]
+              {:clock-ms   clock-ms
+               :call-count call-count
+               :sleep-ms   sleep-ms
+               :deferred   (sut/retry-loop-async
+                            (fn []
+                              (swap! call-count inc)
+                              (throw (sut/connection-error "google" "connection failed")))
+                            3
+                            (fn [ms]
+                              (swap! sleep-ms conj ms)
+                              (swap! clock-ms + ms)
+                              (p/resolved nil))
+                            {:provider   "google"
+                             :timeout-ms 2500
+                             :now-ms     #(deref clock-ms)})}))
+          (assert-timeout! [ex clock-ms call-count sleep-ms]
+            (is (= {:type         :ol.llx/timeout
+                    :message      "Call timed out after 2500ms while waiting to retry google after a connection error."
+                    :recoverable? true
+                    :provider     "google"
+                    :context      {:timeout-ms 2500
+                                   :phase      :retry-wait
+                                   :attempt    2
+                                   :delay-ms   2000
+                                   :cause-type :ol.llx/connection-error}}
+                   (ex-data ex)))
+            (is (= {:call-count 2
+                    :sleep-ms   [1000 1500]
+                    :clock-ms   2500}
+                   {:call-count @call-count
+                    :sleep-ms   @sleep-ms
+                    :clock-ms   @clock-ms})))]
+    #?(:clj
+       (let [{:keys [clock-ms call-count sleep-ms deferred]} (run-case)
+             ex                                              (try
+                                                               (util/await! deferred)
+                                                               nil
+                                                               (catch clojure.lang.ExceptionInfo e
+                                                                 e))]
+         (assert-timeout! ex clock-ms call-count sleep-ms))
+       :cljs
+       (async done
+              (let [{:keys [clock-ms call-count sleep-ms deferred]} (run-case)]
+                (-> deferred
+                    (p/then (fn [_]
+                              (is nil "expected retry timeout rejection")
+                              (done)))
+                    (p/catch (fn [ex]
+                               (assert-timeout! ex clock-ms call-count sleep-ms)
+                               (done)))))))))
+
 (deftest retry-loop-async-emits-retry-scheduled-trove-signal
   #?(:clj
      (util/with-captured-logs!

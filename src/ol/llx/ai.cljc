@@ -44,6 +44,7 @@
   | `:headers`           | Additional provider request headers.                        |
   | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.    |
   | `:max-retry-delay-ms`| Optional cap for server-requested retry delays.             |
+  | `:timeout-ms`        | Maximum request time, including retry waits.                |
   | `:metadata`          | Request metadata map forwarded to adapter payload builders. |
   | `:registry`          | Per-call adapter registry override.                         |
   | `:max-retries`       | Retry count for transient failures (default `2`).           |
@@ -78,6 +79,7 @@
   | `:headers`           | Additional provider request headers.                       |
   | `:signal`            | Abort/cancel signal forwarded to runtime/provider layer.   |
   | `:max-retry-delay-ms`| Optional cap for server-requested retry delays.            |
+  | `:timeout-ms`        | Maximum request time, including retry waits.               |
   | `:metadata`          | Request metadata map forwarded to adapter payload builders.|
   | `:registry`          | Per-call adapter registry override.                        |
   | `:max-retries`       | Retry count for transient failures (default `2`).          |
@@ -117,6 +119,7 @@
   | `:headers`          | Additional provider request headers.                              |
   | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
   | `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+  | `:timeout-ms`       | Maximum request time, including retry waits.                      |
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 
@@ -150,6 +153,7 @@
   | `:headers`          | Additional provider request headers.                              |
   | `:signal`           | Abort/cancel signal forwarded to runtime/provider layer.          |
   | `:max-retry-delay-ms` | Optional cap for server-requested retry delays.               |
+  | `:timeout-ms`       | Maximum request time, including retry waits.                      |
   | `:metadata`         | Request metadata map forwarded to adapter payload builders.       |
   | `:registry`         | Per-call adapter registry override.                               |
 

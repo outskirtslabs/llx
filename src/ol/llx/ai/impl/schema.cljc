@@ -369,6 +369,7 @@
     [:headers {:optional true} [:map-of :string :string]]
     [:signal {:optional true} :any]
     [:max-retry-delay-ms {:optional true} :ol.llx/non-neg-int]
+    [:timeout-ms {:optional true} :ol.llx/non-neg-int]
     [:metadata {:optional true} :ol.llx/metadata-map]
     [:registry {:optional true} :any]]
 
@@ -392,6 +393,7 @@
     [:max-output-tokens {:optional true} :ol.llx/non-neg-int]
     [:signal {:optional true} :any]
     [:max-retry-delay-ms {:optional true} :ol.llx/non-neg-int]
+    [:timeout-ms {:optional true} :ol.llx/non-neg-int]
     [:metadata {:optional true} :ol.llx/metadata-map]
     [:registry {:optional true} :any]
     [:max-retries {:optional true} :ol.llx/non-neg-int]]

@@ -157,12 +157,14 @@
     (is (= {:max-output-tokens  88
             :session-id         "session-1"
             :thinking-budgets   {:high 1234}
-            :max-retry-delay-ms 2500}
+            :max-retry-delay-ms 2500
+            :timeout-ms         55000}
            (sut/unified-opts->request-opts model
                                            {:max-tokens         88
                                             :session-id         "session-1"
                                             :thinking-budgets   {:high 1234}
-                                            :max-retry-delay-ms 2500})))
+                                            :max-retry-delay-ms 2500
+                                            :timeout-ms         55000})))
     (is (= {:max-output-tokens 32000}
            (sut/unified-opts->request-opts model {})))
     (is (= {:max-output-tokens 77
@@ -290,6 +292,53 @@
                                          :http-status  401}
                                         (ex-data ex))))
                                done))))
+
+(deftest complete-times-out-while-waiting-to-retry
+  (letfn [(run-case []
+            (let [call-count (atom 0)
+                  env        (stub-env
+                              (fn [_request]
+                                (swap! call-count inc)
+                                {:status  429
+                                 :headers {"retry-after" "60"}
+                                 :body    (util/json-write
+                                           {:error {:message "rate limit"
+                                                    :type    "rate_limit"}})}))]
+              {:call-count call-count
+               :deferred   (sut/complete* env base-model
+                                          {:messages [{:role      :user
+                                                       :content   "hi"
+                                                       :timestamp 1}]}
+                                          {:api-key    "test-key"
+                                           :timeout-ms 0})}))
+          (assert-timeout! [ex call-count]
+            (is (= {:type         :ol.llx/timeout
+                    :message      "Call timed out after 0ms while waiting to retry openai after a rate-limit error."
+                    :recoverable? true
+                    :provider     :openai
+                    :context      {:timeout-ms  0
+                                   :phase       :retry-wait
+                                   :attempt     1
+                                   :delay-ms    60000
+                                   :cause-type  :ol.llx/rate-limit
+                                   :http-status 429
+                                   :retry-after 60.0}}
+                   (ex-data ex)))
+            (is (= 1 @call-count)))]
+    #?(:clj
+       (let [{:keys [call-count deferred]} (run-case)
+             ex                            (try
+                                             (util/await! deferred)
+                                             nil
+                                             (catch clojure.lang.ExceptionInfo e
+                                               e))]
+         (assert-timeout! ex call-count))
+       :cljs
+       (util/async done
+                   (let [{:keys [call-count deferred]} (run-case)]
+                     (rejects-with! deferred
+                                    #(assert-timeout! % call-count)
+                                    done))))))
 
 (deftest complete-emits-lifecycle-trove-signals
   (util/async done

@@ -128,5 +128,5 @@
 (deftest ^:ol.llx/google live-image-tool-result-google
   (util/async done
               (util/run-live-async!
-               (run-image-suite!* models/google {})
+               (run-image-suite!* models/google {:timeout-ms 45000})
                done)))

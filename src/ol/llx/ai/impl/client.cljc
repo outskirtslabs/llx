@@ -50,6 +50,7 @@
    :headers
    :signal
    :max-retry-delay-ms
+   :timeout-ms
    :metadata
    :registry])
 
@@ -332,7 +333,9 @@
            (-> (errors/retry-loop-async do-request max-retries p/delay
                                         {:call-id            (:call/id call-env)
                                          :provider           (:provider model)
-                                         :max-retry-delay-ms (:max-retry-delay-ms request-opts)})
+                                         :max-retry-delay-ms (:max-retry-delay-ms request-opts)
+                                         :timeout-ms         (:timeout-ms request-opts)
+                                         :now-ms             (:clock/now-ms call-env)})
                (p/then (fn [response]
                          (let [{:keys [assistant-message]} (schema/assert-valid!
                                                             :ol.llx/runtime-finalize-result

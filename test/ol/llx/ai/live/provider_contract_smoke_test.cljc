@@ -262,9 +262,11 @@
   (util/async done
               (util/run-live-async!
                (run-provider-suite!* {:model         models/google
-                                      :opts          {:max-output-tokens 256}
+                                      :opts          {:max-output-tokens 256
+                                                      :timeout-ms        45000}
                                       :thinking-opts {:max-output-tokens 2048
-                                                      :reasoning         {:level :high}}})
+                                                      :reasoning         {:level :high}
+                                                      :timeout-ms        45000}})
                done)))
 
 (deftest ^:ol.llx/openai live-contract-openai-completions

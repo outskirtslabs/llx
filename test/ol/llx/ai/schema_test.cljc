@@ -160,6 +160,7 @@
                        :headers            {"x-trace-id" "abc"}
                        :signal             ::sig
                        :max-retry-delay-ms 2500
+                       :timeout-ms         55000
                        :metadata           {:request-id "abc"}}
         provider-opts {:tools             [valid-tool]
                        :tool-choice       :auto
@@ -170,6 +171,7 @@
                        :top-p             0.95
                        :max-output-tokens 1024
                        :signal            ::sig
+                       :timeout-ms        55000
                        :metadata          {:request-id "abc"}
                        :provider-extra    true}
         input-schema  [:map
