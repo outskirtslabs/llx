@@ -15,19 +15,30 @@
 
 (defn- handoff-check!*
   [model-a opts-a prompt-a model-b opts-b]
-  (let [user1 {:role      :user
-               :content   prompt-a
-               :timestamp 1}
-        user2 {:role      :user
-               :content   "Now say hi and mention the previous sentence briefly."
-               :timestamp 2}]
-    (p/let [step-1 (client/complete* env model-a {:messages [user1]} opts-a)
-            step-2 (client/complete* env model-b {:messages [user1 step-1 user2]} opts-b)]
-      (is (not= :error (:stop-reason step-1)))
-      (is (not= :error (:stop-reason step-2)))
-      (is (seq (:content step-2)))
-      (is (#{:stop :length :tool-use} (:stop-reason step-2)))
-      true)))
+  (let [user1   {:role      :user
+                 :content   prompt-a
+                 :timestamp 1}
+        user2   {:role      :user
+                 :content   "Now say hi and mention the previous sentence briefly."
+                 :timestamp 2}
+        result* (p/let [step-1 (client/complete* env model-a {:messages [user1]} opts-a)
+                        step-2 (client/complete* env model-b {:messages [user1 step-1 user2]} opts-b)]
+                  [step-1 step-2])
+        check!  (fn [[step-1 step-2]]
+                  (is (not= :error (:stop-reason step-1)))
+                  (is (not= :error (:stop-reason step-2)))
+                  (is (seq (:content step-2)))
+                  (is (#{:stop :length :tool-use} (:stop-reason step-2)))
+                  true)]
+    #?(:clj
+       (let [result (util/await! result* 60000 ::timeout)]
+         (when (= ::timeout result)
+           (throw (ex-info "Handoff test timed out waiting for provider responses."
+                           {:type       :ol.llx/test-timeout
+                            :timeout-ms 60000})))
+         (p/resolved (check! result)))
+       :cljs
+       (p/then result* check!))))
 
 (deftest ^{:ol.llx/openai true :ol.llx/anthropic true} live-handoff-openai-to-anthropic
   (util/async done
@@ -102,7 +113,8 @@
               (util/run-live-async!
                (handoff-check!*
                 models/google {:max-output-tokens 96
-                               :reasoning         {:level :high :effort :high}}
+                               :reasoning         {:level :high :effort :high}
+                               :timeout-ms        45000}
                 "Give one short sentence about Clojure protocols."
                 models/mistral {:max-output-tokens 128})
                done)))
