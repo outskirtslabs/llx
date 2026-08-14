@@ -10,12 +10,13 @@
      - `:emit-event` — publish an event to subscribers
      - `:reject`     — report invalid operation state
 
-   Signal-producing — async, return a channel of signals.
+   Signal-producing — async, return an effect handle.
      - `:call-llm`     — perform inference and stream `llm-*` signals
      - `:execute-tool` — execute a tool and emit `tool-*` signals
 
-   Signal-producing effects return promesa CSP channels consumed by
-   `ol.llx.agent.driver/run`."
+   Signal-producing effects return maps containing a `:signals>` promesa CSP
+   channel and a `:cancel!` function. `ol.llx.agent.driver/run` consumes the
+   channel and retains the cancellation function."
   (:require
    [com.fulcrologic.guardrails.malli.core :refer [>defn]]
    [ol.llx.agent.fx.inference :as inference]
@@ -40,11 +41,11 @@
    Execute the side effect synchronously. Return `nil`.
 
    Signal-producing effects (`:call-llm`, `:execute-tool`):
-   Start the async work and return a promesa CSP channel that will
-   emit signal maps. The channel closes when the effect is complete.
-   The driver consumes the channel and steps each signal through
-   `loop/step`. The interpreter must not call `step` or mutate the
-   state atom.
+   Start the async work and return an effect handle containing a `:signals>`
+   promesa CSP channel and a `:cancel!` function. The channel closes when the
+   effect completes. The driver consumes the channel and retains the handle
+   so it can cancel active work. The interpreter must not call `step` or
+   mutate the state atom.
 
    `env` carries runtime dependencies:
      - `:state_`            — atom holding current agent state (read-only for fx)

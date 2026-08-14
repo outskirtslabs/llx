@@ -25,6 +25,8 @@
    :model                   model
    :thinking-level          :off
    :tools                   []
+   :schema-registry         {}
+   :custom-message-schemas  {}
    :messages                []
    :stream-message          nil
    :pending-tool-calls      []
@@ -33,6 +35,18 @@
    :follow-up-queue         (empty-queue)
    :steering-mode           :one-at-a-time
    :follow-up-mode          :one-at-a-time})
+
+(defn- runtime-state
+  [model]
+  {:public-state (agent-state model)
+   :runtime      {:status      :running
+                  :closing?    false
+                  :next-run-id 2
+                  :active-run  {:id             1
+                                :signal         nil
+                                :cancel!        (fn [] true)
+                                :cancelled?     (constantly false)
+                                :effect-handles {}}}})
 
 (defn- collect-signals*
   [ch timeout-ms]
@@ -54,7 +68,7 @@
 (deftest ^:ol.llx/openai live-fx-call-llm-openai
   (util/async done
               (util/run-live-async!
-               (let [env    {:state_          (atom (agent-state models/openai-completions))
+               (let [env    {:state_          (atom (runtime-state models/openai-completions))
                              :command>        (sp/chan)
                              :events-mx>      (sp/mult :buf (sp/sliding-buffer 16))
                              :schema-registry (schema/registry {})
@@ -70,7 +84,7 @@
                                          :content   "Reply with exactly: llx agent fx live ok"
                                          :timestamp 1}]}
                      out    (fx/execute-fx env effect)]
-                 (-> (collect-signals* out 90000)
+                 (-> (collect-signals* (:signals> out) 90000)
                      (p/then (fn [signals]
                                (is (seq signals))
                                (let [terminal (last signals)]
