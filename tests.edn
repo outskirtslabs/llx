@@ -1,43 +1,38 @@
 #kaocha/v1
- {:bindings
-  {kaocha.stacktrace/*stacktrace-stop-list* ["kaocha.runner"
-                                             "kaocha.plugin.capture_output"
-                                             "kaocha.testable"]}
-  :kaocha/reporter
-  [kaocha.report/documentation]
+ {:bindings                           {kaocha.stacktrace/*stacktrace-stop-list* ["kaocha.runner"
+                                                                                 "kaocha.plugin.capture_output"
+                                                                                 "kaocha.testable"]
+                                       kaocha.stacktrace/*stacktrace-filters*   ["java.lang." "java.util.concurrent."
+                                                                                 "clojure.test$" "clojure.lang." "clojure.core" "clojure.main"
+                                                                                 "orchestra." "kaocha."]}
+  :plugins                            [:kaocha.plugin.alpha/info
+                                       :kaocha.plugin/randomize
+                                       :kaocha.plugin/filter
+                                       :kaocha.plugin/capture-output
+                                      ;; :kaocha-retry.plugin/retry
+                                       :kaocha.plugin/profiling]
 
-  :plugins
-  [:kaocha.plugin.alpha/info
-   :kaocha.plugin/randomize
-   :kaocha.plugin/filter
-   :kaocha.plugin/capture-output
-   :kaocha.plugin/profiling
-   ;; :kaocha-retry.plugin/retry
-   ]
+  :tests                              [{:id          :unit
+                                        :test-paths  ["test"]
+                                        :ns-patterns ["^(?!(ol\\.llx\\.[^.]+\\.live\\.)).*-test$"]}
+                                       {:id          :live
+                                        :test-paths  ["test"]
+                                        :ns-patterns ["^ol\\.llx\\.[^.]+\\.live\\..*-test$"]}
+                                       {:id                        :cljs
+                                        :type                      :kaocha.type/cljs2
+                                        :test-paths                ["test"]
+                                        :ns-patterns               ["^(?!(ol\\.llx\\.[^.]+\\.live\\.)).*-test$"]
+                                        :kaocha.cljs2/clients-hook ol.llx.kaocha-hooks/cljs2-clients-hook
+                                        :kaocha.cljs2/timeout      60000}
+                                       {:id                        :cljs-live
+                                        :type                      :kaocha.type/cljs2
+                                        :test-paths                ["test"]
+                                        :ns-patterns               ["^ol\\.llx\\.[^.]+\\.live\\..*-test$"]
+                                        :kaocha.cljs2/clients-hook ol.llx.kaocha-hooks/cljs2-clients-hook
+                                        :kaocha.cljs2/timeout      60000}]
 
-  ;; use --profiling to enable
-  :kaocha.plugin.profiling/profiling?                                       false
-
-  ;; :kaocha-retry.plugin/retry?                                               false
-  ;; :kaocha-retry.plugin/max-retries                                          3
-  ;; :kaocha-retry.plugin/retrying-tests-regexes                               ["ol\\.llx\\.[^.]+\\.live\\."]
-
-  :tests
-  [{:id          :unit
-    :test-paths  ["test"]
-    :ns-patterns ["^(?!(ol\\.llx\\.[^.]+\\.live\\.)).*-test$"]}
-   {:id          :live
-    :test-paths  ["test"]
-    :ns-patterns ["^ol\\.llx\\.[^.]+\\.live\\..*-test$"]}
-   {:id                        :cljs
-    :type                      :kaocha.type/cljs2
-    :test-paths                ["test"]
-    :ns-patterns               ["^(?!(ol\\.llx\\.[^.]+\\.live\\.)).*-test$"]
-    :kaocha.cljs2/clients-hook ol.llx.kaocha-hooks/cljs2-clients-hook
-    :kaocha.cljs2/timeout      60000}
-   {:id                        :cljs-live
-    :type                      :kaocha.type/cljs2
-    :test-paths                ["test"]
-    :ns-patterns               ["^ol\\.llx\\.[^.]+\\.live\\..*-test$"]
-    :kaocha.cljs2/clients-hook ol.llx.kaocha-hooks/cljs2-clients-hook
-    :kaocha.cljs2/timeout      60000}]}
+  :kaocha.plugin.profiling/profiling? false ;; use --profiling to enable
+ ;; :kaocha-retry.plugin/retry?                                               false
+ ;; :kaocha-retry.plugin/max-retries                                          3
+ ;; :kaocha-retry.plugin/retrying-tests-regexes                               ["ol\\.llx\\.[^.]+\\.live\\."]
+  }

@@ -6,7 +6,7 @@
 #?(:clj (set! *warn-on-reflection* true))
 
 (def openai-responses
-  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_MODEL") "gpt-5-mini")
+  {:id             (or (live-env/get-env "LLX_LIVE_OPENAI_RESPONSES_MODEL") "gpt-5.4-mini")
    :name           "OpenAI Responses"
    :provider       :openai
    :api            :openai-responses
@@ -50,7 +50,7 @@
    :capabilities   {:reasoning? true :input #{:text :image}}})
 
 (def google
-  {:id             (or (live-env/get-env "LLX_LIVE_GOOGLE_MODEL") "gemini-2.5-flash")
+  {:id             (or (live-env/get-env "LLX_LIVE_GOOGLE_MODEL") "gemini-flash-latest")
    :name           "Google"
    :provider       :google
    :api            :google-generative-ai
@@ -83,8 +83,8 @@
    :capabilities   {:reasoning? false :input #{:text :image}}})
 
 (def ollama
-  {:id             (or (live-env/get-env "LLX_LIVE_OLLAMA_MODEL") "gpt-oss:20b")
-   :name           "Ollama GPT-OSS 20B"
+  {:id             (or (live-env/get-env "LLX_LIVE_OLLAMA_MODEL") "qwen3.5:9b")
+   :name           "Ollama qwen3.5:9b"
    :provider       :openai-compatible
    :api            :openai-completions
    :base-url       (or (live-env/get-env "LLX_LIVE_OLLAMA_BASE_URL") "http://localhost:11434/v1")
